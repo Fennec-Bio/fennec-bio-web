@@ -14,7 +14,7 @@ export default function AuthSync() {
     const check = async () => {
       try {
         const token = await getToken()
-        const res = await fetch('http://localhost:8000/api/check-account/', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/check-account/`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) {

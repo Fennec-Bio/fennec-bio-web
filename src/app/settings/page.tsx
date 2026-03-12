@@ -43,7 +43,7 @@ export default function Settings() {
     const fetchMe = async () => {
       try {
         const token = await getToken()
-        const res = await fetch('http://localhost:8000/api/me/', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me/`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) {
@@ -85,7 +85,7 @@ export default function Settings() {
 
     try {
       const token = await getToken()
-      const res = await fetch('http://localhost:8000/api/remove-member/', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/remove-member/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

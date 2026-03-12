@@ -27,7 +27,7 @@ export default function NewProject() {
 
     try {
       const token = await getToken()
-      const res = await fetch('http://localhost:8000/api/projects/create/', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/create/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

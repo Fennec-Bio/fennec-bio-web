@@ -24,7 +24,7 @@ export default function CompleteSignup() {
 
     try {
       const token = await getToken()
-      const res = await fetch('http://localhost:8000/api/complete-signup/', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/complete-signup/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

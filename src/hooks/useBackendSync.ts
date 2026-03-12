@@ -18,7 +18,7 @@ export function useBackendSync() {
     const sync = async () => {
       try {
         const token = await getToken()
-        await fetch('http://localhost:8000/api/me/', {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me/`, {
           headers: { Authorization: `Bearer ${token}` },
         })
       } catch {

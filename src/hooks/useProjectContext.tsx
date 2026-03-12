@@ -38,7 +38,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     if (!isSignedIn) return
     try {
       const token = await getToken()
-      const res = await fetch('http://localhost:8000/api/projects/', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
