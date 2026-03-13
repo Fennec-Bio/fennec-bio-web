@@ -5,12 +5,12 @@ import { usePathname } from 'next/navigation'
 import { useAuth, useClerk } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 
-interface NavBarProps {
+interface NavbarProps {
   onMenuToggle?: () => void
   isMenuOpen?: boolean
 }
 
-export const NavBar = ({ onMenuToggle, isMenuOpen }: NavBarProps) => {
+export const Navbar = ({ onMenuToggle, isMenuOpen }: NavbarProps) => {
   const [navDropdownOpen, setNavDropdownOpen] = useState(false)
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const pathname = usePathname()
@@ -19,7 +19,7 @@ export const NavBar = ({ onMenuToggle, isMenuOpen }: NavBarProps) => {
   const { projects, activeProject, setActiveProjectId } = useProjectContext()
 
   // Don't show navbar on public pages
-  const isPublicPage = pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname === '/no-org' || pathname === '/auth-sync' || pathname === '/complete-signup'
+  const isPublicPage = pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname === '/no-org' || pathname === '/auth-sync'
   if (isPublicPage) return null
 
   const navItems = [
@@ -171,4 +171,4 @@ export const NavBar = ({ onMenuToggle, isMenuOpen }: NavBarProps) => {
   )
 }
 
-export default NavBar
+export default Navbar
