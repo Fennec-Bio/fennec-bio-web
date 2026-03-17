@@ -219,13 +219,15 @@ export default function Settings() {
                 ))
               )}
             </select>
-            <button
-              onClick={() => router.push('/settings/new-project')}
-              className="px-4 py-2 text-sm font-medium text-white rounded-md transition-colors hover:opacity-90"
-              style={{ backgroundColor: '#eb5234' }}
-            >
-              Create New
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => router.push('/settings/new-project')}
+                className="px-4 py-2 text-sm font-medium text-white rounded-md transition-colors hover:opacity-90"
+                style={{ backgroundColor: '#eb5234' }}
+              >
+                Create New
+              </button>
+            )}
           </div>
         </div>
 
