@@ -15,7 +15,7 @@ interface Project {
 interface ProjectContextValue {
   projects: Project[]
   activeProject: Project | null
-  setActiveProjectId: (id: number) => void
+  setActiveProjectId: (id: number | null) => void
   refreshProjects: () => Promise<void>
   isLoading: boolean
 }
@@ -44,9 +44,6 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json()
         setProjects(data)
-        if (data.length > 0 && !activeProjectId) {
-          setActiveProjectId(data[0].id)
-        }
       }
     } catch {
       // silently fail

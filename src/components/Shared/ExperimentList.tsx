@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/nextjs'
+import { useProjectContext } from '@/hooks/useProjectContext'
 
 interface Experiment {
   id: number
@@ -45,6 +46,7 @@ interface ExperimentListProps {
 
 export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobileDrawer = false }: ExperimentListProps) => {
   const { getToken } = useAuth()
+  const { activeProject } = useProjectContext()
 
   const [uniqueNames, setUniqueNames] = useState<{
     products: string[]
@@ -141,9 +143,10 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
   }
 
   useEffect(() => {
+    setCurrentPage(1)
     fetchExperiments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, currentSortBy, currentSortOrder, activeFilters])
+  }, [currentPage, currentSortBy, currentSortOrder, activeFilters, activeProject])
 
   useEffect(() => {
     if (experiments.length > 0 && onExperimentSelect) {
@@ -247,6 +250,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
       const params = new URLSearchParams()
       params.append('page', page.toString())
 
+      if (activeProject) params.append('project_id', activeProject.id.toString())
       if (filters.variable_name) params.append('variable_name', filters.variable_name)
       if (filters.variable_value) params.append('variable_value', filters.variable_value)
       if (filters.anomaly_name) params.append('anomaly_name', filters.anomaly_name)
@@ -301,6 +305,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
       const params = new URLSearchParams()
       params.append('page', currentPage.toString())
 
+      if (activeProject) params.append('project_id', activeProject.id.toString())
       if (activeFilters.variable_name) params.append('variable_name', activeFilters.variable_name)
       if (activeFilters.variable_value) params.append('variable_value', activeFilters.variable_value)
       if (activeFilters.anomaly_name) params.append('anomaly_name', activeFilters.anomaly_name)

@@ -1,7 +1,12 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ExperimentList } from '@/components/Shared/ExperimentList'
+import { QuickView } from '@/components/dashboard/QuickView'
+import { Overlay } from '@/components/dashboard/Overlay'
+import { VariableImpact } from '@/components/dashboard/VariableImpact'
+import { AIRecommendations } from '@/components/AIRecommendations'
 
 interface Experiment {
   id: number
@@ -12,10 +17,40 @@ interface Experiment {
   updated_at: string
 }
 
+interface CollapsibleSectionProps {
+  title: string
+  isOpen: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}
+
+function CollapsibleSection({ title, isOpen, onToggle, children }: CollapsibleSectionProps) {
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <button
+        onClick={onToggle}
+        className="w-full px-4 py-3 flex items-center justify-between text-left text-xl md:text-2xl font-bold text-gray-900 hover:bg-gray-50 rounded-t-lg"
+      >
+        <span>{title}</span>
+        {isOpen ? (
+          <ChevronDown className="h-5 w-5 text-gray-500" />
+        ) : (
+          <ChevronRight className="h-5 w-5 text-gray-500" />
+        )}
+      </button>
+      {isOpen && <div>{children}</div>}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isQuickGraphOpen, setIsQuickGraphOpen] = useState(true)
+  const [isOverlayOpen, setIsOverlayOpen] = useState(true)
+  const [isVariableImpactOpen, setIsVariableImpactOpen] = useState(true)
+  const [isAIRecommendationsOpen, setIsAIRecommendationsOpen] = useState(true)
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
@@ -24,6 +59,9 @@ export default function Dashboard() {
 
   const handleExperimentsChange = useCallback((experiments: Experiment[]) => {
     setExperiments(experiments)
+    if (experiments.length === 0) {
+      setSelectedExperiment(null)
+    }
   }, [])
 
   return (
@@ -64,17 +102,48 @@ export default function Dashboard() {
 
           {/* Main content */}
           <div className="flex-1 min-w-0 flex flex-col gap-3 md:gap-5">
-            {selectedExperiment ? (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl md:text-2xl font-bold">{selectedExperiment.title}</h2>
-                <p className="text-gray-600 mt-2">{selectedExperiment.description}</p>
-              </div>
-            ) : (
+            {!selectedExperiment && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl md:text-2xl font-bold">Dashboard</h2>
                 <p className="text-gray-500 mt-2">Select an experiment to view details.</p>
               </div>
             )}
+
+            <CollapsibleSection
+              title="AI Recommendations"
+              isOpen={isAIRecommendationsOpen}
+              onToggle={() => setIsAIRecommendationsOpen(!isAIRecommendationsOpen)}
+            >
+              <AIRecommendations />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Quick Graph"
+              isOpen={isQuickGraphOpen}
+              onToggle={() => setIsQuickGraphOpen(!isQuickGraphOpen)}
+            >
+              <QuickView
+                selectedExperiment={selectedExperiment}
+                onExperimentSelect={handleExperimentSelect}
+                experiments={experiments}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Overlay"
+              isOpen={isOverlayOpen}
+              onToggle={() => setIsOverlayOpen(!isOverlayOpen)}
+            >
+              <Overlay experiments={experiments} />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Analysis"
+              isOpen={isVariableImpactOpen}
+              onToggle={() => setIsVariableImpactOpen(!isVariableImpactOpen)}
+            >
+              <VariableImpact />
+            </CollapsibleSection>
           </div>
         </div>
       </div>
