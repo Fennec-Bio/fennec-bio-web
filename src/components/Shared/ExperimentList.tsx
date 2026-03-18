@@ -64,6 +64,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [hasError, setHasError] = useState(false)
+  const [uniqueNamesLoading, setUniqueNamesLoading] = useState(true)
 
   // Filter state variables
   const [activeFilters, setActiveFilters] = useState<{
@@ -140,6 +141,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
   // Fetch unique names once when project changes (separate from experiment list)
   useEffect(() => {
     const fetchUniqueNames = async () => {
+      setUniqueNamesLoading(true)
       try {
         const token = await getToken()
         const params = new URLSearchParams()
@@ -152,6 +154,8 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
         setUniqueNames(data)
       } catch (err) {
         console.error('Error fetching unique names:', err)
+      } finally {
+        setUniqueNamesLoading(false)
       }
     }
     fetchUniqueNames()
@@ -501,6 +505,11 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Products</div>
                   {productsMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                      {uniqueNamesLoading ? (
+                        <div className="px-4 py-3 text-sm text-gray-400">Loading...</div>
+                      ) : uniqueNames.products.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-400">No products</div>
+                      ) : null}
                       {sortItems([...uniqueNames.products]).map((product, index) => (
                         <div className="relative" onMouseEnter={() => setActiveSortItem(product)} onMouseLeave={() => setActiveSortItem(null)} key={index}>
                           <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{product}</div>
@@ -531,6 +540,11 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Secondary Products</div>
                   {secondaryProductsMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                      {uniqueNamesLoading ? (
+                        <div className="px-4 py-3 text-sm text-gray-400">Loading...</div>
+                      ) : uniqueNames.secondary_products.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-400">No secondary products</div>
+                      ) : null}
                       {sortItems([...uniqueNames.secondary_products]).map((sp, index) => (
                         <div className="relative" onMouseEnter={() => setActiveSortItem(sp)} onMouseLeave={() => setActiveSortItem(null)} key={index}>
                           <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{sp}</div>
