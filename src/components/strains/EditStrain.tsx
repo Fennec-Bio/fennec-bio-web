@@ -32,14 +32,14 @@ interface EditStrainProps {
   strainName: string
   strainData: StrainLineageData | null
   onStrainUpdated: () => void
+  availableStrains: StrainOption[]
 }
 
-export function EditStrain({ strainName, strainData, onStrainUpdated }: EditStrainProps) {
+export function EditStrain({ strainName, strainData, onStrainUpdated, availableStrains }: EditStrainProps) {
   const { getToken } = useAuth()
 
   const [parent, setParent] = useState('')
   const [modifications, setModifications] = useState<Modification[]>([])
-  const [availableStrains, setAvailableStrains] = useState<StrainOption[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -63,26 +63,6 @@ export function EditStrain({ strainName, strainData, onStrainUpdated }: EditStra
     setSuccessMessage('')
     setErrorMessage('')
   }, [strainData, strainName])
-
-  useEffect(() => {
-    fetchAvailableStrains()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const fetchAvailableStrains = async () => {
-    try {
-      const token = await getToken()
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strains/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setAvailableStrains(data.strains || [])
-      }
-    } catch (err) {
-      console.error('Error fetching strains for parent selector:', err)
-    }
-  }
 
   const addModification = () => {
     setModifications(prev => [...prev, { id: null, modification_type: 'insertion', gene_name: '', isNew: true }])

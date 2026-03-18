@@ -22,20 +22,15 @@ interface ApiResponse {
     has_previous: boolean
     experiments: Experiment[]
   }
-  unique_names: {
-    products: string[]
-    secondary_products: string[]
-    process_data: string[]
-    variables: { [key: string]: string[] }
-    events: string[]
-    anomalies: string[]
-  }
-  filters_applied?: {
-    variable_name?: string
-    variable_value?: string
-    anomaly_name?: string
-    event_name?: string
-  }
+}
+
+interface UniqueNamesResponse {
+  products: string[]
+  secondary_products: string[]
+  process_data: string[]
+  variables: { [key: string]: string[] }
+  events: string[]
+  anomalies: string[]
 }
 
 interface ExperimentListProps {
@@ -141,6 +136,27 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
       variableValuesTimeoutRef.current = null
     }, delay)
   }
+
+  // Fetch unique names once when project changes (separate from experiment list)
+  useEffect(() => {
+    const fetchUniqueNames = async () => {
+      try {
+        const token = await getToken()
+        const params = new URLSearchParams()
+        if (activeProject) params.append('project_id', activeProject.id.toString())
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/uniqueNames/?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!response.ok) return
+        const data: UniqueNamesResponse = await response.json()
+        setUniqueNames(data)
+      } catch (err) {
+        console.error('Error fetching unique names:', err)
+      }
+    }
+    fetchUniqueNames()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -276,10 +292,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
         setHasError(false)
       }
 
-      setUniqueNames(data.unique_names || {
-        products: [], secondary_products: [], process_data: [], variables: {}, events: [], anomalies: []
-      })
-
       if (onExperimentsChange) {
         onExperimentsChange(data.experiments?.experiments || [])
       }
@@ -330,10 +342,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
         setTotalPages(data.experiments.total_pages)
         setHasError(false)
       }
-
-      setUniqueNames(data.unique_names || {
-        products: [], secondary_products: [], process_data: [], variables: {}, events: [], anomalies: []
-      })
 
       if (onExperimentsChange) {
         onExperimentsChange(data.experiments?.experiments || [])

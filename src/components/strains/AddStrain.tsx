@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 
 interface Modification {
@@ -15,43 +15,18 @@ interface StrainOption {
 
 interface AddStrainProps {
   onStrainAdded: () => void
+  availableStrains: StrainOption[]
 }
 
-export function AddStrain({ onStrainAdded }: AddStrainProps) {
+export function AddStrain({ onStrainAdded, availableStrains }: AddStrainProps) {
   const { getToken } = useAuth()
 
   const [name, setName] = useState('')
   const [parent, setParent] = useState('')
   const [modifications, setModifications] = useState<Modification[]>([])
-  const [availableStrains, setAvailableStrains] = useState<StrainOption[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
-  const isFetchingRef = useRef(false)
-
-  useEffect(() => {
-    fetchAvailableStrains()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const fetchAvailableStrains = async () => {
-    if (isFetchingRef.current) return
-    isFetchingRef.current = true
-    try {
-      const token = await getToken()
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strains/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setAvailableStrains(data.strains || [])
-      }
-    } catch (err) {
-      console.error('Error fetching strains for parent selector:', err)
-    } finally {
-      isFetchingRef.current = false
-    }
-  }
 
   const addModification = () => {
     setModifications(prev => [...prev, { modification_type: 'insertion', gene_name: '' }])

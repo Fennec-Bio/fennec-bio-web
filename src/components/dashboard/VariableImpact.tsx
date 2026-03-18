@@ -27,6 +27,7 @@ interface GroupData {
 interface ApiResponse {
   products: string[]
   impacts: ImpactEntry[]
+  rebuild_status: 'running' | 'completed' | 'failed' | null
 }
 
 export function VariableImpact() {
@@ -39,6 +40,7 @@ export function VariableImpact() {
   const [selectedVariable, setSelectedVariable] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [productOpen, setProductOpen] = useState(false)
+  const [isRebuilding, setIsRebuilding] = useState(false)
 
   const heatmapRef = useRef<SVGSVGElement>(null)
   const boxplotRef = useRef<SVGSVGElement>(null)
@@ -71,6 +73,51 @@ export function VariableImpact() {
       setIsLoading(false)
     }
   }, [getToken, activeProject])
+
+  // Poll for rebuild completion
+  useEffect(() => {
+    if (!isRebuilding || data?.rebuild_status !== 'running') return
+    const interval = setInterval(() => {
+      fetchData(selectedProduct || undefined)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [isRebuilding, data?.rebuild_status, selectedProduct, fetchData])
+
+  // Detect rebuild completion
+  useEffect(() => {
+    if (isRebuilding && data?.rebuild_status === 'completed') {
+      setIsRebuilding(false)
+      // Re-fetch without product filter to reload product list
+      fetchData()
+    }
+  }, [isRebuilding, data?.rebuild_status, fetchData])
+
+  const handleRebuild = async () => {
+    setIsRebuilding(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/variable-impact/rebuild/`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+      if (!res.ok) {
+        const err = await res.json()
+        if (res.status === 409) {
+          // Already running, just start polling
+          return
+        }
+        throw new Error(err.error || 'Failed to trigger rebuild')
+      }
+      // Start polling
+      fetchData(selectedProduct || undefined)
+    } catch (err) {
+      console.error('Rebuild failed:', err)
+      setIsRebuilding(false)
+    }
+  }
 
   // Fetch on mount and when project changes
   useEffect(() => {
@@ -270,7 +317,7 @@ export function VariableImpact() {
       <div className={activeTab === 'variable-impact' ? '' : 'hidden'}>
         <div className="p-4">
           {/* Product selector */}
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <div className="relative vi-product-dropdown inline-block">
               <button
                 className="h-9 px-4 py-2 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all"
@@ -291,6 +338,20 @@ export function VariableImpact() {
                 </div>
               )}
             </div>
+            <button
+              onClick={handleRebuild}
+              disabled={isRebuilding}
+              className="h-9 px-4 py-2 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRebuilding ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-gray-600" />
+                  Rebuilding...
+                </span>
+              ) : (
+                'Rebuild Analysis'
+              )}
+            </button>
           </div>
 
           {isLoading && (
@@ -301,7 +362,21 @@ export function VariableImpact() {
 
           {!isLoading && impacts.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              No variable impact data available. An admin can trigger a rebuild.
+              <p>No variable impact data available.</p>
+              <button
+                onClick={handleRebuild}
+                disabled={isRebuilding}
+                className="mt-3 h-9 px-4 py-2 bg-[#eb5234] text-white rounded-md text-sm font-medium shadow-xs hover:bg-[#d4472c] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRebuilding ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                    Rebuilding...
+                  </span>
+                ) : (
+                  'Build Analysis'
+                )}
+              </button>
             </div>
           )}
 

@@ -52,34 +52,20 @@ export function StrainStats({ strainName, lineageData, onSelectStrain }: StrainS
     [lineageData, strainName]
   )
 
-  // Fetch experiments for this strain
+  // Fetch experiments for this strain in a single request
   useEffect(() => {
     let cancelled = false
     const fetchExps = async () => {
       setLoading(true)
       try {
         const token = await getToken()
-        const params = new URLSearchParams({
-          variable_name: 'strain',
-          variable_value: strainName,
-        })
-        // Fetch all pages
-        let allExps: Experiment[] = []
-        let page = 1
-        let hasNext = true
-        while (hasNext) {
-          params.set('page', page.toString())
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/experimentList/?${params}`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          if (!res.ok) break
-          const data = await res.json()
-          allExps = allExps.concat(data.experiments.experiments)
-          hasNext = data.experiments.has_next
-          page++
-        }
-        if (!cancelled) setExperiments(allExps)
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/strain-experiments/${encodeURIComponent(strainName)}/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!res.ok) throw new Error('Failed to fetch')
+        const data = await res.json()
+        if (!cancelled) setExperiments(data.experiments || [])
       } catch (err) {
         console.error('Error fetching strain experiments:', err)
       } finally {

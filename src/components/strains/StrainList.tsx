@@ -1,16 +1,10 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { useAuth } from '@clerk/nextjs'
 
 interface Strain {
   name: string
   experiment_count: number
-}
-
-interface ApiResponse {
-  strains: Strain[]
-  total_strains: number
 }
 
 type SortOption = 'name-asc' | 'experiments-desc' | 'experiments-asc'
@@ -19,62 +13,17 @@ interface StrainListProps {
   onStrainSelect: (name: string) => void
   selectedStrain: string | null
   isMobileDrawer?: boolean
-  refreshKey?: number
+  strains: Strain[]
 }
 
 const PAGE_SIZE = 15
 
-export function StrainList({ onStrainSelect, selectedStrain, isMobileDrawer = false, refreshKey = 0 }: StrainListProps) {
-  const { getToken } = useAuth()
-
-  const [strains, setStrains] = useState<Strain[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasError, setHasError] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
+export function StrainList({ onStrainSelect, selectedStrain, isMobileDrawer = false, strains }: StrainListProps) {
   const [filterText, setFilterText] = useState('')
   const [sortOption, setSortOption] = useState<SortOption>('name-asc')
   const [sortOpen, setSortOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const isFetchingRef = useRef(false)
   const sortRef = useRef<HTMLDivElement>(null)
-
-  const fetchStrains = async () => {
-    if (isFetchingRef.current) return
-    isFetchingRef.current = true
-    setIsLoading(true)
-    setHasError(false)
-    setErrorMessage('')
-
-    try {
-      const token = await getToken()
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strains/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) throw new Error('Failed to fetch strains')
-      const data: ApiResponse = await response.json()
-
-      if (!data.strains || data.strains.length === 0) {
-        setStrains([])
-        setHasError(true)
-        setErrorMessage('No strains found')
-      } else {
-        setStrains(data.strains)
-      }
-    } catch (err) {
-      console.error('Error fetching strains:', err)
-      setStrains([])
-      setHasError(true)
-      setErrorMessage('Failed to load strains')
-    } finally {
-      isFetchingRef.current = false
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchStrains()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey])
 
   // Close sort dropdown on outside click
   useEffect(() => {
@@ -193,13 +142,9 @@ export function StrainList({ onStrainSelect, selectedStrain, isMobileDrawer = fa
       </div>
 
       <div className="px-0 pb-4 overflow-y-auto flex-1">
-        {isLoading ? (
+        {processedStrains.length === 0 ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#eb5234]" />
-          </div>
-        ) : hasError || processedStrains.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">{errorMessage || 'No strains found'}</div>
+            <div className="text-gray-500">No strains found</div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -223,7 +168,7 @@ export function StrainList({ onStrainSelect, selectedStrain, isMobileDrawer = fa
         )}
 
         {/* Pagination */}
-        {!isLoading && !hasError && processedStrains.length > PAGE_SIZE && (
+        {processedStrains.length > PAGE_SIZE && (
           <>
             <div className="mt-6 flex items-center justify-center gap-2">
               <button

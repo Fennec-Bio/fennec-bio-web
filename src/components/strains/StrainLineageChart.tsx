@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useAuth } from '@clerk/nextjs'
 import * as d3 from 'd3'
 
 interface StrainData {
@@ -20,51 +19,20 @@ interface TreeNode {
 
 interface StrainLineageChartProps {
   selectedStrain?: string | null
-  refreshKey?: number
+  strains: StrainData[]
+  availableProducts: string[]
 }
 
-export function StrainLineageChart({ selectedStrain, refreshKey = 0 }: StrainLineageChartProps) {
-  const { getToken } = useAuth()
-  const [strains, setStrains] = useState<StrainData[]>([])
-  const [availableProducts, setAvailableProducts] = useState<string[]>([])
+export function StrainLineageChart({ selectedStrain, strains, availableProducts }: StrainLineageChartProps) {
   const [selectedProduct, setSelectedProduct] = useState('total')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Set default product when availableProducts changes
   useEffect(() => {
-    let cancelled = false
-    const fetch_ = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const token = await getToken()
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strain-lineage/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) throw new Error('Failed to fetch')
-        const data = await res.json()
-        if (cancelled) return
-        if (!data.strains?.length) {
-          setError('No strain lineage data available')
-          setStrains([])
-        } else {
-          setStrains(data.strains)
-          setAvailableProducts(data.available_products || ['total'])
-          const defaultProd = data.available_products?.find((p: string) => p !== 'total') || 'total'
-          setSelectedProduct(defaultProd)
-        }
-      } catch (err) {
-        if (!cancelled) setError('Failed to load strain lineage')
-        console.error(err)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    fetch_()
-    return () => { cancelled = true }
-  }, [getToken, refreshKey])
+    const defaultProd = availableProducts.find(p => p !== 'total') || 'total'
+    setSelectedProduct(defaultProd)
+  }, [availableProducts])
 
   const buildTree = useCallback((data: StrainData[]): TreeNode | null => {
     const root = data.find(s => s.parent === null)
@@ -185,18 +153,10 @@ export function StrainLineageChart({ selectedStrain, refreshKey = 0 }: StrainLin
     return () => observer.disconnect()
   }, [renderTree])
 
-  if (loading) {
+  if (strains.length === 0) {
     return (
       <div className="p-8 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#eb5234]" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="text-gray-500">{error}</div>
+        <div className="text-gray-500">No strain lineage data available</div>
       </div>
     )
   }

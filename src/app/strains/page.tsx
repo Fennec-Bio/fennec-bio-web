@@ -22,6 +22,11 @@ interface StrainLineageData {
   lineage_id: number | null
 }
 
+interface StrainOption {
+  name: string
+  experiment_count: number
+}
+
 interface CollapsibleSectionProps {
   title: string
   isOpen: boolean
@@ -53,8 +58,10 @@ export default function StrainsPage() {
   const [selectedStrain, setSelectedStrain] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'edit' | 'add'>('edit')
   const [lineageData, setLineageData] = useState<StrainLineageData[]>([])
+  const [availableProducts, setAvailableProducts] = useState<string[]>(['total'])
+  const [strainsList, setStrainsList] = useState<StrainOption[]>([])
 
-  // Fetch lineage data (shared between StrainStats and EditStrain)
+  // Fetch lineage data (shared across StrainStats, EditStrain, StrainLineageChart)
   useEffect(() => {
     let cancelled = false
     const fetchLineage = async () => {
@@ -65,13 +72,37 @@ export default function StrainsPage() {
         })
         if (res.ok) {
           const data = await res.json()
-          if (!cancelled) setLineageData(data.strains || [])
+          if (!cancelled) {
+            setLineageData(data.strains || [])
+            setAvailableProducts(data.available_products || ['total'])
+          }
         }
       } catch (err) {
         console.error('Error fetching lineage data:', err)
       }
     }
     fetchLineage()
+    return () => { cancelled = true }
+  }, [refreshKey, getToken])
+
+  // Fetch strains list once (shared across StrainList, AddStrain, EditStrain)
+  useEffect(() => {
+    let cancelled = false
+    const fetchStrains = async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strains/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (!cancelled) setStrainsList(data.strains || [])
+        }
+      } catch (err) {
+        console.error('Error fetching strains:', err)
+      }
+    }
+    fetchStrains()
     return () => { cancelled = true }
   }, [refreshKey, getToken])
 
@@ -109,7 +140,7 @@ export default function StrainsPage() {
               isMobileDrawer
               onStrainSelect={handleStrainSelect}
               selectedStrain={selectedStrain}
-              refreshKey={refreshKey}
+              strains={strainsList}
             />
           </div>
         </div>
@@ -128,10 +159,9 @@ export default function StrainsPage() {
           {/* Desktop sidebar */}
           <div className="hidden md:block w-[364px] min-w-[364px] max-w-[416px] flex-shrink-0 relative z-50">
             <StrainList
-              key={refreshKey}
               onStrainSelect={handleStrainSelect}
               selectedStrain={selectedStrain}
-              refreshKey={refreshKey}
+              strains={strainsList}
             />
           </div>
 
@@ -173,9 +203,13 @@ export default function StrainsPage() {
                     strainName={selectedStrain}
                     strainData={selectedStrainData}
                     onStrainUpdated={handleStrainChanged}
+                    availableStrains={strainsList}
                   />
                 ) : (
-                  <AddStrain onStrainAdded={handleStrainChanged} />
+                  <AddStrain
+                    onStrainAdded={handleStrainChanged}
+                    availableStrains={strainsList}
+                  />
                 )}
               </div>
             </CollapsibleSection>
@@ -195,9 +229,9 @@ export default function StrainsPage() {
             >
               <div className="min-h-[500px]">
                 <StrainLineageChart
-                  key={refreshKey}
                   selectedStrain={selectedStrain}
-                  refreshKey={refreshKey}
+                  strains={lineageData}
+                  availableProducts={availableProducts}
                 />
               </div>
             </CollapsibleSection>
