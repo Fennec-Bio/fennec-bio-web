@@ -89,6 +89,12 @@ Define colors as CSS custom properties in `globals.css` using **OKLch color spac
 - **Error**: `bg-red-50 text-red-600`
 - **Info/Selection**: `bg-blue-100 border-blue-300`
 
+### Separators & Dividers
+
+- **Section dividers**: `border-b border-gray-200` (light grey, used in dropdowns, tabs, card sections)
+- **Row separators in tables**: `border-b border-gray-200` or `divide-y divide-gray-200`
+- **Dropdown section dividers** (e.g., "Currently Selected" separator): `border-b border-gray-200`
+
 ### Tags & Badges
 
 ```

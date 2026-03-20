@@ -246,7 +246,7 @@ export function AIRecommendations() {
   const [activeTab, setActiveTab] = useState<string>('recent-results')
 
   return (
-    <div className="flex flex-col h-[540px]">
+    <div className="flex flex-col h-[400px]">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 flex-shrink-0">
         {TABS.map((tabKey) => (

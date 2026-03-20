@@ -18,6 +18,7 @@ interface Product {
   unit: string
   timepoint: string
   value: number
+  data_type?: 'discrete' | 'continuous'
 }
 
 interface ProcessData {
@@ -71,6 +72,7 @@ interface DataPoint {
   name: string
   unit: string
   type: string
+  dataType?: 'discrete' | 'continuous'
 }
 
 interface QuickGraphProps {
@@ -127,23 +129,24 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
 
   const activeExperiment = manualExperiment || selectedExperiment
 
-  // Reset and auto-select first experiment when experiments list changes (e.g. project switch)
+  // Reset graph state when experiments list changes (e.g. project switch)
   useEffect(() => {
     setExperimentData(null)
     setCurrentTitle(null)
     setSelectedMetabolites({})
+    setManualExperiment(null)
     if (svgRef.current) {
       d3.select(svgRef.current).selectAll('*').remove()
     }
-    if (experiments.length > 0) {
-      setManualExperiment(experiments[0])
-      onExperimentSelect?.(experiments[0])
-    } else {
-      setManualExperiment(null)
-      onExperimentSelect?.(null as unknown as Experiment)
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experiments])
+
+  // Follow sidebar selection when no manual override
+  useEffect(() => {
+    if (!manualExperiment && selectedExperiment) {
+      setCurrentTitle(null) // force refetch
+    }
+  }, [selectedExperiment, manualExperiment])
 
   const getGraphDimensions = useCallback(() => {
     const w = containerRef.current?.clientWidth || 675
@@ -209,12 +212,13 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     ]
       .filter(p => selectedMetabolites[p.name])
       .map(p => ({
-        time: parseTimepoint(p.timepoint),
+        time: p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint),
         timepoint: p.timepoint,
         value: p.value,
         name: p.name,
         unit: p.unit,
         type: p.type,
+        dataType: p.data_type,
       }))
 
     const processPoints = experimentData.process_data
@@ -301,7 +305,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
 
       svg.append('path').datum(display).attr('fill', 'none').attr('stroke', color(name)).attr('stroke-width', 2).attr('d', line)
 
-      if (sorted.length <= 100 || sorted[0]?.type !== 'process_data') {
+      if ((sorted.length <= 100 || sorted[0]?.type !== 'process_data') && sorted[0]?.dataType !== 'continuous') {
         svg.selectAll(null).data(display).enter().append('circle')
           .attr('cx', d => xScale(d.time)).attr('cy', d => yScale(d.value))
           .attr('r', 4).attr('fill', color(name)).attr('stroke', 'white').attr('stroke-width', 2)
@@ -338,8 +342,8 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
 
     // Bar graph only shows products/secondary products (not continuous process data)
     const barData = [
-      ...experimentData.products.filter(p => selectedMetabolites[p.name]).map(p => ({ ...p, type: 'product' })),
-      ...experimentData.secondary_products.filter(p => selectedMetabolites[p.name]).map(p => ({ ...p, type: 'secondary_product' })),
+      ...experimentData.products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'product' })),
+      ...experimentData.secondary_products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'secondary_product' })),
     ].map(p => ({ time: parseTimepoint(p.timepoint), value: p.value, name: p.name, unit: p.unit, type: p.type }))
 
     const timepoints = [...new Set(barData.map(p => p.time))].sort((a, b) => a - b)
@@ -421,10 +425,24 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
             style={{ backgroundColor: '#eb5234' }}
             onClick={() => setExperimentDropdownOpen(!experimentDropdownOpen)}
           >
-            {activeExperiment?.title || (experiments.length === 0 ? 'No experiments available' : 'Select Experiment')}
+            {!manualExperiment && selectedExperiment
+              ? `Selected: ${selectedExperiment.title}`
+              : activeExperiment?.title || (experiments.length === 0 ? 'No experiments available' : 'Select Experiment')}
           </button>
           {experimentDropdownOpen && (
             <div className="absolute top-full left-0 w-auto min-w-full bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] mt-1 max-h-60 overflow-y-auto">
+              {selectedExperiment && (
+                <div
+                  className="px-4 py-2 cursor-pointer border-b border-gray-200 bg-gray-50 hover:bg-gray-100"
+                  onClick={() => {
+                    setManualExperiment(null)
+                    setExperimentDropdownOpen(false)
+                  }}
+                >
+                  <div className="font-medium text-sm text-gray-900">Currently Selected</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{selectedExperiment.title}</div>
+                </div>
+              )}
               {experiments.map(exp => (
                 <div
                   key={exp.id}
@@ -434,7 +452,6 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
                   onClick={() => {
                     setManualExperiment(exp)
                     setExperimentDropdownOpen(false)
-                    onExperimentSelect?.(exp)
                   }}
                 >
                   {exp.title}

@@ -18,6 +18,7 @@ interface Product {
   unit: string
   timepoint: string
   value: number
+  data_type?: 'discrete' | 'continuous'
 }
 
 interface ProcessData {
@@ -71,6 +72,7 @@ interface DataPoint {
   name: string
   unit: string
   type: string
+  dataType?: 'discrete' | 'continuous'
   experimentPrefix: string
 }
 
@@ -204,8 +206,10 @@ export function Overlay({ experiments }: OverlayProps) {
     ]
       .filter(p => selected[p.name])
       .map(p => ({
-        time: parseTimepoint(p.timepoint), timepoint: p.timepoint,
-        value: p.value, name: p.name, unit: p.unit, type: p.type, experimentPrefix: prefix,
+        time: p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint),
+        timepoint: p.timepoint,
+        value: p.value, name: p.name, unit: p.unit, type: p.type,
+        dataType: p.data_type, experimentPrefix: prefix,
       }))
 
     const processPoints = data.process_data
@@ -277,7 +281,7 @@ export function Overlay({ experiments }: OverlayProps) {
       const display = decimateData(sorted, 1000)
       svg.append('path').datum(display).attr('fill', 'none')
         .attr('stroke', colorMap.get(key)!).attr('stroke-width', 2).attr('d', line)
-      if (sorted.length <= 100 || sorted[0]?.type !== 'process_data') {
+      if ((sorted.length <= 100 || sorted[0]?.type !== 'process_data') && sorted[0]?.dataType !== 'continuous') {
         svg.selectAll(null).data(display).enter().append('circle')
           .attr('cx', d => xScale(d.time)).attr('cy', d => yScale(d.value))
           .attr('r', 4).attr('fill', colorMap.get(key)!).attr('stroke', 'white').attr('stroke-width', 2)
@@ -335,12 +339,12 @@ export function Overlay({ experiments }: OverlayProps) {
       .attr('width', tw).attr('height', th)
       .append('g').attr('transform', `translate(${margin.left},${margin.top})`)
 
-    const allData = buildAllData()
+    const allData = buildAllData().filter(d => d.dataType !== 'continuous' && d.type !== 'process_data')
 
     if (allData.length === 0) {
       svg.append('text').attr('x', w / 2).attr('y', h / 2)
         .attr('text-anchor', 'middle').attr('fill', '#666')
-        .text('Select experiments and metabolites to compare')
+        .text('No discrete product data available for bar chart')
       return
     }
 
