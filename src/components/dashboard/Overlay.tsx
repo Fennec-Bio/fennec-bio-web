@@ -288,28 +288,30 @@ export function Overlay({ experiments }: OverlayProps) {
       }
     })
 
-    // Event & anomaly markers
+    // Event & anomaly markers with numbered labels
     const maxTime = d3.max(allData, d => d.time)!
-    const drawMarkers = (items: { timepoint: string; name: string }[], color: string, prefix: string) => {
+    let markerNum = 1
+    const drawMarkers = (items: { timepoint: string; name: string }[], color: string) => {
       items.forEach(item => {
         const t = parseTimepoint(item.timepoint)
         if (t >= 0 && t <= maxTime) {
           const x = xScale(t)
+          const num = markerNum++
           svg.append('line').attr('x1', x).attr('y1', 0).attr('x2', x).attr('y2', h)
             .attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', '5,5').attr('opacity', 0.7)
           svg.append('text').attr('x', x).attr('y', -10).attr('text-anchor', 'middle')
-            .attr('font-size', '10px').attr('font-weight', 'bold').attr('fill', color).text(`${prefix}: ${item.name}`)
+            .attr('font-size', '11px').attr('font-weight', 'bold').attr('fill', color).text(num)
         }
       })
     }
     if (showEvents) {
       for (let i = 0; i < 3; i++) {
-        if (datas[i]?.events) drawMarkers(datas[i]!.events, EVENT_COLORS[i], `E${i + 1}`)
+        if (datas[i]?.events) drawMarkers(datas[i]!.events, EVENT_COLORS[i])
       }
     }
     if (showAnomalies) {
       for (let i = 0; i < 3; i++) {
-        if (datas[i]?.anomalies) drawMarkers(datas[i]!.anomalies, ANOMALY_COLORS[i], `A${i + 1}`)
+        if (datas[i]?.anomalies) drawMarkers(datas[i]!.anomalies, ANOMALY_COLORS[i])
       }
     }
 
@@ -604,55 +606,64 @@ export function Overlay({ experiments }: OverlayProps) {
           </div>
         )}
 
-        {showEvents && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-3">Events</h4>
-            <div className="flex gap-4">
-              {expConfigs.map(({ idx, label }) => {
-                const textColors = ['text-blue-900', 'text-purple-900', 'text-emerald-900']
-                return datas[idx]?.events && datas[idx]!.events.length > 0 && (
-                  <div key={label} className="flex-1">
-                    <h5 className={`font-medium text-sm mb-2 ${textColors[idx]}`}>{label}: {exps[idx]?.title}</h5>
-                    {datas[idx]!.events.map((e, i) => (
-                      <div key={i} className={`flex justify-between text-sm ${textColors[idx]}`}>
-                        <span className="font-medium">{e.name}:</span>
-                        <span>Time: {e.timepoint}</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-              {!datas.some(d => d?.events?.length) && (
-                <p className="text-blue-700 text-sm">No events data</p>
-              )}
+        {showEvents && (() => {
+          let num = 1
+          return (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-3">Events</h4>
+              <div className="flex gap-4">
+                {expConfigs.map(({ idx, label }) => {
+                  const textColors = ['text-blue-900', 'text-purple-900', 'text-emerald-900']
+                  return datas[idx]?.events && datas[idx]!.events.length > 0 && (
+                    <div key={label} className="flex-1">
+                      <h5 className={`font-medium text-sm mb-2 ${textColors[idx]}`}>{label}: {exps[idx]?.title}</h5>
+                      {datas[idx]!.events.map((e, i) => (
+                        <div key={i} className={`flex gap-2 text-sm ${textColors[idx]}`}>
+                          <span className="font-bold min-w-[1.5rem]">{num++}.</span>
+                          <span className="font-medium flex-1">{e.name}</span>
+                          <span className="opacity-75">({e.timepoint}h)</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+                {!datas.some(d => d?.events?.length) && (
+                  <p className="text-blue-700 text-sm">No events data</p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
-        {showAnomalies && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h4 className="font-medium text-red-900 mb-3">Anomalies</h4>
-            <div className="flex gap-4">
-              {expConfigs.map(({ idx, label }) => {
-                const textColors = ['text-red-900', 'text-orange-900', 'text-yellow-900']
-                return datas[idx]?.anomalies && datas[idx]!.anomalies.length > 0 && (
-                  <div key={label} className="flex-1">
-                    <h5 className={`font-medium text-sm mb-2 ${textColors[idx]}`}>{label}: {exps[idx]?.title}</h5>
-                    {datas[idx]!.anomalies.map((a, i) => (
-                      <div key={i} className={`flex justify-between text-sm ${textColors[idx]}`}>
-                        <span className="font-medium">{a.name}:</span>
-                        <span>Time: {a.timepoint}</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-              {!datas.some(d => d?.anomalies?.length) && (
-                <p className="text-red-700 text-sm">No anomalies data</p>
-              )}
+        {showAnomalies && (() => {
+          // Continue numbering after events
+          let num = 1 + (showEvents ? datas.reduce((sum, d) => sum + (d?.events?.length || 0), 0) : 0)
+          return (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h4 className="font-medium text-red-900 mb-3">Anomalies</h4>
+              <div className="flex gap-4">
+                {expConfigs.map(({ idx, label }) => {
+                  const textColors = ['text-red-900', 'text-orange-900', 'text-yellow-900']
+                  return datas[idx]?.anomalies && datas[idx]!.anomalies.length > 0 && (
+                    <div key={label} className="flex-1">
+                      <h5 className={`font-medium text-sm mb-2 ${textColors[idx]}`}>{label}: {exps[idx]?.title}</h5>
+                      {datas[idx]!.anomalies.map((a, i) => (
+                        <div key={i} className={`flex gap-2 text-sm ${textColors[idx]}`}>
+                          <span className="font-bold min-w-[1.5rem]">{num++}.</span>
+                          <span className="font-medium flex-1">{a.name}</span>
+                          <span className="opacity-75">({a.timepoint}h)</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+                {!datas.some(d => d?.anomalies?.length) && (
+                  <p className="text-red-700 text-sm">No anomalies data</p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )

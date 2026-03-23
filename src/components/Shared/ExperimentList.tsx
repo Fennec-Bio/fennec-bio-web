@@ -68,8 +68,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
 
   // Filter state variables
   const [activeFilters, setActiveFilters] = useState<{
-    variable_name?: string
-    variable_value?: string
+    variables?: { name: string; value: string }[]
     anomaly_name?: string
     event_name?: string
     keyword?: string
@@ -202,10 +201,15 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
     clearAllTimeouts()
     const newFilters = { ...activeFilters }
     switch (filterType) {
-      case 'variable':
-        newFilters.variable_name = filterValue
-        newFilters.variable_value = subValue || ''
+      case 'variable': {
+        const existing = newFilters.variables || []
+        // Don't add duplicate variable filters
+        const alreadyExists = existing.some(v => v.name === filterValue && v.value === (subValue || ''))
+        if (!alreadyExists) {
+          newFilters.variables = [...existing, { name: filterValue, value: subValue || '' }]
+        }
         break
+      }
       case 'anomaly':
         if (filterValue === 'anomalies_only') {
           newFilters.has_anomaly = 'true'
@@ -271,8 +275,9 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
       params.append('page', page.toString())
 
       if (activeProject) params.append('project_id', activeProject.id.toString())
-      if (filters.variable_name) params.append('variable_name', filters.variable_name)
-      if (filters.variable_value) params.append('variable_value', filters.variable_value)
+      if (filters.variables && filters.variables.length > 0) {
+        params.append('variables', filters.variables.map(v => `${v.name}:${v.value}`).join(','))
+      }
       if (filters.anomaly_name) params.append('anomaly_name', filters.anomaly_name)
       if (filters.has_anomaly) params.append('has_anomaly', filters.has_anomaly)
       if (filters.event_name) params.append('event_name', filters.event_name)
@@ -322,8 +327,9 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
       params.append('page', currentPage.toString())
 
       if (activeProject) params.append('project_id', activeProject.id.toString())
-      if (activeFilters.variable_name) params.append('variable_name', activeFilters.variable_name)
-      if (activeFilters.variable_value) params.append('variable_value', activeFilters.variable_value)
+      if (activeFilters.variables && activeFilters.variables.length > 0) {
+        params.append('variables', activeFilters.variables.map(v => `${v.name}:${v.value}`).join(','))
+      }
       if (activeFilters.anomaly_name) params.append('anomaly_name', activeFilters.anomaly_name)
       if (activeFilters.has_anomaly) params.append('has_anomaly', activeFilters.has_anomaly)
       if (activeFilters.event_name) params.append('event_name', activeFilters.event_name)
@@ -523,6 +529,14 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
                                 onClick={() => applySort(`product_${product}`, 'asc')}>
                                 Lowest first
                               </div>
+                              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+                                onClick={() => applySort(`product_${product}`, 'diff_desc')}>
+                                Highest differential
+                              </div>
+                              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+                                onClick={() => applySort(`product_${product}`, 'diff_asc')}>
+                                Lowest differential
+                              </div>
                             </div>
                           )}
                         </div>
@@ -557,6 +571,14 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
                               <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
                                 onClick={() => applySort(`secondary_product_${sp}`, 'asc')}>
                                 Lowest first
+                              </div>
+                              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+                                onClick={() => applySort(`secondary_product_${sp}`, 'diff_desc')}>
+                                Highest differential
+                              </div>
+                              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+                                onClick={() => applySort(`secondary_product_${sp}`, 'diff_asc')}>
+                                Lowest differential
                               </div>
                             </div>
                           )}
@@ -605,14 +627,25 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
         </div>
 
         {/* Active filters */}
-        {Object.keys(activeFilters).length > 0 && (
+        {(activeFilters.variables?.length || activeFilters.anomaly_name || activeFilters.has_anomaly || activeFilters.event_name || activeFilters.keyword) && (
           <div className="flex flex-wrap gap-2 mt-4">
-            {activeFilters.variable_name && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                Variable: {activeFilters.variable_name}
-                {activeFilters.variable_value && ` = ${activeFilters.variable_value}`}
+            {activeFilters.variables?.map((v, i) => (
+              <span key={i} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center gap-1">
+                {v.name}{v.value && ` = ${v.value}`}
+                <button
+                  className="ml-1 hover:text-blue-600"
+                  onClick={() => {
+                    const newVars = activeFilters.variables!.filter((_, idx) => idx !== i)
+                    const newFilters = { ...activeFilters, variables: newVars.length > 0 ? newVars : undefined }
+                    setActiveFilters(newFilters)
+                    setCurrentPage(1)
+                    fetchExperimentsWithPage(1, newFilters, currentSortBy || undefined, currentSortOrder || undefined)
+                  }}
+                >
+                  x
+                </button>
               </span>
-            )}
+            ))}
             {activeFilters.anomaly_name && (
               <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
                 Anomalies Removed
@@ -641,7 +674,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
           <div className="flex flex-wrap gap-2 mt-2">
             <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
               Sorted by: {currentSortBy === 'date' ? 'Date' : currentSortBy.replace('product_', '').replace('secondary_product_', '')}
-              {' '}({currentSortOrder === 'desc' ? 'Highest first' : 'Lowest first'})
+              {' '}({currentSortOrder === 'desc' ? 'Highest first' : currentSortOrder === 'asc' ? 'Lowest first' : currentSortOrder === 'diff_desc' ? 'Highest differential' : 'Lowest differential'})
             </span>
           </div>
         )}

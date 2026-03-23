@@ -211,15 +211,19 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       ...experimentData.secondary_products.map(p => ({ ...p, type: 'secondary_product' })),
     ]
       .filter(p => selectedMetabolites[p.name])
-      .map(p => ({
-        time: p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint),
-        timepoint: p.timepoint,
-        value: p.value,
-        name: p.name,
-        unit: p.unit,
-        type: p.type,
-        dataType: p.data_type,
-      }))
+      .map(p => {
+        // Timepoints are stored in minutes — convert to hours for display
+        const rawTime = p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint)
+        return {
+          time: rawTime / 60,
+          timepoint: p.timepoint,
+          value: p.value,
+          name: p.name,
+          unit: p.unit,
+          type: p.type,
+          dataType: p.data_type,
+        }
+      })
 
     const processPoints = experimentData.process_data
       .filter(p => selectedMetabolites[p.name])
@@ -235,22 +239,24 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     return [...productData, ...processPoints].sort((a, b) => a.time - b.time)
   }, [experimentData, selectedMetabolites])
 
-  // Draw vertical marker lines for events/anomalies
+  // Draw vertical marker lines for events/anomalies with numbered labels
   const drawMarkers = useCallback((
     svg: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
     height: number,
     maxTime: number
   ) => {
+    let markerNum = 1
     if (showEvents && experimentData?.events) {
       experimentData.events.forEach(event => {
         const t = parseTimepoint(event.timepoint)
         if (t >= 0 && t <= maxTime) {
           const x = xScale(t)
+          const num = markerNum++
           svg.append('line').attr('x1', x).attr('y1', 0).attr('x2', x).attr('y2', height)
             .attr('stroke', '#3b82f6').attr('stroke-width', 2).attr('stroke-dasharray', '5,5').attr('opacity', 0.7)
           svg.append('text').attr('x', x).attr('y', -5).attr('text-anchor', 'middle')
-            .attr('font-size', '10px').attr('font-weight', 'bold').attr('fill', '#3b82f6').text(event.name)
+            .attr('font-size', '11px').attr('font-weight', 'bold').attr('fill', '#3b82f6').text(num)
         }
       })
     }
@@ -260,10 +266,11 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
         const t = parseTimepoint(anomaly.timepoint)
         if (t >= 0 && t <= maxTime) {
           const x = xScale(t)
+          const num = markerNum++
           svg.append('line').attr('x1', x).attr('y1', 0).attr('x2', x).attr('y2', height)
             .attr('stroke', '#ef4444').attr('stroke-width', 2).attr('stroke-dasharray', '5,5').attr('opacity', 0.7)
           svg.append('text').attr('x', x).attr('y', -5).attr('text-anchor', 'middle')
-            .attr('font-size', '10px').attr('font-weight', 'bold').attr('fill', '#ef4444').text(anomaly.name)
+            .attr('font-size', '11px').attr('font-weight', 'bold').attr('fill', '#ef4444').text(num)
         }
       })
     }
@@ -341,10 +348,11 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       .append('g').attr('transform', `translate(${margin.left},${margin.top})`)
 
     // Bar graph only shows products/secondary products (not continuous process data)
+    // Timepoints stored in minutes — convert to hours for display
     const barData = [
       ...experimentData.products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'product' })),
       ...experimentData.secondary_products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'secondary_product' })),
-    ].map(p => ({ time: parseTimepoint(p.timepoint), value: p.value, name: p.name, unit: p.unit, type: p.type }))
+    ].map(p => ({ time: parseTimepoint(p.timepoint) / 60, value: p.value, name: p.name, unit: p.unit, type: p.type }))
 
     const timepoints = [...new Set(barData.map(p => p.time))].sort((a, b) => a - b)
 
@@ -585,28 +593,36 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
                 ))}
               </div>
             )}
-            {showEvents && experimentData.events.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-900 mb-2">Events</h4>
-                {experimentData.events.map((e, i) => (
-                  <div key={i} className="flex justify-between text-sm text-blue-900">
-                    <span className="font-medium">{e.name}:</span>
-                    <span>Time: {e.timepoint}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {showAnomalies && experimentData.anomalies.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h4 className="font-medium text-red-900 mb-2">Anomalies</h4>
-                {experimentData.anomalies.map((a, i) => (
-                  <div key={i} className="flex justify-between text-sm text-red-900">
-                    <span className="font-medium">{a.name}:</span>
-                    <span>Time: {a.timepoint}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {showEvents && experimentData.events.length > 0 && (() => {
+              let num = 1
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">Events</h4>
+                  {experimentData.events.map((e, i) => (
+                    <div key={i} className="flex gap-2 text-sm text-blue-900">
+                      <span className="font-bold min-w-[1.5rem]">{num++}.</span>
+                      <span className="font-medium flex-1">{e.name}</span>
+                      <span className="text-blue-700">({e.timepoint}h)</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+            {showAnomalies && experimentData.anomalies.length > 0 && (() => {
+              let num = 1 + (showEvents ? experimentData.events.length : 0)
+              return (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-900 mb-2">Anomalies</h4>
+                  {experimentData.anomalies.map((a, i) => (
+                    <div key={i} className="flex gap-2 text-sm text-red-900">
+                      <span className="font-bold min-w-[1.5rem]">{num++}.</span>
+                      <span className="font-medium flex-1">{a.name}</span>
+                      <span className="text-red-700">({a.timepoint}h)</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
             {showVariables && experimentData.variables.length === 0 && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center text-green-700 text-sm">No variables data</div>
             )}
