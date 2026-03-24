@@ -1,26 +1,23 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/no-org", "/auth-sync", "/complete-signup"]);
+const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/no-org"]);
 
 export default clerkMiddleware(async (auth, request) => {
-  const { userId, orgId } = await auth();
-
-  // Redirect logged-in users from "/" to "/dashboard"
-  if (userId && request.nextUrl.pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
   if (isPublicRoute(request)) {
     return;
   }
 
+  const { userId, orgId } = await auth();
+
   if (!userId) {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+    const signInUrl = new URL("/sign-in", request.url);
+    return NextResponse.redirect(signInUrl);
   }
 
   if (!orgId) {
-    return NextResponse.redirect(new URL("/no-org", request.url));
+    const noOrgUrl = new URL("/no-org", request.url);
+    return NextResponse.redirect(noOrgUrl);
   }
 });
 

@@ -88,6 +88,7 @@ export function CreateExperiment() {
           name: p.name,
           unit: p.unit,
           data_type: p.data_type,
+          time_unit: p.time_unit,
           data: p.data.map((d) => ({ timepoint: d.timepoint, value: d.value })),
         })) ?? [],
         secondary_products: classifiedData?.secondary_products.map((p) => ({
@@ -95,6 +96,7 @@ export function CreateExperiment() {
           unit: p.unit,
           type: p.type,
           data_type: p.data_type,
+          time_unit: p.time_unit,
           data: p.data.map((d) => ({ timepoint: d.timepoint, value: d.value })),
         })) ?? [],
         process_data: classifiedData?.process_data.map((p) => ({
@@ -102,6 +104,7 @@ export function CreateExperiment() {
           unit: p.unit,
           type: p.type,
           data_type: p.data_type,
+          time_unit: p.time_unit,
           data: p.data.map((d) => ({ time: d.time, value: d.value })),
         })) ?? [],
       }

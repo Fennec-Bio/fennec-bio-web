@@ -105,6 +105,19 @@ export function Step3Review({
     })
   }
 
+  const handleTimeUnitChange = (
+    category: 'products' | 'secondary_products' | 'process_data',
+    columnHeader: string,
+    newTimeUnit: string
+  ) => {
+    onDataChange({
+      ...classifiedData,
+      [category]: classifiedData[category].map((item: any) =>
+        item.column_header === columnHeader ? { ...item, time_unit: newTimeUnit } : item
+      ),
+    })
+  }
+
   const handleProcessGridChange = (columnHeader: string, grid: GridData) => {
     onDataChange({
       ...classifiedData,
@@ -139,6 +152,19 @@ export function Step3Review({
     const max = Math.max(...values)
     return `${min.toFixed(2)} – ${max.toFixed(2)}`
   }
+
+  const TimeUnitSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="h-6 px-1.5 text-xs font-medium border border-gray-200 rounded-md bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
+    >
+      <option value="hours">Hours</option>
+      <option value="minutes">Minutes</option>
+      <option value="days">Days</option>
+      <option value="hh:mm:ss">HH:MM:SS</option>
+    </select>
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -188,6 +214,10 @@ export function Step3Review({
                     >
                       {item.data_type === 'continuous' ? 'Continuous' : 'Discrete'}
                     </span>
+                    <TimeUnitSelect
+                      value={item.time_unit}
+                      onChange={v => handleTimeUnitChange('products', item.column_header, v)}
+                    />
                     <span className="text-xs text-gray-500">
                       {item.data.length} point{item.data.length !== 1 ? 's' : ''} &middot; {getValueRange(item.data)} {item.unit}
                     </span>
@@ -255,6 +285,10 @@ export function Step3Review({
                     >
                       {item.data_type === 'continuous' ? 'Continuous' : 'Discrete'}
                     </span>
+                    <TimeUnitSelect
+                      value={item.time_unit}
+                      onChange={v => handleTimeUnitChange('secondary_products', item.column_header, v)}
+                    />
                     <span className="text-xs text-gray-500">
                       {item.data.length} point{item.data.length !== 1 ? 's' : ''} &middot; {getValueRange(item.data)} {item.unit}
                     </span>
@@ -324,6 +358,10 @@ export function Step3Review({
                     >
                       {item.data_type === 'continuous' ? 'Continuous' : 'Discrete'}
                     </span>
+                    <TimeUnitSelect
+                      value={item.time_unit}
+                      onChange={v => handleTimeUnitChange('process_data', item.column_header, v)}
+                    />
                     <span className="text-xs text-gray-500">
                       {item.data.length} point{item.data.length !== 1 ? 's' : ''} &middot; {getValueRange(item.data)} {item.unit}
                     </span>

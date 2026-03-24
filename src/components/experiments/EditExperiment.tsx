@@ -20,6 +20,7 @@ interface Product {
   unit: string
   timepoint: string
   value: number
+  time_unit?: string
 }
 
 interface ExperimentDetail {

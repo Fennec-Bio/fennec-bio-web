@@ -4,9 +4,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 
 export interface ClassifiedData {
-  products: { name: string; column_header: string; unit: string; data_type: string; data: { timepoint: string; value: number }[] }[]
-  secondary_products: { name: string; column_header: string; unit: string; type: string; data_type: string; data: { timepoint: string; value: number }[] }[]
-  process_data: { name: string; column_header: string; unit: string; type: string; data_type: string; data: { time: string; value: number }[] }[]
+  products: { name: string; column_header: string; unit: string; data_type: string; time_unit: string; data: { timepoint: string; value: number }[] }[]
+  secondary_products: { name: string; column_header: string; unit: string; type: string; data_type: string; time_unit: string; data: { timepoint: string; value: number }[] }[]
+  process_data: { name: string; column_header: string; unit: string; type: string; data_type: string; time_unit: string; data: { time: string; value: number }[] }[]
   ignored: string[]
 }
 
@@ -120,7 +120,12 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
 
         if (data.status === 'completed') {
           clearInterval(intervalRef.current!)
-          setClassifiedData(data.results)
+          const results = data.results as ClassifiedData
+          // Default time_unit to 'hours' if classifier didn't provide it
+          results.products = results.products.map(p => ({ ...p, time_unit: p.time_unit || 'hours' }))
+          results.secondary_products = results.secondary_products.map(p => ({ ...p, time_unit: p.time_unit || 'hours' }))
+          results.process_data = results.process_data.map(p => ({ ...p, time_unit: p.time_unit || 'hours' }))
+          setClassifiedData(results)
           setUploadState('classified')
         } else if (data.status === 'failed') {
           clearInterval(intervalRef.current!)

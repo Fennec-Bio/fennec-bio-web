@@ -19,6 +19,7 @@ interface Product {
   timepoint: string
   value: number
   data_type?: 'discrete' | 'continuous'
+  time_unit?: string
 }
 
 interface ProcessData {
@@ -28,6 +29,7 @@ interface ProcessData {
   time: string
   value: number
   type?: string
+  time_unit?: string
 }
 
 interface Variable {
@@ -91,6 +93,9 @@ const ANOMALY_COLORS = ['#ef4444', '#f97316', '#eab308']
 const CHECKBOX_COLORS = ['text-blue-600', 'text-purple-600', 'text-emerald-600']
 
 function parseTimepoint(tp: string): number {
+  const hhmmss = tp.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
+  if (hhmmss) return parseInt(hhmmss[1]) + parseInt(hhmmss[2]) / 60 + parseFloat(hhmmss[3]) / 3600
+
   const match = tp.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
   if (match) {
     const num = parseFloat(match[1])
@@ -101,6 +106,35 @@ function parseTimepoint(tp: string): number {
   }
   const num = parseFloat(tp)
   return isNaN(num) ? 0 : num
+}
+
+function normalizeToHours(rawTime: number, timeUnit?: string): number {
+  if (timeUnit === 'minutes') return rawTime / 60
+  if (timeUnit === 'days') return rawTime * 24
+  return rawTime
+}
+
+function normalizeWallClockSeries(dataPoints: DataPoint[]): void {
+  const groups = new Map<string, DataPoint[]>()
+  for (const dp of dataPoints) {
+    const key = `${dp.experimentPrefix}:${dp.name}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(dp)
+  }
+
+  for (const [, points] of groups) {
+    const isHHMMSS = points.some(p => /^\d{1,2}:\d{2}:\d{2}(?:\.\d+)?$/.test(p.timepoint))
+    if (!isHHMMSS) continue
+
+    for (let i = 1; i < points.length; i++) {
+      while (points[i].time < points[i - 1].time - 12) {
+        points[i].time += 24
+      }
+    }
+
+    const minTime = Math.min(...points.map(p => p.time))
+    for (const p of points) p.time -= minTime
+  }
 }
 
 function decimateData<T>(data: T[], maxPoints = 1000): T[] {
@@ -206,7 +240,10 @@ export function Overlay({ experiments }: OverlayProps) {
     ]
       .filter(p => selected[p.name])
       .map(p => ({
-        time: p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint),
+        time: normalizeToHours(
+          p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint),
+          p.time_unit,
+        ),
         timepoint: p.timepoint,
         value: p.value, name: p.name, unit: p.unit, type: p.type,
         dataType: p.data_type, experimentPrefix: prefix,
@@ -215,11 +252,16 @@ export function Overlay({ experiments }: OverlayProps) {
     const processPoints = data.process_data
       .filter(p => selected[p.name])
       .map(p => ({
-        time: parseFloat(p.time), timepoint: p.time,
+        time: normalizeToHours(
+          p.time_unit === 'hh:mm:ss' ? parseTimepoint(p.time) : parseFloat(p.time),
+          p.time_unit,
+        ), timepoint: p.time,
         value: p.value, name: p.name, unit: p.unit, type: 'process_data', experimentPrefix: prefix,
       }))
 
-    return [...productPoints, ...processPoints].sort((a, b) => a.time - b.time)
+    const allPoints = [...productPoints, ...processPoints]
+    normalizeWallClockSeries(allPoints)
+    return allPoints.sort((a, b) => a.time - b.time)
   }, [])
 
   const buildAllData = useCallback(() => {

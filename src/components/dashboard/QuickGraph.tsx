@@ -19,6 +19,7 @@ interface Product {
   timepoint: string
   value: number
   data_type?: 'discrete' | 'continuous'
+  time_unit?: string
 }
 
 interface ProcessData {
@@ -28,6 +29,7 @@ interface ProcessData {
   time: string
   value: number
   type?: string
+  time_unit?: string
 }
 
 interface Variable {
@@ -81,8 +83,12 @@ interface QuickGraphProps {
   experiments: Experiment[]
 }
 
-/** Parse a timepoint string like "2 hr", "96h", "15.16" into hours */
+/** Parse a timepoint string like "2 hr", "96h", "15:25:36" into hours */
 function parseTimepoint(timepoint: string): number {
+  // HH:MM:SS format (with optional fractional seconds)
+  const hhmmss = timepoint.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
+  if (hhmmss) return parseInt(hhmmss[1]) + parseInt(hhmmss[2]) / 60 + parseFloat(hhmmss[3]) / 3600
+
   const match = timepoint.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
   if (match) {
     const num = parseFloat(match[1])
@@ -93,6 +99,42 @@ function parseTimepoint(timepoint: string): number {
   }
   const num = parseFloat(timepoint)
   return isNaN(num) ? 0 : num
+}
+
+/** Convert a raw numeric time value to hours based on its stored unit */
+function normalizeToHours(rawTime: number, timeUnit?: string): number {
+  if (timeUnit === 'minutes') return rawTime / 60
+  if (timeUnit === 'days') return rawTime * 24
+  return rawTime
+}
+
+/**
+ * For hh:mm:ss series, detect midnight crossings and normalize so the first point starts at 0.
+ * Assumes data points arrive in chronological array order.
+ * Mutates the time values in the dataPoints array.
+ */
+function normalizeWallClockSeries(dataPoints: DataPoint[]): void {
+  const groups = new Map<string, DataPoint[]>()
+  for (const dp of dataPoints) {
+    if (!groups.has(dp.name)) groups.set(dp.name, [])
+    groups.get(dp.name)!.push(dp)
+  }
+
+  for (const [, points] of groups) {
+    const isHHMMSS = points.some(p => /^\d{1,2}:\d{2}:\d{2}(?:\.\d+)?$/.test(p.timepoint))
+    if (!isHHMMSS) continue
+
+    // Unwrap midnight crossings: if time drops by >12 hours from previous, add 24
+    for (let i = 1; i < points.length; i++) {
+      while (points[i].time < points[i - 1].time - 12) {
+        points[i].time += 24
+      }
+    }
+
+    // Subtract minimum so series starts at 0
+    const minTime = Math.min(...points.map(p => p.time))
+    for (const p of points) p.time -= minTime
+  }
 }
 
 /** Downsample data to maxPoints for performance */
@@ -212,10 +254,9 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     ]
       .filter(p => selectedMetabolites[p.name])
       .map(p => {
-        // Timepoints are stored in minutes — convert to hours for display
         const rawTime = p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint)
         return {
-          time: rawTime / 60,
+          time: normalizeToHours(rawTime, p.time_unit),
           timepoint: p.timepoint,
           value: p.value,
           name: p.name,
@@ -228,7 +269,10 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     const processPoints = experimentData.process_data
       .filter(p => selectedMetabolites[p.name])
       .map(p => ({
-        time: parseFloat(p.time),
+        time: normalizeToHours(
+          p.time_unit === 'hh:mm:ss' ? parseTimepoint(p.time) : parseFloat(p.time),
+          p.time_unit,
+        ),
         timepoint: p.time,
         value: p.value,
         name: p.name,
@@ -236,7 +280,9 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
         type: 'process_data',
       }))
 
-    return [...productData, ...processPoints].sort((a, b) => a.time - b.time)
+    const allPoints = [...productData, ...processPoints]
+    normalizeWallClockSeries(allPoints)
+    return allPoints.sort((a, b) => a.time - b.time)
   }, [experimentData, selectedMetabolites])
 
   // Draw vertical marker lines for events/anomalies with numbered labels
@@ -348,11 +394,11 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       .append('g').attr('transform', `translate(${margin.left},${margin.top})`)
 
     // Bar graph only shows products/secondary products (not continuous process data)
-    // Timepoints stored in minutes — convert to hours for display
+    // Normalize timepoints to hours for display using stored time_unit
     const barData = [
       ...experimentData.products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'product' })),
       ...experimentData.secondary_products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'secondary_product' })),
-    ].map(p => ({ time: parseTimepoint(p.timepoint) / 60, value: p.value, name: p.name, unit: p.unit, type: p.type }))
+    ].map(p => ({ time: normalizeToHours(parseTimepoint(p.timepoint), p.time_unit), value: p.value, name: p.name, unit: p.unit, type: p.type }))
 
     const timepoints = [...new Set(barData.map(p => p.time))].sort((a, b) => a - b)
 
