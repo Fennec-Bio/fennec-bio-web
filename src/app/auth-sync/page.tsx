@@ -2,36 +2,58 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth, useOrganizationList } from '@clerk/nextjs'
 
 export default function AuthSync() {
-  const { isSignedIn, getToken } = useAuth()
+  const { isSignedIn, orgId, getToken } = useAuth()
+  const { userMemberships, setActive } = useOrganizationList({
+    userMemberships: { infinite: true },
+  })
   const router = useRouter()
   const [error, setError] = useState(false)
 
   useEffect(() => {
     if (!isSignedIn) return
 
-    const check = async () => {
+    const sync = async () => {
       try {
-        const token = await getToken()
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/check-account/`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        )
-        if (res.ok) {
-          const data = await res.json()
-          router.replace(data.has_account ? '/dashboard' : '/complete-signup')
+        // If no active org, auto-activate the first one
+        if (!orgId && userMemberships?.data && userMemberships.data.length > 0) {
+          await setActive?.({ organization: userMemberships.data[0].organization.id })
+          // setActive triggers a re-render with orgId set, so return and let the effect re-run
           return
         }
+
+        // If still no org after attempting activation, show no-org page
+        if (!orgId && userMemberships?.data?.length === 0) {
+          router.replace('/no-org')
+          return
+        }
+
+        // Org is active — check backend account
+        if (orgId) {
+          const token = await getToken()
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/check-account/`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
+          if (res.ok) {
+            const data = await res.json()
+            router.replace(data.has_account ? '/dashboard' : '/complete-signup')
+            return
+          }
+        }
       } catch {
-        // Auth check failed — fall through to error state
+        // Fall through to error state
       }
       setError(true)
     }
 
-    check()
-  }, [isSignedIn, getToken, router])
+    // Wait for memberships to load
+    if (userMemberships?.isLoading) return
+
+    sync()
+  }, [isSignedIn, orgId, userMemberships, setActive, getToken, router])
 
   if (error) {
     return (
@@ -61,7 +83,7 @@ export default function AuthSync() {
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4" />
-        <p className="text-gray-600">Checking your account...</p>
+        <p className="text-gray-600">Setting up your session...</p>
       </div>
     </div>
   )
