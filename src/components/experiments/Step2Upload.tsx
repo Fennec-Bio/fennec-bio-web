@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '@clerk/nextjs'
+import { SpreadsheetGrid, GridData, buildSpreadsheet } from './SpreadsheetGrid'
 
 export interface ClassifiedData {
   products: { name: string; column_header: string; unit: string; data_type: string; time_unit: string; data: { timepoint: string; value: number }[] }[]
@@ -18,6 +19,48 @@ interface Step2UploadProps {
 }
 
 type UploadState = 'idle' | 'uploading' | 'scanning' | 'classified' | 'error'
+type PreviewTab = 'primary-products' | 'secondary-products' | 'process-data'
+
+const PREVIEW_TABS: { key: PreviewTab; label: string }[] = [
+  { key: 'primary-products', label: 'Primary Products' },
+  { key: 'secondary-products', label: 'Secondary Products' },
+  { key: 'process-data', label: 'Process Data' },
+]
+
+function classifiedToGrid(
+  items: { name: string; data: { timepoint?: string; time?: string; value: number }[] }[]
+): GridData {
+  const names = items.map(i => i.name)
+  const timepointSet = new Map<string, number>()
+  items.forEach(item => {
+    item.data.forEach(d => {
+      const tp = (d.timepoint ?? d.time ?? '0').toString()
+      if (!timepointSet.has(tp)) {
+        const n = parseFloat(tp)
+        timepointSet.set(tp, isNaN(n) ? 0 : n)
+      }
+    })
+  })
+  const timepoints = [...timepointSet.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0])
+
+  const lookup = new Map<string, number>()
+  items.forEach(item => {
+    item.data.forEach(d => {
+      const tp = (d.timepoint ?? d.time ?? '0').toString()
+      lookup.set(`${tp}|${item.name}`, d.value)
+    })
+  })
+
+  const rows = timepoints.map(tp => ({
+    timepoint: tp,
+    values: names.map(name => {
+      const val = lookup.get(`${tp}|${name}`)
+      return val !== undefined ? val.toFixed(2) : ''
+    }),
+  }))
+
+  return { names, rows }
+}
 
 const MAX_POLLS = 48 // 2 minutes at 2500ms intervals
 
@@ -39,7 +82,78 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
   const [deselectedSecondary, setDeselectedSecondary] = useState<Set<string>>(new Set())
   const [deselectedProcess, setDeselectedProcess] = useState<Set<string>>(new Set())
 
+  const [previewTab, setPreviewTab] = useState<PreviewTab>('primary-products')
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL
+
+  // Baseline grids from last experiment
+  const [baselinePrimary, setBaselinePrimary] = useState<GridData | null>(null)
+  const [baselineSecondary, setBaselineSecondary] = useState<GridData | null>(null)
+  const [baselineProcess, setBaselineProcess] = useState<GridData | null>(null)
+
+  // Fetch last experiment's data as baseline
+  useEffect(() => {
+    if (!projectId) return
+    let cancelled = false
+    const fetchBaseline = async () => {
+      try {
+        const token = await getToken()
+        // Get the most recent experiment for this project
+        const listRes = await fetch(
+          `${apiUrl}/api/experimentList/?project_id=${projectId}&sort_by=date&sort_order=desc&page=1`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!listRes.ok || cancelled) return
+        const listData = await listRes.json()
+        const experiments = listData?.experiments?.experiments ?? []
+        if (experiments.length === 0) return
+
+        const title = experiments[0].title
+        const detailRes = await fetch(
+          `${apiUrl}/api/experiment/title/${encodeURIComponent(title)}/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!detailRes.ok || cancelled) return
+        const detail = await detailRes.json()
+
+        if (!cancelled) {
+          const emptyGrid = (items: { name: string }[]): GridData => {
+            const names = [...new Set(items.map(i => i.name))].sort()
+            if (names.length === 0) return { names: [], rows: [] }
+            return { names, rows: [{ timepoint: '', values: names.map(() => '') }] }
+          }
+          setBaselinePrimary(emptyGrid(detail.products ?? []))
+          setBaselineSecondary(emptyGrid(detail.secondary_products ?? []))
+          setBaselineProcess(emptyGrid(detail.process_data ?? []))
+        }
+      } catch {
+        // Silently fail — baseline is optional
+      }
+    }
+    fetchBaseline()
+    return () => { cancelled = true }
+  }, [projectId, getToken, apiUrl])
+
+  // Classified grids override baseline when available
+  const classifiedPrimary = useMemo(() => classifiedData ? classifiedToGrid(classifiedData.products) : null, [classifiedData])
+  const classifiedSecondary = useMemo(() => classifiedData ? classifiedToGrid(classifiedData.secondary_products) : null, [classifiedData])
+  const classifiedProcess = useMemo(() => classifiedData ? classifiedToGrid(classifiedData.process_data.map(p => ({ ...p, data: p.data.map(d => ({ ...d, timepoint: d.time })) }))) : null, [classifiedData])
+
+  // Use classified data if available, otherwise baseline
+  const primaryGrid = classifiedPrimary ?? baselinePrimary
+  const secondaryGrid = classifiedSecondary ?? baselineSecondary
+  const processGrid = classifiedProcess ?? baselineProcess
+
+  // Auto-select first tab that has data
+  useEffect(() => {
+    const grids: [PreviewTab, GridData | null][] = [
+      ['primary-products', primaryGrid],
+      ['secondary-products', secondaryGrid],
+      ['process-data', processGrid],
+    ]
+    const first = grids.find(([, g]) => g && g.names.length > 0)
+    if (first) setPreviewTab(first[0])
+  }, [primaryGrid, secondaryGrid, processGrid])
 
   const resetToIdle = () => {
     setUploadState('idle')
@@ -129,7 +243,8 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
           setUploadState('classified')
         } else if (data.status === 'failed') {
           clearInterval(intervalRef.current!)
-          handleError(data.error || 'Spreadsheet scan failed')
+          console.error('Spreadsheet scan failed:', data)
+          handleError(data.error_message || data.error || 'Spreadsheet scan failed')
         }
       } catch (err) {
         clearInterval(intervalRef.current!)
@@ -146,10 +261,10 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
     e.preventDefault()
     setIsDragActive(false)
     const file = e.dataTransfer.files[0]
-    if (file && file.name.endsWith('.xlsx')) {
+    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.csv'))) {
       uploadFile(file)
     } else {
-      handleError('Please upload an .xlsx file')
+      handleError('Please upload an .xlsx or .csv file')
     }
   }
 
@@ -189,6 +304,68 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
     (classifiedData?.secondary_products.length ?? 0) +
     (classifiedData?.process_data.length ?? 0)
 
+  const hasPreviewData = !!(primaryGrid?.names.length || secondaryGrid?.names.length || processGrid?.names.length)
+
+  const renderDataPreview = () => {
+    if (!hasPreviewData) return null
+    return (
+      <div className="mt-6">
+        <div className="flex border-b border-gray-200 overflow-x-auto">
+          {PREVIEW_TABS.map(({ key, label }) => {
+            const grid = key === 'primary-products' ? primaryGrid : key === 'secondary-products' ? secondaryGrid : processGrid
+            if (!grid || grid.names.length === 0) return null
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPreviewTab(key)}
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                  previewTab === key
+                    ? 'border-b-2 border-[#eb5234] text-[#eb5234]'
+                    : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="pt-4">
+          {previewTab === 'primary-products' && primaryGrid && primaryGrid.names.length > 0 && (
+            <SpreadsheetGrid
+              grid={primaryGrid}
+              onChange={classifiedData ? () => {} : (g) => setBaselinePrimary(g)}
+              readOnly={!!classifiedData}
+              truncated={!!classifiedData}
+              showAddRow={!classifiedData}
+              showAddColumn={!classifiedData}
+            />
+          )}
+          {previewTab === 'secondary-products' && secondaryGrid && secondaryGrid.names.length > 0 && (
+            <SpreadsheetGrid
+              grid={secondaryGrid}
+              onChange={classifiedData ? () => {} : (g) => setBaselineSecondary(g)}
+              readOnly={!!classifiedData}
+              truncated={!!classifiedData}
+              showAddRow={!classifiedData}
+              showAddColumn={!classifiedData}
+            />
+          )}
+          {previewTab === 'process-data' && processGrid && processGrid.names.length > 0 && (
+            <SpreadsheetGrid
+              grid={processGrid}
+              onChange={classifiedData ? () => {} : (g) => setBaselineProcess(g)}
+              readOnly={!!classifiedData}
+              truncated={!!classifiedData}
+              showAddRow={!classifiedData}
+              showAddColumn={!classifiedData}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // ---- Idle state ----
   if (uploadState === 'idle') {
     return (
@@ -226,7 +403,7 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
           <p className="text-sm font-medium text-gray-700 mb-1">
             Drag &amp; drop your Excel spreadsheet here
           </p>
-          <p className="text-xs text-gray-400 mb-4">.xlsx files only</p>
+          <p className="text-xs text-gray-400 mb-4">.xlsx or .csv files</p>
 
           <button
             type="button"
@@ -243,11 +420,13 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx"
+            accept=".xlsx,.csv"
             className="hidden"
             onChange={handleFileSelect}
           />
         </div>
+
+        {renderDataPreview()}
 
         <div className="flex items-center justify-between mt-4">
           <button
@@ -561,6 +740,8 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId }: Step2Up
             </div>
           </div>
         )}
+
+        {renderDataPreview()}
 
         {/* Actions */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 
@@ -33,13 +34,20 @@ interface UniqueNamesResponse {
   anomalies: string[]
 }
 
+interface ExperimentSetData {
+  id: string
+  name: string
+  experiments: { id: number; title: string }[]
+}
+
 interface ExperimentListProps {
   onExperimentSelect?: (experiment: Experiment) => void
   onExperimentsChange?: (experiments: Experiment[]) => void
+  onExperimentSetSelect?: (setId: string) => void
   isMobileDrawer?: boolean
 }
 
-export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobileDrawer = false }: ExperimentListProps) => {
+export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExperimentSetSelect, isMobileDrawer = false }: ExperimentListProps) => {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
 
@@ -58,6 +66,11 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
     events: [],
     anomalies: []
   })
+
+  const [viewMode, setViewMode] = useState<'experiments' | 'sets'>('experiments')
+  const [experimentSets, setExperimentSets] = useState<ExperimentSetData[]>([])
+  const [expandedSets, setExpandedSets] = useState<Set<string>>(new Set())
+  const [setsLoading, setSetsLoading] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [experiments, setExperiments] = useState<Experiment[]>([])
@@ -135,6 +148,41 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
       setVariableValuesMenu(null)
       variableValuesTimeoutRef.current = null
     }, delay)
+  }
+
+  const fetchExperimentSets = useCallback(async () => {
+    setSetsLoading(true)
+    try {
+      const token = await getToken()
+      const params = new URLSearchParams()
+      if (activeProject) params.append('project', activeProject.id.toString())
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment-sets/?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (res.ok) {
+        setExperimentSets(await res.json())
+      }
+    } catch (err) {
+      console.error('Error fetching experiment sets:', err)
+    } finally {
+      setSetsLoading(false)
+    }
+  }, [activeProject, getToken])
+
+  useEffect(() => {
+    if (viewMode === 'sets') {
+      fetchExperimentSets()
+    }
+  }, [viewMode, fetchExperimentSets, activeProject])
+
+  const toggleSetExpanded = (setId: string) => {
+    setExpandedSets(prev => {
+      const next = new Set(prev)
+      if (next.has(setId)) next.delete(setId)
+      else next.add(setId)
+      return next
+    })
   }
 
   // Fetch unique names once when project changes (separate from experiment list)
@@ -372,8 +420,18 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
       isMobileDrawer ? 'h-full border-0 shadow-none' : ''
     }`}>
       <div className="pb-4">
-        <h2 className="text-left text-xl md:text-2xl font-bold">Experiment List</h2>
-        <div className="flex gap-2 mt-4 relative" ref={menuRef}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-left text-xl md:text-2xl font-bold">
+            {viewMode === 'experiments' ? 'Experiment List' : 'Experiment Sets'}
+          </h2>
+          <button
+            onClick={() => setViewMode(viewMode === 'experiments' ? 'sets' : 'experiments')}
+            className="h-8 px-3 border border-gray-200 rounded-md text-xs font-medium shadow-xs hover:bg-gray-100 transition-all"
+          >
+            {viewMode === 'experiments' ? 'View Sets' : 'View List'}
+          </button>
+        </div>
+        {viewMode === 'experiments' && <><div className="flex gap-2 mt-4 relative" ref={menuRef}>
           <div className="flex-1 relative">
             <button
               className="w-full h-9 px-4 py-2 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all"
@@ -678,88 +736,141 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, isMobi
             </span>
           </div>
         )}
+        </>}
       </div>
 
-      <div className="px-0 pb-4 overflow-y-auto flex-1">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">Loading experiments...</div>
-          </div>
-        ) : hasError || experiments.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">No experiments available here</div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {experiments.map((experiment) => (
-              <div
-                key={experiment.id}
-                className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                onClick={() => onExperimentSelect?.(experiment)}
-              >
-                <h4 className="font-medium">{experiment.title}</h4>
-                <p className="text-sm text-gray-600 mt-1 line-clamp-1">{experiment.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {!isLoading && !hasError && experiments.length > 0 && totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-center gap-2">
-            <button
-              className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all disabled:opacity-50 disabled:pointer-events-none"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </button>
-
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                let pageNum: number
-                if (totalPages <= 3) {
-                  pageNum = i + 1
-                } else if (currentPage <= 2) {
-                  pageNum = i + 1
-                } else if (currentPage >= totalPages - 1) {
-                  pageNum = totalPages - 2 + i
-                } else {
-                  pageNum = currentPage - 1 + i
-                }
-                if (pageNum < 1 || pageNum > totalPages) return null
-                return (
-                  <button
-                    key={pageNum}
-                    className={`min-w-[40px] h-8 px-3 rounded-md text-sm font-medium shadow-xs transition-all ${
-                      currentPage === pageNum
-                        ? 'bg-gray-900 text-white'
-                        : 'border border-gray-200 hover:bg-gray-100'
-                    }`}
-                    onClick={() => setCurrentPage(pageNum)}
-                  >
-                    {pageNum}
-                  </button>
-                )
-              })}
+      {viewMode === 'experiments' ? (
+        <div className="px-0 pb-4 overflow-y-auto flex-1">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">Loading experiments...</div>
             </div>
+          ) : hasError || experiments.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">No experiments available here</div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {experiments.map((experiment) => (
+                <div
+                  key={experiment.id}
+                  className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => onExperimentSelect?.(experiment)}
+                >
+                  <h4 className="font-medium">{experiment.title}</h4>
+                  <p className="text-sm text-gray-600 mt-1 line-clamp-1">{experiment.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
-            <button
-              className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all disabled:opacity-50 disabled:pointer-events-none"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </button>
-          </div>
-        )}
+          {/* Pagination */}
+          {!isLoading && !hasError && experiments.length > 0 && totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <button
+                className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
 
-        {!isLoading && !hasError && experiments.length > 0 && totalPages > 1 && (
-          <div className="text-center text-sm text-gray-600 mt-2">
-            Page {currentPage} of {totalPages} • {experiments.length} experiments
-          </div>
-        )}
-      </div>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                  let pageNum: number
+                  if (totalPages <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 2) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 1) {
+                    pageNum = totalPages - 2 + i
+                  } else {
+                    pageNum = currentPage - 1 + i
+                  }
+                  if (pageNum < 1 || pageNum > totalPages) return null
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`min-w-[40px] h-8 px-3 rounded-md text-sm font-medium shadow-xs transition-all ${
+                        currentPage === pageNum
+                          ? 'bg-gray-900 text-white'
+                          : 'border border-gray-200 hover:bg-gray-100'
+                      }`}
+                      onClick={() => setCurrentPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !hasError && experiments.length > 0 && totalPages > 1 && (
+            <div className="text-center text-sm text-gray-600 mt-2">
+              Page {currentPage} of {totalPages} • {experiments.length} experiments
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="px-0 pb-4 overflow-y-auto flex-1">
+          {setsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">Loading experiment sets...</div>
+            </div>
+          ) : experimentSets.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">No experiment sets in this project</div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {experimentSets.map((set) => (
+                <div key={set.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    className="w-full p-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    onClick={() => { toggleSetExpanded(set.id); onExperimentSetSelect?.(set.id) }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {expandedSets.has(set.id) ? (
+                        <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      )}
+                      <h4 className="font-medium text-left">{set.name}</h4>
+                    </div>
+                    <span className="text-xs text-gray-500">{set.experiments.length} exp</span>
+                  </button>
+                  {expandedSets.has(set.id) && (
+                    <div className="border-t border-gray-200">
+                      {set.experiments.length === 0 ? (
+                        <p className="px-4 py-2 text-sm text-gray-500">No experiments in this set</p>
+                      ) : (
+                        set.experiments.map((exp) => (
+                          <div
+                            key={exp.id}
+                            className="px-4 py-2 pl-9 hover:bg-gray-50 cursor-pointer transition-colors text-sm border-b border-gray-100 last:border-b-0"
+                            onClick={() => onExperimentSelect?.({ id: exp.id, title: exp.title, description: '', benchmark: '', created_at: '', updated_at: '' })}
+                          >
+                            {exp.title}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

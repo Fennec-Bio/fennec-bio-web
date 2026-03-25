@@ -30,7 +30,22 @@ const ProjectContext = createContext<ProjectContextValue>({
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([])
-  const [activeProjectId, setActiveProjectId] = useState<number | null>(null)
+  const [activeProjectId, setActiveProjectIdRaw] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null
+    const stored = sessionStorage.getItem('activeProjectId')
+    return stored ? Number(stored) : null
+  })
+
+  const setActiveProjectId = useCallback((id: number | null) => {
+    setActiveProjectIdRaw(id)
+    if (typeof window !== 'undefined') {
+      if (id !== null) {
+        sessionStorage.setItem('activeProjectId', String(id))
+      } else {
+        sessionStorage.removeItem('activeProjectId')
+      }
+    }
+  }, [])
   const [isLoading, setIsLoading] = useState(true)
   const { getToken, isSignedIn } = useAuth()
 

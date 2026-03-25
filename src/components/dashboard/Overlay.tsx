@@ -80,6 +80,7 @@ interface DataPoint {
 
 interface OverlayProps {
   experiments: Experiment[]
+  preselectedExperiments?: Experiment[] | null
 }
 
 const EXP_COLORS = [
@@ -151,7 +152,7 @@ const CLOSED_DROPDOWNS: Record<DropdownKey, boolean> = {
   exp1: false, exp2: false, exp3: false, met1: false, met2: false, met3: false, graphType: false,
 }
 
-export function Overlay({ experiments }: OverlayProps) {
+export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
   const { getToken } = useAuth()
 
   const [exps, setExps] = useState<(Experiment | null)[]>([null, null, null])
@@ -217,6 +218,18 @@ export function Overlay({ experiments }: OverlayProps) {
   useEffect(() => { if (exps[0]) fetchExperimentData(exps[0].title, 0) }, [exps[0], fetchExperimentData])
   useEffect(() => { if (exps[1]) fetchExperimentData(exps[1].title, 1) }, [exps[1], fetchExperimentData])
   useEffect(() => { if (exps[2]) fetchExperimentData(exps[2].title, 2) }, [exps[2], fetchExperimentData])
+
+  // Auto-populate slots when an experiment set is selected
+  useEffect(() => {
+    if (!preselectedExperiments || preselectedExperiments.length === 0) return
+    const newExps: (Experiment | null)[] = [null, null, null]
+    for (let i = 0; i < Math.min(preselectedExperiments.length, 3); i++) {
+      newExps[i] = preselectedExperiments[i]
+    }
+    setExps(newExps)
+    setDatas([null, null, null])
+    setMetabolites([{}, {}, {}])
+  }, [preselectedExperiments])
 
   const initMetabolites = (data: ExperimentDetail | null): Record<string, boolean> => {
     if (!data) return {}

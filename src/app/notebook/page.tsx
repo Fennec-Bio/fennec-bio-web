@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import * as d3 from 'd3'
@@ -21,6 +21,8 @@ interface Product {
   unit: string
   timepoint: string
   value: number
+  data_type?: 'discrete' | 'continuous'
+  time_unit?: string
 }
 
 interface ProcessData {
@@ -29,6 +31,34 @@ interface ProcessData {
   unit: string
   time: string
   value: number
+  type?: string
+  time_unit?: string
+}
+
+interface DataPoint {
+  time: number
+  timepoint: string
+  value: number
+  name: string
+  unit: string
+  type: string
+  dataType?: 'discrete' | 'continuous'
+}
+
+interface NoteImage {
+  id: number
+  gcs_url: string
+  filename: string
+  uploaded_at: string
+}
+
+interface Comment {
+  id: number
+  text: string
+  author_name: string
+  author_picture: string
+  created_at: string
+  updated_at: string
 }
 
 interface ExperimentDetail {
@@ -44,6 +74,8 @@ interface ExperimentDetail {
   products: Product[]
   secondary_products: Product[]
   process_data: ProcessData[]
+  note_images?: NoteImage[]
+  comments?: Comment[]
   unique_names?: {
     products?: string[]
     secondary_products?: string[]
@@ -51,8 +83,11 @@ interface ExperimentDetail {
   }
 }
 
-function parseTimepoint(tp: string): number {
-  const match = tp.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
+function parseTimepoint(timepoint: string): number {
+  const hhmmss = timepoint.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
+  if (hhmmss) return parseInt(hhmmss[1]) + parseInt(hhmmss[2]) / 60 + parseFloat(hhmmss[3]) / 3600
+
+  const match = timepoint.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
   if (match) {
     const num = parseFloat(match[1])
     const unit = match[2].toLowerCase()
@@ -60,8 +95,40 @@ function parseTimepoint(tp: string): number {
     if (unit.includes('day') || unit === 'd') return num * 24
     return num
   }
-  const num = parseFloat(tp)
+  const num = parseFloat(timepoint)
   return isNaN(num) ? 0 : num
+}
+
+function normalizeToHours(rawTime: number, timeUnit?: string): number {
+  if (timeUnit === 'minutes') return rawTime / 60
+  if (timeUnit === 'days') return rawTime * 24
+  return rawTime
+}
+
+function normalizeWallClockSeries(dataPoints: DataPoint[]): void {
+  const groups = new Map<string, DataPoint[]>()
+  for (const dp of dataPoints) {
+    if (!groups.has(dp.name)) groups.set(dp.name, [])
+    groups.get(dp.name)!.push(dp)
+  }
+  for (const [, points] of groups) {
+    const isHHMMSS = points.some(p => /^\d{1,2}:\d{2}:\d{2}(?:\.\d+)?$/.test(p.timepoint))
+    if (!isHHMMSS) continue
+    for (let i = 1; i < points.length; i++) {
+      while (points[i].time < points[i - 1].time - 12) points[i].time += 24
+    }
+    const minTime = Math.min(...points.map(p => p.time))
+    for (const p of points) p.time -= minTime
+  }
+}
+
+function decimateData<T>(data: T[], maxPoints: number = 1000): T[] {
+  if (data.length <= maxPoints) return data
+  const step = Math.ceil(data.length / maxPoints)
+  const result: T[] = [data[0]]
+  for (let i = step; i < data.length - step; i += step) result.push(data[i])
+  if (result[result.length - 1] !== data[data.length - 1]) result.push(data[data.length - 1])
+  return result
 }
 
 function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }) {
@@ -70,6 +137,17 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(true)
+  const [attachmentsOpen, setAttachmentsOpen] = useState(true)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [notesDraft, setNotesDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -119,93 +197,227 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
     return () => document.removeEventListener('mousedown', handler)
   }, [dropdownOpen])
 
+  const buildDataPoints = useCallback((): DataPoint[] => {
+    if (!data) return []
+
+    const productData = [
+      ...data.products.map(p => ({ ...p, type: 'product' })),
+      ...data.secondary_products.map(p => ({ ...p, type: 'secondary_product' })),
+    ]
+      .filter(p => selected[p.name])
+      .map(p => {
+        const rawTime = p.data_type === 'continuous' ? parseFloat(p.timepoint) : parseTimepoint(p.timepoint)
+        return {
+          time: normalizeToHours(rawTime, p.time_unit),
+          timepoint: p.timepoint,
+          value: p.value,
+          name: p.name,
+          unit: p.unit,
+          type: p.type,
+          dataType: p.data_type,
+        }
+      })
+
+    const processPoints = data.process_data
+      .filter(p => selected[p.name])
+      .map(p => ({
+        time: normalizeToHours(
+          p.time_unit === 'hh:mm:ss' ? parseTimepoint(p.time) : parseFloat(p.time),
+          p.time_unit,
+        ),
+        timepoint: p.time,
+        value: p.value,
+        name: p.name,
+        unit: p.unit,
+        type: 'process_data',
+      }))
+
+    const allPoints = [...productData, ...processPoints]
+    normalizeWallClockSeries(allPoints)
+    return allPoints.sort((a, b) => a.time - b.time)
+  }, [data, selected])
+
+  const getGraphDimensions = useCallback(() => {
+    const w = containerRef.current?.clientWidth || 675
+    const mobile = w < 500
+    const legendSpace = mobile ? 100 : 180
+    const width = Math.min(Math.max(w - legendSpace, mobile ? 280 : 420), mobile ? 500 : 750)
+    return { width, height: Math.round(width * 0.72) }
+  }, [])
+
   const renderGraph = useCallback(() => {
     if (!data || !svgRef.current || !containerRef.current) return
 
     d3.select(svgRef.current).selectAll('*').remove()
 
-    const containerWidth = containerRef.current.clientWidth - 40
-    const margin = { top: 20, right: 150, bottom: 50, left: 60 }
-    const width = Math.max(containerWidth - margin.left - margin.right, 400)
-    const height = 400 - margin.top - margin.bottom
+    const margin = { top: 20, right: 130, bottom: 50, left: 60 }
+    const { width: tw, height: th } = getGraphDimensions()
+    const w = tw - margin.left - margin.right
+    const h = th - margin.top - margin.bottom
 
     const svg = d3.select(svgRef.current)
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom)
-      .append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`)
+      .attr('width', tw + 150).attr('height', th)
+      .append('g').attr('transform', `translate(${margin.left},${margin.top})`)
 
-    const timeSeriesData = [
-      ...data.products.filter(p => selected[p.name]).map(p => ({
-        time: parseTimepoint(p.timepoint), value: p.value, name: p.name, unit: p.unit,
-      })),
-      ...data.secondary_products.filter(p => selected[p.name]).map(p => ({
-        time: parseTimepoint(p.timepoint), value: p.value, name: p.name, unit: p.unit,
-      })),
-      ...data.process_data.filter(p => selected[p.name]).map(p => ({
-        time: parseFloat(p.time), value: p.value, name: p.name, unit: p.unit,
-      })),
-    ].sort((a, b) => a.time - b.time)
-
-    if (timeSeriesData.length === 0) {
-      svg.append('text')
-        .attr('x', width / 2).attr('y', height / 2)
+    const points = buildDataPoints()
+    if (points.length === 0) {
+      svg.append('text').attr('x', w / 2).attr('y', h / 2)
         .attr('text-anchor', 'middle').attr('fill', '#666')
         .text('No data available — select metabolites to display')
       return
     }
 
-    const groups = d3.group(timeSeriesData, d => d.name)
+    const groups = d3.group(points, d => d.name)
     const color = d3.scaleOrdinal(d3.schemeCategory10).domain(Array.from(groups.keys()))
 
-    const x = d3.scaleLinear()
-      .domain([0, d3.max(timeSeriesData, d => d.time)!])
-      .range([0, width])
+    const xScale = d3.scaleLinear().domain([0, d3.max(points, d => d.time)!]).range([0, w])
+    const yScale = d3.scaleLinear().domain([0, d3.max(points, d => d.value)!]).range([h, 0])
+    const line = d3.line<DataPoint>().x(d => xScale(d.time)).y(d => yScale(d.value))
 
-    const y = d3.scaleLinear()
-      .domain([0, d3.max(timeSeriesData, d => d.value)! * 1.1])
-      .range([height, 0])
-
-    const line = d3.line<{ time: number; value: number }>()
-      .x(d => x(d.time)).y(d => y(d.value))
-
-    svg.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x).ticks(8))
-    svg.append('g').call(d3.axisLeft(y))
+    svg.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(xScale).ticks(5))
+    svg.append('g').call(d3.axisLeft(yScale))
 
     groups.forEach((pts, name) => {
       const sorted = pts.sort((a, b) => a.time - b.time)
-      svg.append('path').datum(sorted)
-        .attr('fill', 'none').attr('stroke', color(name)).attr('stroke-width', 2).attr('d', line)
-      if (sorted.length <= 100) {
-        svg.selectAll(null).data(sorted).enter().append('circle')
-          .attr('cx', d => x(d.time)).attr('cy', d => y(d.value))
+      const display = decimateData(sorted, 1000)
+
+      svg.append('path').datum(display).attr('fill', 'none').attr('stroke', color(name)).attr('stroke-width', 2).attr('d', line)
+
+      if ((sorted.length <= 100 || sorted[0]?.type !== 'process_data') && sorted[0]?.dataType !== 'continuous') {
+        svg.selectAll(null).data(display).enter().append('circle')
+          .attr('cx', d => xScale(d.time)).attr('cy', d => yScale(d.value))
           .attr('r', 4).attr('fill', color(name)).attr('stroke', 'white').attr('stroke-width', 2)
       }
     })
 
     // Axis labels
-    svg.append('text').attr('x', width / 2).attr('y', height + 40)
-      .attr('text-anchor', 'middle').attr('font-size', '12px').text('Time (hr)')
-    svg.append('text').attr('transform', 'rotate(-90)')
-      .attr('x', -height / 2).attr('y', -45)
-      .attr('text-anchor', 'middle').attr('font-size', '12px').text('Value')
+    svg.append('text').attr('x', w / 2).attr('y', h + margin.bottom).attr('text-anchor', 'middle').attr('font-size', '12px').text('Time (hr)')
+    svg.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -margin.left + 20).attr('text-anchor', 'middle').attr('font-size', '12px').text('Value')
 
     // Legend
-    const legend = svg.append('g').attr('transform', `translate(${width + 10}, 0)`)
+    const legend = svg.append('g').attr('transform', `translate(${w + 10}, ${h / 2 - groups.size * 10})`)
     Array.from(groups.keys()).forEach((name, i) => {
-      const item = legend.append('g').attr('transform', `translate(0, ${i * 20})`)
-      item.append('rect').attr('width', 12).attr('height', 12).attr('fill', color(name))
-      item.append('text').attr('x', 16).attr('y', 10).attr('font-size', '11px').text(name)
+      const g = legend.append('g').attr('transform', `translate(0, ${i * 20})`)
+      g.append('rect').attr('width', 12).attr('height', 12).attr('fill', color(name))
+      g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(name)
     })
-  }, [data, selected])
+  }, [data, selected, buildDataPoints, getGraphDimensions])
 
   useEffect(() => { renderGraph() }, [renderGraph])
 
   useEffect(() => {
-    const onResize = () => renderGraph()
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    let timeout: NodeJS.Timeout
+    const handleResize = () => {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => renderGraph(), 150)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => { clearTimeout(timeout); window.removeEventListener('resize', handleResize) }
   }, [renderGraph])
+
+  const saveField = async (field: 'description' | 'experiment_note', value: string) => {
+    if (!data?.experiment) return
+    setSaving(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: value }),
+        }
+      )
+      if (!res.ok) throw new Error('Failed to save')
+      const json = await res.json()
+      setData(prev => prev ? { ...prev, experiment: json.experiment } : prev)
+      if (field === 'description') setEditingDescription(false)
+      else setEditingNotes(false)
+    } catch (err) {
+      console.error('Error saving:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const uploadImages = async (files: FileList) => {
+    if (!data?.experiment) return
+    setUploading(true)
+    try {
+      const token = await getToken()
+      const newImages: NoteImage[] = []
+      for (const file of Array.from(files)) {
+        const formData = new FormData()
+        formData.append('image', file)
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/note-images/`,
+          { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }
+        )
+        if (!res.ok) throw new Error('Failed to upload')
+        const json = await res.json()
+        newImages.push(json.image)
+      }
+      setData(prev => prev ? { ...prev, note_images: [...(prev.note_images || []), ...newImages] } : prev)
+    } catch (err) {
+      console.error('Error uploading:', err)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const deleteImage = async (imageId: number) => {
+    if (!data?.experiment) return
+    try {
+      const token = await getToken()
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/note-images/${imageId}/`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!res.ok) throw new Error('Failed to delete')
+      setData(prev => prev ? { ...prev, note_images: (prev.note_images || []).filter(img => img.id !== imageId) } : prev)
+    } catch (err) {
+      console.error('Error deleting image:', err)
+    }
+  }
+
+  const postComment = async () => {
+    if (!data?.experiment || !commentText.trim()) return
+    setPostingComment(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/comments/`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: commentText.trim() }),
+        }
+      )
+      if (!res.ok) throw new Error('Failed to post comment')
+      const json = await res.json()
+      setData(prev => prev ? { ...prev, comments: [...(prev.comments || []), json.comment] } : prev)
+      setCommentText('')
+    } catch (err) {
+      console.error('Error posting comment:', err)
+    } finally {
+      setPostingComment(false)
+    }
+  }
+
+  const deleteComment = async (commentId: number) => {
+    if (!data?.experiment) return
+    try {
+      const token = await getToken()
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/comments/${commentId}/`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!res.ok) throw new Error('Failed to delete comment')
+      setData(prev => prev ? { ...prev, comments: (prev.comments || []).filter(c => c.id !== commentId) } : prev)
+    } catch (err) {
+      console.error('Error deleting comment:', err)
+    }
+  }
 
   if (!selectedExperiment) {
     return (
@@ -242,16 +454,164 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
       <div className="p-6 space-y-6">
         <h1 className="text-2xl font-bold text-gray-900">{selectedExperiment.title}</h1>
 
+        {/* Experiment Description */}
         <div className="bg-gray-50 rounded-lg p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Experiment Description</h2>
-          <p className="text-gray-600">{selectedExperiment.description || 'No description available'}</p>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-700">Experiment Description</h2>
+            {!editingDescription && (
+              <button
+                onClick={() => { setDescriptionDraft(data?.experiment?.description || ''); setEditingDescription(true) }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+          {editingDescription ? (
+            <div className="space-y-2">
+              <textarea
+                value={descriptionDraft}
+                onChange={e => setDescriptionDraft(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setEditingDescription(false)}
+                  className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => saveField('description', descriptionDraft)}
+                  disabled={saving}
+                  className="h-8 px-3 rounded-md text-sm font-medium text-white transition-all disabled:opacity-50"
+                  style={{ backgroundColor: '#eb5234' }}
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-600">{data?.experiment?.description || 'No description available'}</p>
+          )}
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Experiment Notes</h2>
-          <div className="min-h-[100px] text-gray-600 whitespace-pre-wrap">
-            {data?.experiment?.experiment_note || 'No notes available for this experiment.'}
-          </div>
+        {/* Experiment Notes */}
+        <div className="bg-gray-50 rounded-lg">
+          <button
+            onClick={() => setNotesOpen(!notesOpen)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-100 rounded-t-lg"
+          >
+            <span className="text-sm font-semibold text-gray-700">Experiment Notes</span>
+            <svg className={`w-4 h-4 text-gray-500 transition-transform ${notesOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {notesOpen && (
+            <div className="px-4 pb-4">
+              {editingNotes ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={notesDraft}
+                    onChange={e => setNotesDraft(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[200px]"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setEditingNotes(false)}
+                      className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => saveField('experiment_note', notesDraft)}
+                      disabled={saving}
+                      className="h-8 px-3 rounded-md text-sm font-medium text-white transition-all disabled:opacity-50"
+                      style={{ backgroundColor: '#eb5234' }}
+                    >
+                      {saving ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-gray-600 whitespace-pre-wrap flex-1">
+                    {data?.experiment?.experiment_note || 'No notes available for this experiment.'}
+                  </div>
+                  <button
+                    onClick={() => { setNotesDraft(data?.experiment?.experiment_note || ''); setEditingNotes(true) }}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium shrink-0"
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Attachments */}
+        <div className="bg-gray-50 rounded-lg">
+          <button
+            onClick={() => setAttachmentsOpen(!attachmentsOpen)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-100 rounded-t-lg"
+          >
+            <span className="text-sm font-semibold text-gray-700">Attachments ({data?.note_images?.length || 0})</span>
+            <svg className={`w-4 h-4 text-gray-500 transition-transform ${attachmentsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {attachmentsOpen && (
+            <div className="px-4 pb-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }}
+              />
+              <div className="mb-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all disabled:opacity-50"
+                >
+                  {uploading ? 'Uploading...' : 'Add Images'}
+                </button>
+              </div>
+              {data?.note_images && data.note_images.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {data.note_images.map(img => {
+                    const src = img.gcs_url.startsWith('http')
+                      ? img.gcs_url
+                      : `${process.env.NEXT_PUBLIC_API_URL}${img.gcs_url}`
+                    return (
+                      <div key={img.id} className="group relative overflow-hidden rounded-lg border border-gray-200 bg-white hover:shadow-md transition-shadow">
+                        <a href={src} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={src}
+                            alt={img.filename}
+                            className="w-full h-40 object-contain bg-white p-1"
+                          />
+                        </a>
+                        <button
+                          onClick={() => deleteImage(img.id)}
+                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          title="Delete image"
+                        >
+                          &times;
+                        </button>
+                        <div className="px-2 py-1.5 border-t border-gray-200">
+                          <p className="text-xs text-gray-500 truncate">
+                            {img.filename}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No attachments</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Graph */}
@@ -288,25 +648,62 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
           </div>
         </div>
 
-        {/* Comments placeholder */}
+        {/* Comments */}
         <div className="bg-gray-50 rounded-lg p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Comments</h2>
           <div className="space-y-3">
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <p className="text-gray-400 italic text-sm">No comments yet</p>
-            </div>
+            {data?.comments && data.comments.length > 0 ? (
+              data.comments.map(comment => (
+                <div key={comment.id} className="group bg-white rounded-lg p-3 border border-gray-200">
+                  <div className="flex items-start gap-2">
+                    {comment.author_picture ? (
+                      <img src={comment.author_picture} alt="" className="w-7 h-7 rounded-full shrink-0" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-gray-300 shrink-0 flex items-center justify-center text-xs font-medium text-gray-600">
+                        {comment.author_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-900">{comment.author_name}</span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(comment.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {' '}
+                          {new Date(comment.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <button
+                          onClick={() => deleteComment(comment.id)}
+                          className="ml-auto text-xs text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-0.5 whitespace-pre-wrap">{comment.text}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
+                <p className="text-gray-400 italic text-sm">No comments yet</p>
+              </div>
+            )}
             <div className="flex gap-2">
               <input
                 type="text"
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment() } }}
                 placeholder="Add a comment..."
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled
               />
               <button
-                className="h-9 px-4 py-2 border border-gray-200 rounded-md text-sm font-medium shadow-xs opacity-50 cursor-not-allowed"
-                disabled
+                onClick={postComment}
+                disabled={postingComment || !commentText.trim()}
+                className="h-9 px-4 py-2 rounded-md text-sm font-medium text-white shadow-xs transition-all disabled:opacity-50"
+                style={{ backgroundColor: '#eb5234' }}
               >
-                Post
+                {postingComment ? 'Posting...' : 'Post'}
               </button>
             </div>
           </div>

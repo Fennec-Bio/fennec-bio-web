@@ -598,7 +598,17 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       {/* Graph */}
       {experimentData && !isLoading && (
         <>
-          <div ref={containerRef} className="overflow-x-auto overflow-y-hidden pb-3">
+          <div
+            ref={containerRef}
+            className="overflow-x-auto overflow-y-hidden pb-3 cursor-pointer"
+            onClick={() => {
+              const title = activeExperiment?.title
+              if (title) {
+                window.open(`/notebook?experiment=${encodeURIComponent(title)}`, '_blank')
+              }
+            }}
+            title="Click to open in Notebook"
+          >
             <svg ref={svgRef} className="min-w-max" />
           </div>
 

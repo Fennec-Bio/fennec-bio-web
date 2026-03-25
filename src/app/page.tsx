@@ -1,6 +1,13 @@
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { userId } = await auth();
+  if (userId) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <div className="max-w-2xl text-center space-y-8">
@@ -8,7 +15,7 @@ export default function LandingPage() {
           Fennec Bio
         </h1>
         <p className="text-xl text-gray-600">
-          Data management software for companies doing precision fermentation
+          Master the microbes: Advanced data infrastructure for precision fermentation
         </p>
         <Link
           href="/sign-in"

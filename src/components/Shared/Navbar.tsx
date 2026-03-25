@@ -24,10 +24,10 @@ export const Navbar = ({ onMenuToggle, isMenuOpen }: NavbarProps) => {
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard' },
+    { href: '/experiments', label: 'Experiments' },
     { href: '/notebook', label: 'Notebook' },
     { href: '/strains', label: 'Strains' },
     { href: '/literature', label: 'Literature' },
-    { href: '/experiments', label: 'Experiments' },
     { href: '/settings', label: 'Settings' },
   ]
 
@@ -56,52 +56,6 @@ export const Navbar = ({ onMenuToggle, isMenuOpen }: NavbarProps) => {
 
       {/* Right-side items */}
       <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-3">
-        {/* Navigation dropdown - only when signed in */}
-        {isSignedIn && (
-          <div className="relative">
-            <button
-              onClick={() => setNavDropdownOpen(!navDropdownOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-            >
-              <span className="text-sm font-medium">{currentPage}</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`h-4 w-4 transition-transform ${navDropdownOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-            {navDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setNavDropdownOpen(false)}
-                />
-                <div className="absolute right-0 top-full mt-2 w-40 bg-white rounded-lg shadow-lg z-50 overflow-hidden">
-                  {navItems.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setNavDropdownOpen(false)}
-                      className={`block px-4 py-2 text-sm transition-colors ${
-                        pathname === item.href
-                          ? 'bg-gray-100 text-gray-900 font-medium'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
         {/* Project dropdown */}
         {isSignedIn && (
           <div className="relative">
@@ -158,6 +112,52 @@ export const Navbar = ({ onMenuToggle, isMenuOpen }: NavbarProps) => {
                     >
                       {project.name}
                     </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Navigation dropdown - only when signed in */}
+        {isSignedIn && (
+          <div className="relative">
+            <button
+              onClick={() => setNavDropdownOpen(!navDropdownOpen)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            >
+              <span className="text-sm font-medium">{currentPage}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-4 w-4 transition-transform ${navDropdownOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {navDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setNavDropdownOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-40 bg-white rounded-lg shadow-lg z-50 overflow-hidden">
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setNavDropdownOpen(false)}
+                      className={`block px-4 py-2 text-sm transition-colors ${
+                        pathname === item.href
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
                   ))}
                 </div>
               </>

@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { useAuth } from '@clerk/nextjs'
+import { useProjectContext } from '@/hooks/useProjectContext'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ExperimentList } from '@/components/Shared/ExperimentList'
 import { QuickView } from '@/components/dashboard/QuickView'
@@ -44,8 +46,13 @@ function CollapsibleSection({ title, isOpen, onToggle, children }: CollapsibleSe
 }
 
 export default function Dashboard() {
+  const { getToken } = useAuth()
+  const { activeProject } = useProjectContext()
+
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
+  const [overlayPreselected, setOverlayPreselected] = useState<Experiment[] | null>(null)
+  const [selectedSetData, setSelectedSetData] = useState<{ experiments: Experiment[]; hypothesis: string; conclusion: string } | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isQuickGraphOpen, setIsQuickGraphOpen] = useState(true)
   const [isOverlayOpen, setIsOverlayOpen] = useState(true)
@@ -54,6 +61,7 @@ export default function Dashboard() {
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
+    setSelectedSetData(null)
     setIsMobileMenuOpen(false)
   }, [])
 
@@ -63,6 +71,36 @@ export default function Dashboard() {
       setSelectedExperiment(null)
     }
   }, [])
+
+  const handleExperimentSetSelect = useCallback(async (setId: string) => {
+    try {
+      const token = await getToken()
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment-sets/${setId}/`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!res.ok) return
+      const data = await res.json()
+      const setExps: Experiment[] = data.experiments.map((e: { id: number; title: string }) => ({
+        id: e.id,
+        title: e.title,
+        description: '',
+        benchmark: '',
+        created_at: '',
+        updated_at: '',
+      }))
+      setOverlayPreselected(setExps)
+      setSelectedSetData({
+        experiments: setExps,
+        hypothesis: data.hypothesis || '',
+        conclusion: data.conclusion || '',
+      })
+      setIsQuickGraphOpen(true)
+      setIsOverlayOpen(true)
+    } catch (err) {
+      console.error('Error fetching experiment set:', err)
+    }
+  }, [getToken])
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -84,6 +122,7 @@ export default function Dashboard() {
             <ExperimentList
               onExperimentSelect={handleExperimentSelect}
               onExperimentsChange={handleExperimentsChange}
+              onExperimentSetSelect={handleExperimentSetSelect}
               isMobileDrawer={true}
             />
           </div>
@@ -97,6 +136,7 @@ export default function Dashboard() {
             <ExperimentList
               onExperimentSelect={handleExperimentSelect}
               onExperimentsChange={handleExperimentsChange}
+              onExperimentSetSelect={handleExperimentSetSelect}
             />
           </div>
 
@@ -126,6 +166,7 @@ export default function Dashboard() {
                 selectedExperiment={selectedExperiment}
                 onExperimentSelect={handleExperimentSelect}
                 experiments={experiments}
+                experimentSetData={selectedSetData}
               />
             </CollapsibleSection>
 
@@ -134,7 +175,7 @@ export default function Dashboard() {
               isOpen={isOverlayOpen}
               onToggle={() => setIsOverlayOpen(!isOverlayOpen)}
             >
-              <Overlay experiments={experiments} />
+              <Overlay experiments={experiments} preselectedExperiments={overlayPreselected} />
             </CollapsibleSection>
 
             <CollapsibleSection

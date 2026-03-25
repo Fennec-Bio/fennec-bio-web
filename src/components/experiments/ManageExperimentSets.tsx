@@ -12,12 +12,18 @@ interface ExperimentOption {
 interface ExperimentSetData {
   id: string
   name: string
+  hypothesis: string
+  conclusion: string
   exp_summary: string
   experiments: ExperimentOption[]
   created_at: string
 }
 
-export function ManageExperimentSets() {
+interface ManageExperimentSetsProps {
+  externalSelectedSetId?: string | null
+}
+
+export function ManageExperimentSets({ externalSelectedSetId }: ManageExperimentSetsProps = {}) {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
 
@@ -25,6 +31,8 @@ export function ManageExperimentSets() {
   const [experiments, setExperiments] = useState<ExperimentOption[]>([])
   const [selectedSetId, setSelectedSetId] = useState<string>('new')
   const [name, setName] = useState('')
+  const [hypothesis, setHypothesis] = useState('')
+  const [conclusion, setConclusion] = useState('')
   const [selectedExpIds, setSelectedExpIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -36,7 +44,7 @@ export function ManageExperimentSets() {
     if (!activeProject) return
     const token = await getToken()
     const res = await fetch(
-      `${apiUrl}/api/experiment-sets/?project=${activeProject}`,
+      `${apiUrl}/api/experiment-sets/?project=${activeProject.id}`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
     if (res.ok) {
@@ -48,7 +56,7 @@ export function ManageExperimentSets() {
     if (!activeProject) return
     const token = await getToken()
     const res = await fetch(
-      `${apiUrl}/api/experimentList/?project=${activeProject}&page_size=500`,
+      `${apiUrl}/api/experimentList/?project=${activeProject.id}&page_size=500`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
     if (res.ok) {
@@ -64,8 +72,16 @@ export function ManageExperimentSets() {
   }, [fetchSets, fetchExperiments])
 
   useEffect(() => {
+    if (externalSelectedSetId && sets.some(s => s.id === externalSelectedSetId)) {
+      setSelectedSetId(externalSelectedSetId)
+    }
+  }, [externalSelectedSetId, sets])
+
+  useEffect(() => {
     if (selectedSetId === 'new') {
       setName('')
+      setHypothesis('')
+      setConclusion('')
       setSelectedExpIds(new Set())
       setError('')
       setSuccess('')
@@ -73,6 +89,8 @@ export function ManageExperimentSets() {
       const set = sets.find(s => s.id === selectedSetId)
       if (set) {
         setName(set.name)
+        setHypothesis(set.hypothesis || '')
+        setConclusion(set.conclusion || '')
         setSelectedExpIds(new Set(set.experiments.map(e => e.id)))
         setError('')
         setSuccess('')
@@ -104,7 +122,9 @@ export function ManageExperimentSets() {
         },
         body: JSON.stringify({
           name: name.trim(),
-          project: activeProject,
+          hypothesis: hypothesis.trim(),
+          conclusion: conclusion.trim(),
+          project: activeProject.id,
           experiment_ids: Array.from(selectedExpIds),
         }),
       })
@@ -136,6 +156,8 @@ export function ManageExperimentSets() {
         },
         body: JSON.stringify({
           name: name.trim(),
+          hypothesis: hypothesis.trim(),
+          conclusion: conclusion.trim(),
           experiment_ids: Array.from(selectedExpIds),
         }),
       })
@@ -208,6 +230,30 @@ export function ManageExperimentSets() {
           onChange={e => setName(e.target.value)}
           placeholder="e.g. FERM 100"
           className="w-full h-9 px-3 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
+      {/* Hypothesis */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Hypothesis</label>
+        <textarea
+          value={hypothesis}
+          onChange={e => setHypothesis(e.target.value)}
+          placeholder="What is the hypothesis for this experiment set?"
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+        />
+      </div>
+
+      {/* Conclusion */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Conclusion</label>
+        <textarea
+          value={conclusion}
+          onChange={e => setConclusion(e.target.value)}
+          placeholder="What was the conclusion from this experiment set?"
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
         />
       </div>
 

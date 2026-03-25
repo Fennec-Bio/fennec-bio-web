@@ -18,6 +18,7 @@ interface Experiment {
 
 export default function ExperimentsPage() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
+  const [selectedSetId, setSelectedSetId] = useState<string | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(true)
@@ -25,7 +26,13 @@ export default function ExperimentsPage() {
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
+    setIsEditOpen(true)
     setIsMobileMenuOpen(false)
+  }, [])
+
+  const handleExperimentSetSelect = useCallback((setId: string) => {
+    setSelectedSetId(setId)
+    setIsSetsOpen(true)
   }, [])
 
   return (
@@ -37,6 +44,7 @@ export default function ExperimentsPage() {
           <div className="fixed left-0 top-0 h-full w-[85%] max-w-[320px] bg-white overflow-y-auto shadow-xl">
             <ExperimentList
               onExperimentSelect={handleExperimentSelect}
+              onExperimentSetSelect={handleExperimentSetSelect}
               isMobileDrawer
             />
           </div>
@@ -57,6 +65,7 @@ export default function ExperimentsPage() {
           <div className="hidden md:block w-[364px] min-w-[364px] max-w-[416px] flex-shrink-0 relative z-30">
             <ExperimentList
               onExperimentSelect={handleExperimentSelect}
+              onExperimentSetSelect={handleExperimentSetSelect}
             />
           </div>
 
@@ -102,7 +111,7 @@ export default function ExperimentsPage() {
               </button>
               {isSetsOpen && (
                 <div className="p-3 md:p-4 lg:p-6">
-                  <ManageExperimentSets />
+                  <ManageExperimentSets externalSelectedSetId={selectedSetId} />
                 </div>
               )}
             </div>
