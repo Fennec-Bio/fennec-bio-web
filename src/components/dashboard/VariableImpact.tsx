@@ -21,7 +21,7 @@ interface ImpactEntry {
 interface GroupData {
   group: string
   values: number[]
-  experiments: { title: string; titer: number; experiment_set: string | null }[]
+  experiments: { title: string; titer: number; experiment_sets: string[] }[]
 }
 
 interface ApiResponse {
@@ -220,7 +220,7 @@ export function VariableImpact() {
     const yPad = (yExtent[1] - yExtent[0]) * 0.1 || 10
     const yScale = d3.scaleLinear().domain([Math.max(0, yExtent[0] - yPad), yExtent[1] + yPad]).range([height, 0])
 
-    const allSets = [...new Set(groupedData.flatMap(d => d.experiments.map(e => e.experiment_set || 'Unknown')))]
+    const allSets = [...new Set(groupedData.flatMap(d => d.experiments.flatMap(e => e.experiment_sets.length > 0 ? e.experiment_sets : ['Unknown'])))]
     const colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allSets)
 
     g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(xScale))
@@ -270,11 +270,11 @@ export function VariableImpact() {
       group.experiments.forEach(exp => {
         const jitter = (Math.random() - 0.5) * bw * 0.6
         g.append('circle').attr('cx', x + bw / 2 + jitter).attr('cy', yScale(exp.titer)).attr('r', 5)
-          .attr('fill', colorScale(exp.experiment_set || 'Unknown')).attr('stroke', 'white').attr('opacity', 0.8)
+          .attr('fill', colorScale(exp.experiment_sets[0] || 'Unknown')).attr('stroke', 'white').attr('opacity', 0.8)
           .style('cursor', 'pointer')
           .on('mouseover', () => {
             tooltip.style('visibility', 'visible').html(
-              `<strong>${exp.title}</strong><br/>${selectedVariable}: ${group.group}<br/>Titer: ${exp.titer.toFixed(1)}<br/><span style="color:#6b7280">${exp.experiment_set || 'No set'}</span>`
+              `<strong>${exp.title}</strong><br/>${selectedVariable}: ${group.group}<br/>Titer: ${exp.titer.toFixed(1)}<br/><span style="color:#6b7280">${exp.experiment_sets.length > 0 ? exp.experiment_sets.join(', ') : 'No set'}</span>`
             )
           })
           .on('mousemove', (event) => {
