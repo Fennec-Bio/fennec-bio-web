@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ExperimentList } from '@/components/Shared/ExperimentList'
 import { CreateExperiment } from '@/components/experiments/CreateExperiment'
 import { EditExperiment } from '@/components/experiments/EditExperiment'
+import { ManageExperimentSets } from '@/components/experiments/ManageExperimentSets'
 
 interface Experiment {
   id: number
@@ -20,6 +21,7 @@ export default function ExperimentsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(true)
+  const [isSetsOpen, setIsSetsOpen] = useState(false)
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
@@ -86,6 +88,21 @@ export default function ExperimentsPage() {
               {isEditOpen && (
                 <div>
                   <EditExperiment selectedExperiment={selectedExperiment} />
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow">
+              <button
+                onClick={() => setIsSetsOpen(!isSetsOpen)}
+                className="w-full px-4 py-3 flex items-center justify-between text-left text-xl md:text-2xl font-bold text-gray-900 hover:bg-gray-50 rounded-t-lg"
+              >
+                <span>Experiment Sets</span>
+                {isSetsOpen ? <ChevronDown className="h-5 w-5 text-gray-500" /> : <ChevronRight className="h-5 w-5 text-gray-500" />}
+              </button>
+              {isSetsOpen && (
+                <div className="p-3 md:p-4 lg:p-6">
+                  <ManageExperimentSets />
                 </div>
               )}
             </div>
