@@ -34,6 +34,7 @@ export function CreateExperiment() {
     events: string[]
     anomalies: string[]
   }>({ variables: {}, events: [], anomalies: [] })
+  const [dataTemplates, setDataTemplates] = useState<{ id: number; name: string; timepoint_column: string; time_unit: string; column_mappings: { column: string; name: string; category: string; unit: string }[] }[]>([])
 
   // Fetch unique_names on mount (and when active project changes)
   useEffect(() => {
@@ -57,6 +58,21 @@ export function CreateExperiment() {
     }
 
     fetchUniqueNames()
+
+    // Fetch data templates
+    const fetchTemplates = async () => {
+      if (!activeProject) return
+      try {
+        const token = await getToken()
+        const res = await fetch(`${apiUrl}/api/data-templates/?project_id=${activeProject.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) setDataTemplates(await res.json())
+      } catch {
+        // Non-critical
+      }
+    }
+    fetchTemplates()
   }, [getToken, apiUrl, activeProject])
 
   const resetForm = () => {
@@ -185,16 +201,7 @@ export function CreateExperiment() {
             noteImages={noteImages}
             onNoteImagesChange={setNoteImages}
           />
-          <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={!title.trim() || isCreating}
-              className="px-6 py-2 text-sm font-medium text-white rounded-md shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: '#eb5234' }}
-            >
-              {isCreating ? 'Creating…' : 'Create Experiment'}
-            </button>
+          <div className="flex justify-end pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={() => setStep(2)}
@@ -219,6 +226,7 @@ export function CreateExperiment() {
             onSkip={handleCreate}
             onBack={() => setStep(1)}
             projectId={activeProject?.id ?? 0}
+            dataTemplates={dataTemplates}
           />
         </>
       )}
@@ -231,8 +239,18 @@ export function CreateExperiment() {
             classifiedData={classifiedData}
             onDataChange={setClassifiedData}
             title={title}
-            variableCount={variables.filter((v) => v.name.trim() !== '').length}
-            eventCount={events.filter((e) => e.name.trim() !== '').length}
+            onTitleChange={setTitle}
+            variables={variables}
+            onVariablesChange={setVariables}
+            events={events}
+            onEventsChange={setEvents}
+            anomalies={anomalies}
+            onAnomaliesChange={setAnomalies}
+            uniqueNames={uniqueNames}
+            experimentNote={experimentNote}
+            onExperimentNoteChange={setExperimentNote}
+            noteImages={noteImages}
+            onNoteImagesChange={setNoteImages}
             onBack={() => setStep(2)}
             onCreate={handleCreate}
             isCreating={isCreating}
