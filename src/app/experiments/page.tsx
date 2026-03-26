@@ -6,6 +6,7 @@ import { ExperimentList } from '@/components/Shared/ExperimentList'
 import { CreateExperiment } from '@/components/experiments/CreateExperiment'
 import { EditExperiment } from '@/components/experiments/EditExperiment'
 import { ManageExperimentSets } from '@/components/experiments/ManageExperimentSets'
+import { DataTemplates } from '@/components/experiments/DataTemplates'
 
 interface Experiment {
   id: number
@@ -23,6 +24,7 @@ export default function ExperimentsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(true)
   const [isSetsOpen, setIsSetsOpen] = useState(false)
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
@@ -112,6 +114,21 @@ export default function ExperimentsPage() {
               {isSetsOpen && (
                 <div className="p-3 md:p-4 lg:p-6">
                   <ManageExperimentSets externalSelectedSetId={selectedSetId} />
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow">
+              <button
+                onClick={() => setIsTemplatesOpen(!isTemplatesOpen)}
+                className="w-full px-4 py-3 flex items-center justify-between text-left text-xl md:text-2xl font-bold text-gray-900 hover:bg-gray-50 rounded-t-lg"
+              >
+                <span>Data Templates</span>
+                {isTemplatesOpen ? <ChevronDown className="h-5 w-5 text-gray-500" /> : <ChevronRight className="h-5 w-5 text-gray-500" />}
+              </button>
+              {isTemplatesOpen && (
+                <div className="p-3 md:p-4 lg:p-6">
+                  <DataTemplates />
                 </div>
               )}
             </div>
