@@ -114,11 +114,11 @@ export function DataTemplates() {
     fetchUniqueNames()
   }, [fetchTemplates, fetchUniqueNames])
 
-  const allKnownNames = [
-    ...uniqueNames.products.map(n => ({ name: n, category: 'product' as const })),
-    ...uniqueNames.secondary_products.map(n => ({ name: n, category: 'secondary_product' as const })),
-    ...uniqueNames.process_data.map(n => ({ name: n, category: 'process_data' as const })),
-  ]
+  const namesByCategory: Record<string, string[]> = {
+    product: uniqueNames.products,
+    secondary_product: uniqueNames.secondary_products,
+    process_data: uniqueNames.process_data,
+  }
 
   const resetForm = () => {
     setIsEditing(false)
@@ -153,15 +153,11 @@ export function DataTemplates() {
 
   const updateMapping = (index: number, field: keyof ColumnMapping, value: string) => {
     const updated = [...formMappings]
-    if (field === 'name') {
-      const detectedCategory = getCategoryForName(value, uniqueNames)
-      updated[index] = {
-        ...updated[index],
-        name: value,
-        ...(detectedCategory ? { category: detectedCategory } : {}),
-      }
-    } else if (field === 'category') {
-      updated[index] = { ...updated[index], category: value as ColumnMapping['category'] }
+    if (field === 'category') {
+      // When category changes, clear name since it may not belong to the new category
+      updated[index] = { ...updated[index], category: value as ColumnMapping['category'], name: '', unit: '' }
+    } else if (field === 'name') {
+      updated[index] = { ...updated[index], name: value }
     } else {
       updated[index] = { ...updated[index], [field]: value }
     }
@@ -302,11 +298,11 @@ export function DataTemplates() {
 
         {formMappings.length > 0 && (
           <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
-            <div className="grid grid-cols-[60px_1fr_120px_80px_32px] gap-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
-              <span>Col</span><span>Name</span><span>Category</span><span>Unit</span><span />
+            <div className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
+              <span>Col</span><span>Category</span><span>Name</span><span>Unit</span><span />
             </div>
             {formMappings.map((m, i) => (
-              <div key={i} className="grid grid-cols-[60px_1fr_120px_80px_32px] gap-0 px-3 py-2 border-t border-gray-100 items-center">
+              <div key={i} className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 px-3 py-2 border-t border-gray-100 items-center">
                 <select
                   value={m.column}
                   onChange={e => updateMapping(i, 'column', e.target.value)}
@@ -315,6 +311,16 @@ export function DataTemplates() {
                   {COLUMN_LETTERS.map(l => (
                     <option key={l} value={l}>{l}</option>
                   ))}
+                </select>
+
+                <select
+                  value={m.category}
+                  onChange={e => updateMapping(i, 'category', e.target.value)}
+                  className="border border-gray-200 rounded px-1 py-1 text-sm"
+                >
+                  <option value="product">Product</option>
+                  <option value="secondary_product">Secondary</option>
+                  <option value="process_data">Process</option>
                 </select>
 
                 <div className="flex items-center gap-1">
@@ -328,29 +334,13 @@ export function DataTemplates() {
                     placeholder="Select or type..."
                   />
                   <datalist id={`names-${i}`}>
-                    {allKnownNames.map(n => (
-                      <option key={`${n.category}-${n.name}`} value={n.name} />
+                    {(namesByCategory[m.category] || []).map(n => (
+                      <option key={n} value={n} />
                     ))}
                   </datalist>
                 </div>
 
-                <select
-                  value={m.category}
-                  onChange={e => updateMapping(i, 'category', e.target.value)}
-                  className="border border-gray-200 rounded px-1 py-1 text-sm"
-                >
-                  <option value="product">Product</option>
-                  <option value="secondary_product">Secondary</option>
-                  <option value="process_data">Process</option>
-                </select>
-
-                <input
-                  type="text"
-                  value={m.unit}
-                  onChange={e => updateMapping(i, 'unit', e.target.value)}
-                  className="border border-gray-200 rounded px-2 py-1 text-sm w-full"
-                  placeholder="mg/L"
-                />
+                <span className="text-sm text-gray-500 truncate">{m.unit || '—'}</span>
 
                 <button onClick={() => removeMapping(i)} className="text-gray-300 hover:text-red-500">
                   <X className="h-4 w-4" />
