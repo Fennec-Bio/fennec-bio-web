@@ -83,6 +83,8 @@ interface QuickGraphProps {
   selectedExperiment: Experiment | null
   onExperimentSelect?: (experiment: Experiment) => void
   experiments: Experiment[]
+  /** When set, the graph starts on this experiment via the dropdown (not sidebar-tracking mode). */
+  defaultExperiment?: Experiment | null
 }
 
 /** Parse a timepoint string like "2 hr", "96h", "15:25:36" into hours */
@@ -156,7 +158,7 @@ function decimateData<T>(data: T[], maxPoints: number = 1000): T[] {
 // Simple in-memory cache so switching between experiments is instant on revisit
 const experimentCache = new Map<string, ExperimentDetail>()
 
-export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments }: QuickGraphProps) {
+export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments, defaultExperiment }: QuickGraphProps) {
   const { getToken } = useAuth()
   const [experimentData, setExperimentData] = useState<ExperimentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -169,7 +171,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   const [graphType, setGraphType] = useState<'line' | 'bar'>('line')
   const [graphTypeOpen, setGraphTypeOpen] = useState(false)
   const [selectedMetabolites, setSelectedMetabolites] = useState<Record<string, boolean>>({})
-  const [manualExperiment, setManualExperiment] = useState<Experiment | null>(null)
+  const [manualExperiment, setManualExperiment] = useState<Experiment | null>(defaultExperiment ?? null)
   const [currentTitle, setCurrentTitle] = useState<string | null>(null)
 
   const svgRef = useRef<SVGSVGElement>(null)
@@ -182,7 +184,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     setExperimentData(null)
     setCurrentTitle(null)
     setSelectedMetabolites({})
-    setManualExperiment(null)
+    setManualExperiment(defaultExperiment ?? null)
     prevUniqueRef.current = ''
     fetchingTitleRef.current = null
     experimentCache.clear()

@@ -75,12 +75,13 @@ export function QuickView({ selectedExperiment, onExperimentSelect, experiments,
             experiments={experiments}
           />
         </div>
-        {/* Second graph - hidden on mobile */}
+        {/* Second graph - hidden on mobile, defaults to first experiment */}
         <div className="hidden md:block md:flex-1 md:min-w-[380px]">
           <QuickGraph
             selectedExperiment={selectedExperiment}
             onExperimentSelect={onExperimentSelect}
             experiments={experiments}
+            defaultExperiment={experiments[0] ?? null}
           />
         </div>
       </div>
