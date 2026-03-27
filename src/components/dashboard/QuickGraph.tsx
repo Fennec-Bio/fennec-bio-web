@@ -60,6 +60,8 @@ interface ExperimentDetail {
   variables: Variable[]
   events: Event[]
   anomalies: Anomaly[]
+  note_images?: unknown[]
+  comments?: unknown[]
   unique_names?: {
     products?: string[]
     secondary_products?: string[]
@@ -151,10 +153,14 @@ function decimateData<T>(data: T[], maxPoints: number = 1000): T[] {
   return result
 }
 
+// Simple in-memory cache so switching between experiments is instant on revisit
+const experimentCache = new Map<string, ExperimentDetail>()
+
 export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments }: QuickGraphProps) {
   const { getToken } = useAuth()
   const [experimentData, setExperimentData] = useState<ExperimentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingExtra, setIsLoadingExtra] = useState(false)
   const [showVariables, setShowVariables] = useState(false)
   const [showEvents, setShowEvents] = useState(false)
   const [showAnomalies, setShowAnomalies] = useState(false)
@@ -177,16 +183,19 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     setCurrentTitle(null)
     setSelectedMetabolites({})
     setManualExperiment(null)
+    prevUniqueRef.current = ''
+    fetchingTitleRef.current = null
+    experimentCache.clear()
     if (svgRef.current) {
       d3.select(svgRef.current).selectAll('*').remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experiments])
 
-  // Follow sidebar selection when no manual override
+  // Follow sidebar selection when no manual override — reset fetch ref to allow new fetch
   useEffect(() => {
     if (!manualExperiment && selectedExperiment) {
-      setCurrentTitle(null) // force refetch
+      fetchingTitleRef.current = null
     }
   }, [selectedExperiment, manualExperiment])
 
@@ -198,38 +207,115 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     return { width, height: Math.round(width * 0.72) }
   }, [])
 
-  // Fetch experiment data when selection changes
+  // Track which title is being fetched so stale async results are ignored
+  const fetchingTitleRef = useRef<string | null>(null)
+
+  // Two-phase fetch: products first (fast graph render), then secondary + process data
   useEffect(() => {
-    if (activeExperiment && activeExperiment.title !== currentTitle) {
-      setCurrentTitle(activeExperiment.title)
-      const fetchData = async () => {
-        setIsLoading(true)
-        try {
-          const token = await getToken()
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(activeExperiment.title)}/`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          if (!res.ok) throw new Error('Failed to fetch')
-          setExperimentData(await res.json())
-        } catch (err) {
-          console.error('Error fetching experiment data:', err)
-        } finally {
+    if (!activeExperiment) return
+    const title = activeExperiment.title
+
+    // Check cache first
+    const cached = experimentCache.get(title)
+    if (cached) {
+      setExperimentData(cached)
+      setCurrentTitle(title)
+      setIsLoading(false)
+      setIsLoadingExtra(false)
+      return
+    }
+
+    // Skip if we're already fetching this title
+    if (fetchingTitleRef.current === title) return
+
+    fetchingTitleRef.current = title
+    setCurrentTitle(title)
+
+    const encodedTitle = encodeURIComponent(title)
+    const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodedTitle}/`
+
+    const fetchData = async () => {
+      setIsLoading(true)
+      setIsLoadingExtra(false)
+      try {
+        const token = await getToken()
+        const headers = { Authorization: `Bearer ${token}` }
+
+        // Phase 1: products + metadata (lightweight — renders graph immediately)
+        const res1 = await fetch(
+          `${baseUrl}?fields=products,variables,events,anomalies,unique_names`,
+          { headers }
+        )
+        if (!res1.ok) throw new Error('Failed to fetch')
+        const phase1 = await res1.json()
+
+        // Stale check — user may have switched experiments
+        if (fetchingTitleRef.current !== title) return
+        const partial: ExperimentDetail = {
+          ...phase1,
+          secondary_products: phase1.secondary_products || [],
+          process_data: phase1.process_data || [],
+        }
+        setExperimentData(partial)
+        setIsLoading(false)
+        setIsLoadingExtra(true)
+
+        // Phase 2: secondary products + process data (heavier — loads in background)
+        const res2 = await fetch(
+          `${baseUrl}?fields=secondary_products,process_data,note_images,comments,unique_names`,
+          { headers }
+        )
+        if (!res2.ok) throw new Error('Failed to fetch extra data')
+        const phase2 = await res2.json()
+
+        if (fetchingTitleRef.current !== title) return
+        const full: ExperimentDetail = {
+          ...partial,
+          secondary_products: phase2.secondary_products || [],
+          process_data: phase2.process_data || [],
+          note_images: phase2.note_images,
+          comments: phase2.comments,
+          unique_names: {
+            products: partial.unique_names?.products || [],
+            secondary_products: phase2.unique_names?.secondary_products || [],
+            process_data: phase2.unique_names?.process_data || [],
+          },
+        }
+        setExperimentData(full)
+        experimentCache.set(title, full)
+      } catch (err) {
+        console.error('Error fetching experiment data:', err)
+      } finally {
+        if (fetchingTitleRef.current === title) {
           setIsLoading(false)
+          setIsLoadingExtra(false)
         }
       }
-      fetchData()
     }
-  }, [activeExperiment, currentTitle, getToken])
+    fetchData()
+  }, [activeExperiment, getToken])
 
-  // Set default metabolite selections when data loads
+  // Set default metabolite selections when data loads.
+  // Preserve existing selections when phase 2 data arrives (merges new names in as unchecked).
+  const prevUniqueRef = useRef<string>('')
   useEffect(() => {
-    if (!experimentData) return
-    const defaults: Record<string, boolean> = {}
-    experimentData.unique_names?.products?.forEach(n => { defaults[n] = true })
-    experimentData.unique_names?.secondary_products?.forEach(n => { defaults[n] = false })
-    experimentData.unique_names?.process_data?.forEach(n => { defaults[n] = false })
-    setSelectedMetabolites(defaults)
+    if (!experimentData?.unique_names) return
+    const allNames = [
+      ...(experimentData.unique_names.products || []),
+      ...(experimentData.unique_names.secondary_products || []),
+      ...(experimentData.unique_names.process_data || []),
+    ]
+    const key = allNames.join(',')
+    if (key === prevUniqueRef.current) return
+    prevUniqueRef.current = key
+
+    setSelectedMetabolites(prev => {
+      const next: Record<string, boolean> = { ...prev }
+      experimentData.unique_names?.products?.forEach(n => { if (!(n in next)) next[n] = true })
+      experimentData.unique_names?.secondary_products?.forEach(n => { if (!(n in next)) next[n] = false })
+      experimentData.unique_names?.process_data?.forEach(n => { if (!(n in next)) next[n] = false })
+      return next
+    })
   }, [experimentData])
 
   // Close dropdowns on outside click
@@ -592,6 +678,14 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#eb5234]" />
             <span className="text-gray-600 text-sm">Loading experiment data...</span>
           </div>
+        </div>
+      )}
+
+      {/* Phase 2 loading indicator */}
+      {isLoadingExtra && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-500">
+          <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-400" />
+          Loading secondary products &amp; process data...
         </div>
       )}
 

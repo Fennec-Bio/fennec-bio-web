@@ -202,7 +202,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
     try {
       const token = await getToken()
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,unique_names`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       if (!res.ok) throw new Error('Failed to fetch')
@@ -343,33 +343,6 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
       }
     })
 
-    // Event & anomaly markers with numbered labels
-    const maxTime = d3.max(allData, d => d.time)!
-    let markerNum = 1
-    const drawMarkers = (items: { timepoint: string; name: string }[], color: string) => {
-      items.forEach(item => {
-        const t = parseTimepoint(item.timepoint)
-        if (t >= 0 && t <= maxTime) {
-          const x = xScale(t)
-          const num = markerNum++
-          svg.append('line').attr('x1', x).attr('y1', 0).attr('x2', x).attr('y2', h)
-            .attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', '5,5').attr('opacity', 0.7)
-          svg.append('text').attr('x', x).attr('y', -10).attr('text-anchor', 'middle')
-            .attr('font-size', '11px').attr('font-weight', 'bold').attr('fill', color).text(num)
-        }
-      })
-    }
-    if (showEvents) {
-      for (let i = 0; i < 3; i++) {
-        if (datas[i]?.events) drawMarkers(datas[i]!.events, EVENT_COLORS[i])
-      }
-    }
-    if (showAnomalies) {
-      for (let i = 0; i < 3; i++) {
-        if (datas[i]?.anomalies) drawMarkers(datas[i]!.anomalies, ANOMALY_COLORS[i])
-      }
-    }
-
     // Axis labels
     svg.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle').attr('font-size', '12px').text('Time (hr)')
     svg.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -50).attr('text-anchor', 'middle').attr('font-size', '12px').text('Value')
@@ -381,7 +354,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
       g.append('rect').attr('width', 12).attr('height', 12).attr('fill', colorMap.get(key)!)
       g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '11px').text(key)
     })
-  }, [datas, metabolites, showEvents, showAnomalies, getGraphDimensions, buildAllData])
+  }, [datas, metabolites, getGraphDimensions, buildAllData])
 
   const renderBarGraph = useCallback(() => {
     if (!svgRef.current || !datas.some(d => d)) return
@@ -448,7 +421,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
   useEffect(() => {
     if (!svgRef.current) return
     graphType === 'bar' ? renderBarGraph() : renderLineGraph()
-  }, [datas, metabolites, graphType, showEvents, showAnomalies, renderLineGraph, renderBarGraph])
+  }, [datas, metabolites, graphType, renderLineGraph, renderBarGraph])
 
   // Debounced resize
   useEffect(() => {

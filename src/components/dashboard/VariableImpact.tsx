@@ -3,9 +3,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import * as d3 from 'd3'
-import { KineticAnalysis } from './KineticAnalysis'
-
-type AnalysisTab = 'variable-impact' | 'kinetics'
 
 interface ImpactEntry {
   variable: string
@@ -33,7 +30,6 @@ interface ApiResponse {
 export function VariableImpact() {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
-  const [activeTab, setActiveTab] = useState<AnalysisTab>('variable-impact')
   const [data, setData] = useState<ApiResponse | null>(null)
   const [allProducts, setAllProducts] = useState<string[]>([])
   const [selectedProduct, setSelectedProduct] = useState('')
@@ -287,34 +283,9 @@ export function VariableImpact() {
     return () => { d3.selectAll('.vi-tooltip').remove() }
   }, [selectedVariable, groupedData, selectedProduct])
 
-  const tabs: { id: AnalysisTab; label: string }[] = [
-    { id: 'variable-impact', label: 'Variable Impact' },
-    { id: 'kinetics', label: 'Kinetic Analysis' },
-  ]
-
   return (
     <div>
-      {/* Tab navigation */}
-      <div className="border-b border-gray-200 px-4">
-        <nav className="flex gap-4">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Variable Impact tab */}
-      <div className={activeTab === 'variable-impact' ? '' : 'hidden'}>
+      <div>
         <div className="p-4">
           {/* Product selector */}
           <div className="mb-4 flex items-center gap-2">
@@ -442,10 +413,6 @@ export function VariableImpact() {
         </div>
       </div>
 
-      {/* Kinetic Analysis tab */}
-      <div className={activeTab === 'kinetics' ? '' : 'hidden'}>
-        <KineticAnalysis />
-      </div>
     </div>
   )
 }
