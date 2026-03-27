@@ -202,7 +202,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
     try {
       const token = await getToken()
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,unique_names`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,unique_names&max_points=500`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       if (!res.ok) throw new Error('Failed to fetch')

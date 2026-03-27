@@ -262,7 +262,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
 
         // Phase 2: secondary products + process data (heavier — loads in background)
         const res2 = await fetch(
-          `${baseUrl}?fields=secondary_products,process_data,note_images,comments,unique_names`,
+          `${baseUrl}?fields=secondary_products,process_data,note_images,comments,unique_names&max_points=500`,
           { headers }
         )
         if (!res2.ok) throw new Error('Failed to fetch extra data')
