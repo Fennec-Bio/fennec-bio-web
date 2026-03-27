@@ -457,7 +457,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
         {/* Experiment Description */}
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-gray-700">Experiment Description</h2>
+            <h2 className="text-sm font-semibold text-gray-700">Experiment Summary</h2>
             {!editingDescription && (
               <button
                 onClick={() => { setDescriptionDraft(data?.experiment?.description || ''); setEditingDescription(true) }}

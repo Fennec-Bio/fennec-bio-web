@@ -580,7 +580,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       {/* Description */}
       {activeExperiment && (
         <div className="p-3 bg-gray-50 rounded-lg">
-          <h3 className="font-medium text-gray-900 text-sm">Experiment Description:</h3>
+          <h3 className="font-medium text-gray-900 text-sm">Experiment Summary:</h3>
           <p className="text-gray-700 text-sm mt-1 line-clamp-4 min-h-[5rem]">{activeExperiment.description}</p>
         </div>
       )}

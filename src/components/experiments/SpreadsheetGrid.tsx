@@ -57,6 +57,13 @@ function getCellValue(grid: GridData, row: number, col: number): string {
   return grid.rows[row]?.values[col] ?? ''
 }
 
+const TIME_UNIT_OPTIONS = [
+  { value: 'hours', label: 'Time (hours)' },
+  { value: 'minutes', label: 'Time (minutes)' },
+  { value: 'days', label: 'Time (days)' },
+  { value: 'hh:mm:ss', label: 'Time (HH:MM:SS)' },
+]
+
 interface SpreadsheetGridProps {
   grid: GridData
   onChange: (grid: GridData) => void
@@ -64,6 +71,8 @@ interface SpreadsheetGridProps {
   truncated?: boolean
   showAddRow?: boolean
   showAddColumn?: boolean
+  timeUnit?: string
+  onTimeUnitChange?: (unit: string) => void
 }
 
 export function SpreadsheetGrid({
@@ -73,6 +82,8 @@ export function SpreadsheetGrid({
   truncated = false,
   showAddRow = false,
   showAddColumn = false,
+  timeUnit,
+  onTimeUnitChange,
 }: SpreadsheetGridProps) {
   const [selAnchor, setSelAnchor] = useState<CellPos | null>(null)
   const [selEnd, setSelEnd] = useState<CellPos | null>(null)
@@ -362,7 +373,21 @@ export function SpreadsheetGrid({
           <thead>
             <tr className="bg-gray-50">
               <th className="sticky left-0 bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[100px]">
-                Time
+                {timeUnit && onTimeUnitChange ? (
+                  <select
+                    value={timeUnit}
+                    onChange={e => onTimeUnitChange(e.target.value)}
+                    className="bg-transparent text-xs font-semibold text-gray-500 uppercase cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+                  >
+                    {TIME_UNIT_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : timeUnit ? (
+                  TIME_UNIT_OPTIONS.find(o => o.value === timeUnit)?.label ?? 'Time'
+                ) : (
+                  'Time'
+                )}
               </th>
               {grid.names.map(name => (
                 <th key={name} className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[100px]">

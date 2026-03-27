@@ -4,34 +4,63 @@ import React, { useState } from 'react'
 import { ClassifiedData } from './Step2Upload'
 import { SpreadsheetGrid, GridData } from './SpreadsheetGrid'
 import { DataChart } from './DataChart'
+import { Step1Details } from './Step1Details'
 
 interface Step3ReviewProps {
   classifiedData: ClassifiedData
   onDataChange: (data: ClassifiedData) => void
   title: string
-  variableCount: number
-  eventCount: number
+  onTitleChange: (title: string) => void
+  variables: { name: string; value: string }[]
+  onVariablesChange: (vars: { name: string; value: string }[]) => void
+  events: { name: string; timepoint: string }[]
+  onEventsChange: (evts: { name: string; timepoint: string }[]) => void
+  anomalies: { name: string; timepoint: string; description: string }[]
+  onAnomaliesChange: (anoms: { name: string; timepoint: string; description: string }[]) => void
+  uniqueNames: {
+    variables: Record<string, string[]>
+    events: string[]
+    anomalies: string[]
+  }
+  experimentNote: string
+  onExperimentNoteChange: (note: string) => void
+  noteImages: File[]
+  onNoteImagesChange: (images: File[]) => void
   onBack: () => void
   onCreate: () => void
   isCreating: boolean
 }
 
-type TabKey = 'products' | 'secondary_products' | 'process_data'
+type TabKey = 'details' | 'products' | 'secondary_products' | 'process_data'
 
 export function Step3Review({
   classifiedData,
   onDataChange,
   title,
-  variableCount,
-  eventCount,
+  onTitleChange,
+  variables,
+  onVariablesChange,
+  events,
+  onEventsChange,
+  anomalies,
+  onAnomaliesChange,
+  uniqueNames,
+  experimentNote,
+  onExperimentNoteChange,
+  noteImages,
+  onNoteImagesChange,
   onBack,
   onCreate,
   isCreating,
 }: Step3ReviewProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('products')
+  const [activeTab, setActiveTab] = useState<TabKey>('details')
   const [visibleCharts, setVisibleCharts] = useState<Set<string>>(new Set())
 
+  const variableCount = variables.filter(v => v.name.trim() !== '').length
+  const eventCount = events.filter(e => e.name.trim() !== '').length
+
   const tabs: { key: TabKey; label: string; count: number }[] = [
+    { key: 'details', label: 'Experiment Details', count: variableCount + eventCount },
     { key: 'products', label: 'Products', count: classifiedData.products.length },
     { key: 'secondary_products', label: 'Secondary Products', count: classifiedData.secondary_products.length },
     { key: 'process_data', label: 'Process Data', count: classifiedData.process_data.length },
@@ -189,6 +218,24 @@ export function Step3Review({
 
       {/* Tab content */}
       <div className="flex flex-col gap-6">
+        {activeTab === 'details' && (
+          <Step1Details
+            title={title}
+            onTitleChange={onTitleChange}
+            variables={variables}
+            onVariablesChange={onVariablesChange}
+            events={events}
+            onEventsChange={onEventsChange}
+            anomalies={anomalies}
+            onAnomaliesChange={onAnomaliesChange}
+            uniqueNames={uniqueNames}
+            experimentNote={experimentNote}
+            onExperimentNoteChange={onExperimentNoteChange}
+            noteImages={noteImages}
+            onNoteImagesChange={onNoteImagesChange}
+          />
+        )}
+
         {activeTab === 'products' && (
           <>
             {classifiedData.products.length === 0 && (
