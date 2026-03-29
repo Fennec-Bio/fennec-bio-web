@@ -71,6 +71,13 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     refreshProjects()
   }, [refreshProjects])
 
+  // Auto-select the first project if none is active
+  useEffect(() => {
+    if (activeProjectId === null && projects.length > 0) {
+      setActiveProjectId(projects[0].id)
+    }
+  }, [activeProjectId, projects, setActiveProjectId])
+
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
 
   return (

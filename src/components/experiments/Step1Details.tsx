@@ -16,6 +16,8 @@ interface Step1DetailsProps {
     events: string[]
     anomalies: string[]
   }
+  experimentSummary: string
+  onExperimentSummaryChange: (summary: string) => void
   experimentNote: string
   onExperimentNoteChange: (note: string) => void
   noteImages: File[]
@@ -41,6 +43,8 @@ export function Step1Details({
   anomalies,
   onAnomaliesChange,
   uniqueNames,
+  experimentSummary,
+  onExperimentSummaryChange,
   experimentNote,
   onExperimentNoteChange,
   noteImages,
@@ -448,6 +452,20 @@ export function Step1Details({
             </div>
           )
         })}
+      </div>
+
+      {/* ---- Experiment Summary ---- */}
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Experiment Summary
+        </label>
+        <textarea
+          rows={3}
+          value={experimentSummary}
+          onChange={(e) => onExperimentSummaryChange(e.target.value)}
+          placeholder="Brief summary of the experiment's purpose, goals, or hypothesis..."
+          className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-y"
+        />
       </div>
 
       {/* ---- Experiment Notes ---- */}

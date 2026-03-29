@@ -64,7 +64,7 @@ export const Navbar = ({ onMenuToggle, isMenuOpen }: NavbarProps) => {
               className="flex items-center gap-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
             >
               <span className="text-sm font-medium truncate max-w-[120px]">
-                {activeProject?.name ?? 'All Projects'}
+                {activeProject?.name ?? 'Select Project'}
               </span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -84,19 +84,6 @@ export const Navbar = ({ onMenuToggle, isMenuOpen }: NavbarProps) => {
                   onClick={() => setProjectDropdownOpen(false)}
                 />
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg z-50 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      setActiveProjectId(null)
-                      setProjectDropdownOpen(false)
-                    }}
-                    className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
-                      activeProject === null
-                        ? 'bg-gray-100 text-gray-900 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    All Projects
-                  </button>
                   {projects.map((project) => (
                     <button
                       key={project.id}

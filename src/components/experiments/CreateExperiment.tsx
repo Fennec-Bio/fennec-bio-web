@@ -22,6 +22,7 @@ export function CreateExperiment() {
   const [events, setEvents] = useState<{ name: string; timepoint: string }[]>([])
   const [anomalies, setAnomalies] = useState<{ name: string; timepoint: string; description: string }[]>([])
   const [classifiedData, setClassifiedData] = useState<ClassifiedData | null>(null)
+  const [experimentSummary, setExperimentSummary] = useState('')
   const [experimentNote, setExperimentNote] = useState('')
   const [noteImages, setNoteImages] = useState<File[]>([])
 
@@ -82,6 +83,7 @@ export function CreateExperiment() {
     setAnomalies([])
     setClassifiedData(null)
     setErrorMessage('')
+    setExperimentSummary('')
     setExperimentNote('')
     setNoteImages([])
   }
@@ -96,6 +98,7 @@ export function CreateExperiment() {
       const body = {
         title,
         project_id: activeProject?.id,
+        description: experimentSummary,
         experiment_note: experimentNote,
         variables: variables.filter((v) => v.name.trim() !== ''),
         events: events.filter((e) => e.name.trim() !== ''),
@@ -196,6 +199,8 @@ export function CreateExperiment() {
             anomalies={anomalies}
             onAnomaliesChange={setAnomalies}
             uniqueNames={uniqueNames}
+            experimentSummary={experimentSummary}
+            onExperimentSummaryChange={setExperimentSummary}
             experimentNote={experimentNote}
             onExperimentNoteChange={setExperimentNote}
             noteImages={noteImages}
@@ -247,6 +252,8 @@ export function CreateExperiment() {
             anomalies={anomalies}
             onAnomaliesChange={setAnomalies}
             uniqueNames={uniqueNames}
+            experimentSummary={experimentSummary}
+            onExperimentSummaryChange={setExperimentSummary}
             experimentNote={experimentNote}
             onExperimentNoteChange={setExperimentNote}
             noteImages={noteImages}

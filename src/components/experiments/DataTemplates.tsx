@@ -325,19 +325,34 @@ export function DataTemplates() {
 
                 <div className="flex items-center gap-1">
                   <span className={`w-2 h-2 rounded-full ${CATEGORY_COLORS[m.category]?.dot || 'bg-gray-300'}`} />
-                  <input
-                    type="text"
-                    list={`names-${i}`}
-                    value={m.name}
-                    onChange={e => updateMapping(i, 'name', e.target.value)}
-                    className="border border-gray-200 rounded px-2 py-1 text-sm flex-1 min-w-0"
-                    placeholder="Select or type..."
-                  />
-                  <datalist id={`names-${i}`}>
-                    {(namesByCategory[m.category] || []).map(n => (
-                      <option key={n} value={n} />
-                    ))}
-                  </datalist>
+                  {m.name !== '' && !(namesByCategory[m.category] || []).includes(m.name) ? (
+                    <input
+                      type="text"
+                      value={m.name}
+                      onChange={e => updateMapping(i, 'name', e.target.value)}
+                      className="border border-gray-200 rounded px-1 py-1 text-sm flex-1 min-w-0"
+                      placeholder="Type name..."
+                      autoFocus
+                    />
+                  ) : (
+                    <select
+                      value={m.name}
+                      onChange={e => {
+                        if (e.target.value === '__add_new__') {
+                          updateMapping(i, 'name', '')
+                        } else {
+                          updateMapping(i, 'name', e.target.value)
+                        }
+                      }}
+                      className="border border-gray-200 rounded px-1 py-1 text-sm flex-1 min-w-0"
+                    >
+                      <option value="">Select name...</option>
+                      {(namesByCategory[m.category] || []).map(n => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                      <option value="__add_new__">Add new...</option>
+                    </select>
+                  )}
                 </div>
 
                 <span className="text-sm text-gray-500 truncate">{m.unit || '—'}</span>

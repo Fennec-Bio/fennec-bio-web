@@ -22,6 +22,8 @@ interface Step3ReviewProps {
     events: string[]
     anomalies: string[]
   }
+  experimentSummary: string
+  onExperimentSummaryChange: (summary: string) => void
   experimentNote: string
   onExperimentNoteChange: (note: string) => void
   noteImages: File[]
@@ -45,6 +47,8 @@ export function Step3Review({
   anomalies,
   onAnomaliesChange,
   uniqueNames,
+  experimentSummary,
+  onExperimentSummaryChange,
   experimentNote,
   onExperimentNoteChange,
   noteImages,
@@ -229,6 +233,8 @@ export function Step3Review({
             anomalies={anomalies}
             onAnomaliesChange={onAnomaliesChange}
             uniqueNames={uniqueNames}
+            experimentSummary={experimentSummary}
+            onExperimentSummaryChange={onExperimentSummaryChange}
             experimentNote={experimentNote}
             onExperimentNoteChange={onExperimentNoteChange}
             noteImages={noteImages}

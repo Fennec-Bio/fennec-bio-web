@@ -21,10 +21,10 @@ export default function ExperimentsPage() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isCreateOpen, setIsCreateOpen] = useState(true)
   const [isEditOpen, setIsEditOpen] = useState(true)
-  const [isSetsOpen, setIsSetsOpen] = useState(false)
-  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
+  const [isSetsOpen, setIsSetsOpen] = useState(true)
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(true)
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
