@@ -93,11 +93,13 @@ const EVENT_COLORS = ['#3b82f6', '#9333ea', '#059669']
 const ANOMALY_COLORS = ['#ef4444', '#f97316', '#eab308']
 const CHECKBOX_COLORS = ['text-blue-600', 'text-purple-600', 'text-emerald-600']
 
-function parseTimepoint(tp: string): number {
-  const hhmmss = tp.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
+function parseTimepoint(tp: string | number): number {
+  if (tp === null || tp === undefined) return 0
+  const s = String(tp)
+  const hhmmss = s.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
   if (hhmmss) return parseInt(hhmmss[1]) + parseInt(hhmmss[2]) / 60 + parseFloat(hhmmss[3]) / 3600
 
-  const match = tp.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
+  const match = s.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
   if (match) {
     const num = parseFloat(match[1])
     const unit = match[2].toLowerCase()
@@ -105,7 +107,7 @@ function parseTimepoint(tp: string): number {
     if (unit.includes('day') || unit === 'd') return num * 24
     return num
   }
-  const num = parseFloat(tp)
+  const num = parseFloat(s)
   return isNaN(num) ? 0 : num
 }
 
@@ -202,7 +204,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
     try {
       const token = await getToken()
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,unique_names&max_points=500`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,unique_names&max_points=200`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       if (!res.ok) throw new Error('Failed to fetch')
@@ -214,22 +216,58 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
     }
   }, [getToken])
 
-  // Fetch data when experiments change
-  useEffect(() => { if (exps[0]) fetchExperimentData(exps[0].title, 0) }, [exps[0], fetchExperimentData])
-  useEffect(() => { if (exps[1]) fetchExperimentData(exps[1].title, 1) }, [exps[1], fetchExperimentData])
-  useEffect(() => { if (exps[2]) fetchExperimentData(exps[2].title, 2) }, [exps[2], fetchExperimentData])
+  // Track which titles are currently loaded to avoid redundant fetches
+  const loadedTitlesRef = useRef<(string | null)[]>([null, null, null])
 
-  // Auto-populate slots when an experiment set is selected
+  // Fetch data when individual experiment slots change
+  useEffect(() => {
+    exps.forEach((exp, idx) => {
+      const title = exp?.title ?? null
+      if (title === loadedTitlesRef.current[idx]) return
+      loadedTitlesRef.current[idx] = title
+      if (title) fetchExperimentData(title, idx)
+      else setData(idx, null)
+    })
+  }, [exps, fetchExperimentData])
+
+  // Auto-populate slots when an experiment set is selected — fetch all in parallel
   useEffect(() => {
     if (!preselectedExperiments || preselectedExperiments.length === 0) return
     const newExps: (Experiment | null)[] = [null, null, null]
     for (let i = 0; i < Math.min(preselectedExperiments.length, 3); i++) {
       newExps[i] = preselectedExperiments[i]
     }
-    setExps(newExps)
     setDatas([null, null, null])
     setMetabolites([{}, {}, {}])
-  }, [preselectedExperiments])
+    loadedTitlesRef.current = [null, null, null]
+
+    // Fire all fetches in parallel
+    const fetchAll = async () => {
+      const token = await getToken()
+      const promises = newExps.map(async (exp, idx) => {
+        if (!exp) return
+        setLoading(idx, true)
+        try {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(exp.title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,unique_names&max_points=200`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          if (res.ok) {
+            const data = await res.json()
+            setData(idx, data)
+            loadedTitlesRef.current[idx] = exp.title
+          }
+        } catch (err) {
+          console.error('Error fetching experiment data:', err)
+        } finally {
+          setLoading(idx, false)
+        }
+      })
+      await Promise.all(promises)
+    }
+    fetchAll()
+    setExps(newExps)
+  }, [preselectedExperiments, getToken])
 
   const initMetabolites = (data: ExperimentDetail | null): Record<string, boolean> => {
     if (!data) return {}

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import * as d3 from 'd3'
 
@@ -85,15 +85,20 @@ interface QuickGraphProps {
   experiments: Experiment[]
   /** When set, the graph starts on this experiment via the dropdown (not sidebar-tracking mode). */
   defaultExperiment?: Experiment | null
+  /** Pre-fetched data from batch endpoint — skips the API call when provided. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prefetchedData?: any
 }
 
 /** Parse a timepoint string like "2 hr", "96h", "15:25:36" into hours */
-function parseTimepoint(timepoint: string): number {
+function parseTimepoint(timepoint: string | number): number {
+  if (timepoint === null || timepoint === undefined) return 0
+  const tp = String(timepoint)
   // HH:MM:SS format (with optional fractional seconds)
-  const hhmmss = timepoint.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
+  const hhmmss = tp.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
   if (hhmmss) return parseInt(hhmmss[1]) + parseInt(hhmmss[2]) / 60 + parseFloat(hhmmss[3]) / 3600
 
-  const match = timepoint.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
+  const match = tp.match(/(\d+(?:\.\d+)?)\s*(hr|hours?|h|min|minutes?|m|days?|d)/i)
   if (match) {
     const num = parseFloat(match[1])
     const unit = match[2].toLowerCase()
@@ -101,7 +106,7 @@ function parseTimepoint(timepoint: string): number {
     if (unit.includes('day') || unit === 'd') return num * 24
     return num
   }
-  const num = parseFloat(timepoint)
+  const num = parseFloat(tp)
   return isNaN(num) ? 0 : num
 }
 
@@ -158,7 +163,7 @@ function decimateData<T>(data: T[], maxPoints: number = 1000): T[] {
 // Simple in-memory cache so switching between experiments is instant on revisit
 const experimentCache = new Map<string, ExperimentDetail>()
 
-export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments, defaultExperiment }: QuickGraphProps) {
+export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments, defaultExperiment, prefetchedData }: QuickGraphProps) {
   const { getToken } = useAuth()
   const [experimentData, setExperimentData] = useState<ExperimentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -180,7 +185,9 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   const activeExperiment = manualExperiment || selectedExperiment
 
   // Reset graph state when experiments list changes (e.g. project switch)
+  // Skip reset when prefetched data is provided — the prefetch effect handles initialization
   useEffect(() => {
+    if (prefetchedData) return
     setExperimentData(null)
     setCurrentTitle(null)
     setSelectedMetabolites({})
@@ -212,12 +219,42 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   // Track which title is being fetched so stale async results are ignored
   const fetchingTitleRef = useRef<string | null>(null)
 
-  // Two-phase fetch: products first (fast graph render), then secondary + process data
+  // Apply prefetched data immediately when provided (from batch endpoint)
+  const prefetchAppliedRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!activeExperiment) return
+    console.log('[QuickGraph] prefetch effect', {
+      hasData: !!prefetchedData,
+      activeExp: activeExperiment?.title,
+      appliedRef: prefetchAppliedRef.current,
+    })
+    if (!prefetchedData || !activeExperiment) return
+    const title = activeExperiment.title
+    if (prefetchAppliedRef.current === title) return
+    prefetchAppliedRef.current = title
+    const full: ExperimentDetail = {
+      experiment: prefetchedData.experiment,
+      products: prefetchedData.products || [],
+      secondary_products: prefetchedData.secondary_products || [],
+      process_data: prefetchedData.process_data || [],
+      variables: prefetchedData.variables || [],
+      events: prefetchedData.events || [],
+      anomalies: prefetchedData.anomalies || [],
+      note_images: prefetchedData.note_images,
+      comments: prefetchedData.comments,
+      unique_names: prefetchedData.unique_names,
+    }
+    setExperimentData(full)
+    setCurrentTitle(title)
+    setIsLoading(false)
+    setIsLoadingExtra(false)
+  }, [prefetchedData, activeExperiment])
+
+  // Fetch from API when no prefetched data
+  useEffect(() => {
+    if (!activeExperiment || prefetchedData) return
     const title = activeExperiment.title
 
-    // Check cache first
+    // Check cache
     const cached = experimentCache.get(title)
     if (cached) {
       setExperimentData(cached)
@@ -234,54 +271,29 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     setCurrentTitle(title)
 
     const encodedTitle = encodeURIComponent(title)
-    const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodedTitle}/`
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodedTitle}/?fields=products,secondary_products,process_data,variables,events,anomalies,note_images,comments,unique_names&max_points=200`
 
     const fetchData = async () => {
       setIsLoading(true)
       setIsLoadingExtra(false)
       try {
         const token = await getToken()
-        const headers = { Authorization: `Bearer ${token}` }
-
-        // Phase 1: products + metadata (lightweight — renders graph immediately)
-        const res1 = await fetch(
-          `${baseUrl}?fields=products,variables,events,anomalies,unique_names`,
-          { headers }
-        )
-        if (!res1.ok) throw new Error('Failed to fetch')
-        const phase1 = await res1.json()
-
-        // Stale check — user may have switched experiments
-        if (fetchingTitleRef.current !== title) return
-        const partial: ExperimentDetail = {
-          ...phase1,
-          secondary_products: phase1.secondary_products || [],
-          process_data: phase1.process_data || [],
-        }
-        setExperimentData(partial)
-        setIsLoading(false)
-        setIsLoadingExtra(true)
-
-        // Phase 2: secondary products + process data (heavier — loads in background)
-        const res2 = await fetch(
-          `${baseUrl}?fields=secondary_products,process_data,note_images,comments,unique_names&max_points=500`,
-          { headers }
-        )
-        if (!res2.ok) throw new Error('Failed to fetch extra data')
-        const phase2 = await res2.json()
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) throw new Error('Failed to fetch')
+        const data = await res.json()
 
         if (fetchingTitleRef.current !== title) return
         const full: ExperimentDetail = {
-          ...partial,
-          secondary_products: phase2.secondary_products || [],
-          process_data: phase2.process_data || [],
-          note_images: phase2.note_images,
-          comments: phase2.comments,
-          unique_names: {
-            products: partial.unique_names?.products || [],
-            secondary_products: phase2.unique_names?.secondary_products || [],
-            process_data: phase2.unique_names?.process_data || [],
-          },
+          experiment: data.experiment,
+          products: data.products || [],
+          secondary_products: data.secondary_products || [],
+          process_data: data.process_data || [],
+          variables: data.variables || [],
+          events: data.events || [],
+          anomalies: data.anomalies || [],
+          note_images: data.note_images,
+          comments: data.comments,
+          unique_names: data.unique_names,
         }
         setExperimentData(full)
         experimentCache.set(title, full)
@@ -295,7 +307,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       }
     }
     fetchData()
-  }, [activeExperiment, getToken])
+  }, [activeExperiment, getToken, prefetchedData])
 
   // Set default metabolite selections when data loads.
   // Preserve existing selections when phase 2 data arrives (merges new names in as unchecked).
@@ -332,8 +344,9 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     return () => document.removeEventListener('mousedown', handler)
   }, [metabolitesOpen, experimentDropdownOpen, graphTypeOpen])
 
-  // Build combined data points from selected metabolites
-  const buildDataPoints = useCallback((): DataPoint[] => {
+  // Build combined data points from selected metabolites (memoized to avoid
+  // recomputing on every render — only recalculates when data or selections change)
+  const dataPoints = useMemo((): DataPoint[] => {
     if (!experimentData) return []
 
     const productData = [
@@ -423,7 +436,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       .attr('width', tw + 150).attr('height', th)
       .append('g').attr('transform', `translate(${margin.left},${margin.top})`)
 
-    const data = buildDataPoints()
+    const data = dataPoints
     if (data.length === 0) {
       svg.append('text').attr('x', w / 2).attr('y', h / 2).attr('text-anchor', 'middle').attr('fill', '#666')
         .text('No data available — select metabolites above')
@@ -442,7 +455,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
 
     groups.forEach((points, name) => {
       const sorted = points.sort((a, b) => a.time - b.time)
-      const display = decimateData(sorted, 1000)
+      const display = decimateData(sorted, 300)
 
       svg.append('path').datum(display).attr('fill', 'none').attr('stroke', color(name)).attr('stroke-width', 2).attr('d', line)
 
@@ -466,7 +479,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       g.append('rect').attr('width', 12).attr('height', 12).attr('fill', color(name))
       g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(name)
     })
-  }, [experimentData, buildDataPoints, getGraphDimensions, drawMarkers])
+  }, [experimentData, dataPoints, getGraphDimensions, drawMarkers])
 
   const renderBarGraph = useCallback(() => {
     if (!experimentData || !svgRef.current) return

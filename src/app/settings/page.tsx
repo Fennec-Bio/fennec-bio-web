@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOrganization, useAuth, useUser, useClerk } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { DataCategoryManager } from '@/components/settings/DataCategoryManager'
 
 interface BackendUser {
   first_name: string
@@ -46,6 +48,7 @@ export default function Settings() {
   const [allOrgs, setAllOrgs] = useState<OrgOption[]>([])
   const [switchError, setSwitchError] = useState('')
   const [isSwitching, setIsSwitching] = useState<string | null>(null)
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(true)
   const router = useRouter()
 
   const isAdmin = membership?.role === 'org:admin'
@@ -382,6 +385,23 @@ export default function Settings() {
             </div>
           </>
         )}
+      </div>
+
+      <div className="max-w-2xl mt-8">
+        <div className="bg-white rounded-lg shadow">
+          <button
+            onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 rounded-t-lg"
+          >
+            <span className="text-xl font-semibold text-gray-900">Data Categories</span>
+            {isCategoriesOpen ? <ChevronDown className="h-5 w-5 text-gray-500" /> : <ChevronRight className="h-5 w-5 text-gray-500" />}
+          </button>
+          {isCategoriesOpen && (
+            <div className="p-4 border-t border-gray-200">
+              <DataCategoryManager />
+            </div>
+          )}
+        </div>
       </div>
 
       {confirmRemove && (

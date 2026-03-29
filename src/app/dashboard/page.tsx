@@ -52,7 +52,7 @@ export default function Dashboard() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [overlayPreselected, setOverlayPreselected] = useState<Experiment[] | null>(null)
-  const [selectedSetData, setSelectedSetData] = useState<{ experiments: Experiment[]; hypothesis: string; conclusion: string } | null>(null)
+  const [selectedSetData, setSelectedSetData] = useState<{ experiments: Experiment[]; hypothesis: string; conclusion: string; batchData?: unknown[] } | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isQuickGraphOpen, setIsQuickGraphOpen] = useState(true)
   const [isOverlayOpen, setIsOverlayOpen] = useState(true)
@@ -75,6 +75,36 @@ export default function Dashboard() {
   const handleExperimentSetSelect = useCallback(async (setId: string) => {
     try {
       const token = await getToken()
+      // Try batch endpoint first (single request for all experiment data)
+      const batchRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiment-sets/${setId}/data/?max_points=200`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      console.log('[Dashboard] batch response status:', batchRes.status)
+      if (batchRes.ok) {
+        const data = await batchRes.json()
+        console.log('[Dashboard] batch data:', { experimentCount: data.experiments?.length, hypothesis: data.hypothesis })
+        const setExps: Experiment[] = data.experiments.map((e: { experiment: Experiment }) => ({
+          id: e.experiment.id,
+          title: e.experiment.title,
+          description: e.experiment.description || '',
+          benchmark: e.experiment.benchmark || '',
+          created_at: e.experiment.created_at || '',
+          updated_at: e.experiment.updated_at || '',
+        }))
+        setOverlayPreselected(setExps)
+        setSelectedSetData({
+          experiments: setExps,
+          hypothesis: data.hypothesis || '',
+          conclusion: data.conclusion || '',
+          batchData: data.experiments,
+        })
+        setIsQuickGraphOpen(true)
+        setIsOverlayOpen(true)
+        return
+      }
+
+      console.log('[Dashboard] batch failed, falling back to metadata-only fetch')
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/experiment-sets/${setId}/`,
         { headers: { Authorization: `Bearer ${token}` } }

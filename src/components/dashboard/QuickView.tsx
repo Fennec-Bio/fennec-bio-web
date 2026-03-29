@@ -11,10 +11,12 @@ interface Experiment {
   updated_at: string
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface ExperimentSetData {
   experiments: Experiment[]
   hypothesis: string
   conclusion: string
+  batchData?: any[]
 }
 
 interface QuickViewProps {
@@ -25,6 +27,13 @@ interface QuickViewProps {
 }
 
 export function QuickView({ selectedExperiment, onExperimentSelect, experiments, experimentSetData }: QuickViewProps) {
+  console.log('[QuickView] render', {
+    hasSetData: !!experimentSetData,
+    setExpCount: experimentSetData?.experiments?.length,
+    hasBatchData: !!experimentSetData?.batchData,
+    batchDataCount: experimentSetData?.batchData?.length,
+  })
+
   // Experiment set mode: show hypothesis/conclusion + grid of graphs
   if (experimentSetData && experimentSetData.experiments.length > 0) {
     return (
@@ -49,15 +58,21 @@ export function QuickView({ selectedExperiment, onExperimentSelect, experiments,
 
         {/* Grid of graphs - 2 per row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {experimentSetData.experiments.map((exp) => (
-            <div key={exp.id} className="min-w-0">
-              <QuickGraph
-                selectedExperiment={exp}
-                onExperimentSelect={onExperimentSelect}
-                experiments={experiments}
-              />
-            </div>
-          ))}
+          {experimentSetData.experiments.map((exp) => {
+            const prefetched = experimentSetData.batchData?.find(
+              (d) => d.experiment.id === exp.id
+            )
+            return (
+              <div key={exp.id} className="min-w-0">
+                <QuickGraph
+                  selectedExperiment={exp}
+                  onExperimentSelect={onExperimentSelect}
+                  experiments={experiments}
+                  prefetchedData={prefetched}
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
     )
