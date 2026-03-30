@@ -5,6 +5,8 @@ import React, { useState, useRef, useEffect } from 'react'
 interface Step1DetailsProps {
   title: string
   onTitleChange: (title: string) => void
+  experimentDate: string
+  onExperimentDateChange: (date: string) => void
   variables: { name: string; value: string }[]
   onVariablesChange: (vars: { name: string; value: string }[]) => void
   events: { name: string; timepoint: string }[]
@@ -36,6 +38,8 @@ interface FreeTextState {
 export function Step1Details({
   title,
   onTitleChange,
+  experimentDate,
+  onExperimentDateChange,
   variables,
   onVariablesChange,
   events,
@@ -208,6 +212,19 @@ export function Step1Details({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           placeholder="e.g. Ferm 130-BO"
+          className={inputClass}
+        />
+      </div>
+
+      {/* ---- Date ---- */}
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Experiment Date
+        </label>
+        <input
+          type="date"
+          value={experimentDate}
+          onChange={(e) => onExperimentDateChange(e.target.value)}
           className={inputClass}
         />
       </div>

@@ -26,6 +26,8 @@ interface Step3ReviewProps {
   onExperimentSummaryChange: (summary: string) => void
   experimentNote: string
   onExperimentNoteChange: (note: string) => void
+  experimentDate: string
+  onExperimentDateChange: (date: string) => void
   noteImages: File[]
   onNoteImagesChange: (images: File[]) => void
   onBack: () => void
@@ -51,6 +53,8 @@ export function Step3Review({
   onExperimentSummaryChange,
   experimentNote,
   onExperimentNoteChange,
+  experimentDate,
+  onExperimentDateChange,
   noteImages,
   onNoteImagesChange,
   onBack,
@@ -226,6 +230,8 @@ export function Step3Review({
           <Step1Details
             title={title}
             onTitleChange={onTitleChange}
+            experimentDate={experimentDate}
+            onExperimentDateChange={onExperimentDateChange}
             variables={variables}
             onVariablesChange={onVariablesChange}
             events={events}

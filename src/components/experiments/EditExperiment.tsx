@@ -12,6 +12,7 @@ interface Experiment {
   title: string
   description: string
   experiment_note?: string
+  date?: string | null
   benchmark: string
   created_at: string
   updated_at: string
@@ -110,6 +111,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
 
   // Experiment Details state
   const [editTitle, setEditTitle] = useState('')
+  const [editDate, setEditDate] = useState('')
   const [editNote, setEditNote] = useState('')
   const [editVariables, setEditVariables] = useState<{ name: string; value: string }[]>([])
   const [editEvents, setEditEvents] = useState<{ name: string; timepoint: string }[]>([])
@@ -220,6 +222,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           setSecondaryEdits(buildSpreadsheet(detail.secondary_products))
           setProcessEdits(buildSpreadsheet(detail.process_data))
           setEditTitle(detail.experiment.title)
+          setEditDate(detail.experiment.date || '')
           setEditNote(detail.experiment.experiment_note || '')
           setEditVariables(detail.variables.map(v => ({ name: v.name, value: v.value })))
           setEditEvents(detail.events.map(e => ({ name: e.name, timepoint: e.timepoint })))
@@ -535,6 +538,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         },
         body: JSON.stringify({
           title: editTitle,
+          date: editDate || null,
           experiment_note: editNote,
           variables: editVariables,
           events: editEvents,
@@ -649,6 +653,19 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
             value={editTitle}
             onChange={(e) => { setEditTitle(e.target.value); markChanged() }}
             placeholder="e.g. Ferm 130-BO"
+            className={inputClass}
+          />
+        </div>
+
+        {/* Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Experiment Date
+          </label>
+          <input
+            type="date"
+            value={editDate}
+            onChange={(e) => { setEditDate(e.target.value); markChanged() }}
             className={inputClass}
           />
         </div>

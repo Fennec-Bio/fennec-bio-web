@@ -24,6 +24,7 @@ export function CreateExperiment() {
   const [classifiedData, setClassifiedData] = useState<ClassifiedData | null>(null)
   const [experimentSummary, setExperimentSummary] = useState('')
   const [experimentNote, setExperimentNote] = useState('')
+  const [experimentDate, setExperimentDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [noteImages, setNoteImages] = useState<File[]>([])
 
   // UI state
@@ -85,6 +86,7 @@ export function CreateExperiment() {
     setErrorMessage('')
     setExperimentSummary('')
     setExperimentNote('')
+    setExperimentDate(new Date().toISOString().slice(0, 10))
     setNoteImages([])
   }
 
@@ -100,6 +102,7 @@ export function CreateExperiment() {
         project_id: activeProject?.id,
         description: experimentSummary,
         experiment_note: experimentNote,
+        date: experimentDate,
         variables: variables.filter((v) => v.name.trim() !== ''),
         events: events.filter((e) => e.name.trim() !== ''),
         anomalies: anomalies.filter((a) => a.name.trim() !== ''),
@@ -192,6 +195,8 @@ export function CreateExperiment() {
           <Step1Details
             title={title}
             onTitleChange={setTitle}
+            experimentDate={experimentDate}
+            onExperimentDateChange={setExperimentDate}
             variables={variables}
             onVariablesChange={setVariables}
             events={events}
@@ -256,6 +261,8 @@ export function CreateExperiment() {
             onExperimentSummaryChange={setExperimentSummary}
             experimentNote={experimentNote}
             onExperimentNoteChange={setExperimentNote}
+            experimentDate={experimentDate}
+            onExperimentDateChange={setExperimentDate}
             noteImages={noteImages}
             onNoteImagesChange={setNoteImages}
             onBack={() => setStep(2)}
