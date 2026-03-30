@@ -46,6 +46,10 @@ export function DataCategoryManager() {
   const [editName, setEditName] = useState('')
   const [editUnit, setEditUnit] = useState('')
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<DataCategory | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
   const fetchCategories = useCallback(async () => {
     if (!activeProject) return
     setIsLoading(true)
@@ -252,7 +256,7 @@ export function DataCategoryManager() {
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDelete(cat.id)}
+                          onClick={() => { setDeleteTarget(cat); setDeleteConfirmText('') }}
                           className="text-gray-400 hover:text-red-500"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -321,6 +325,48 @@ export function DataCategoryManager() {
             </button>
           )}
         </>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Data Category</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete <span className="font-medium">{deleteTarget.name}</span>? This action cannot be undone.
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type <span className="font-semibold">delete</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              placeholder="delete"
+              className={inputClass}
+              autoFocus
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={async () => {
+                  await handleDelete(deleteTarget.id)
+                  setDeleteTarget(null)
+                  setDeleteConfirmText('')
+                }}
+                disabled={deleteConfirmText !== 'delete'}
+                className="flex-1 h-9 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => { setDeleteTarget(null); setDeleteConfirmText('') }}
+                className="flex-1 h-9 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

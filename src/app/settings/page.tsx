@@ -53,6 +53,15 @@ export default function Settings() {
 
   const isAdmin = membership?.role === 'org:admin'
 
+  // Scroll to hash anchor (e.g. #data-categories) after page renders
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash) {
+      const el = document.querySelector(hash)
+      if (el) el.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [])
+
   useEffect(() => {
     const fetchMe = async () => {
       try {
@@ -387,7 +396,7 @@ export default function Settings() {
         )}
       </div>
 
-      <div className="max-w-2xl mt-8">
+      <div id="data-categories" className="max-w-2xl mt-8">
         <div className="bg-white rounded-lg shadow">
           <button
             onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}

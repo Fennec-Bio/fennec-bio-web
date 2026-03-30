@@ -433,7 +433,7 @@ export function DataTemplates() {
                         value={m.name}
                         onChange={e => {
                           if (e.target.value === '__add_new__') {
-                            updateMapping(i, 'name', '')
+                            window.open('/settings#data-categories', '_blank')
                           } else {
                             updateMapping(i, 'name', e.target.value)
                           }
