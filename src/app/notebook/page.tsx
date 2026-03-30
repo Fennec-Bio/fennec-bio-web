@@ -83,7 +83,8 @@ interface ExperimentDetail {
   }
 }
 
-function parseTimepoint(timepoint: string): number {
+function parseTimepoint(timepoint: string | number): number {
+  if (typeof timepoint === 'number') return timepoint
   const hhmmss = timepoint.match(/^(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)$/)
   if (hhmmss) return parseInt(hhmmss[1]) + parseInt(hhmmss[2]) / 60 + parseFloat(hhmmss[3]) / 3600
 
