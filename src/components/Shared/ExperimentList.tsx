@@ -67,6 +67,8 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     anomalies: []
   })
 
+  const [strainNames, setStrainNames] = useState<string[]>([])
+
   const [viewMode, setViewMode] = useState<'experiments' | 'sets'>('experiments')
   const [experimentSets, setExperimentSets] = useState<ExperimentSetData[]>([])
   const [expandedSets, setExpandedSets] = useState<Set<string>>(new Set())
@@ -206,6 +208,24 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
       }
     }
     fetchUniqueNames()
+    const fetchStrains = async () => {
+      try {
+        const token = await getToken()
+        const params = new URLSearchParams()
+        if (activeProject) params.append('project_id', activeProject.id.toString())
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strain-lineage/?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const names: string[] = (data.strains || []).map((s: { name: string }) => s.name)
+          setStrainNames(names.sort((a, b) => a.localeCompare(b)))
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+    fetchStrains()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProject])
 
@@ -415,6 +435,16 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     }
   }
 
+  const mergedVariables = React.useMemo(() => {
+    const merged: Record<string, string[]> = { ...uniqueNames.variables }
+    const existingStrains = merged['strain'] || []
+    const allStrains = [...new Set([...existingStrains, ...strainNames])]
+    if (allStrains.length > 0) {
+      merged['strain'] = allStrains.sort((a, b) => a.localeCompare(b))
+    }
+    return merged
+  }, [uniqueNames.variables, strainNames])
+
   return (
     <div className={`w-full pt-4 pb-2 px-4 overflow-visible bg-white rounded-lg shadow ${
       isMobileDrawer ? 'h-full border-0 shadow-none' : ''
@@ -451,7 +481,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">variables</div>
                   {variablesMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
-                      {Object.entries(uniqueNames.variables)
+                      {Object.entries(mergedVariables)
                         .sort(([a], [b]) => sortItems([a, b])[0] === a ? -1 : 1)
                         .map(([variableName, variableValues], index) => (
                           <div className="relative" onMouseEnter={() => {
