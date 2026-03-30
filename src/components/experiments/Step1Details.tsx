@@ -7,6 +7,9 @@ interface Step1DetailsProps {
   onTitleChange: (title: string) => void
   experimentDate: string
   onExperimentDateChange: (date: string) => void
+  strains: string[]
+  selectedStrain: string
+  onStrainChange: (strain: string) => void
   variables: { name: string; value: string }[]
   onVariablesChange: (vars: { name: string; value: string }[]) => void
   events: { name: string; timepoint: string }[]
@@ -40,6 +43,9 @@ export function Step1Details({
   onTitleChange,
   experimentDate,
   onExperimentDateChange,
+  strains,
+  selectedStrain,
+  onStrainChange,
   variables,
   onVariablesChange,
   events,
@@ -229,6 +235,31 @@ export function Step1Details({
         />
       </div>
 
+      {/* ---- Strain ---- */}
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Strain
+        </label>
+        <select
+          value={selectedStrain}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '__add_new_strain__') {
+              window.open('/strains', '_blank')
+            } else {
+              onStrainChange(val)
+            }
+          }}
+          className={selectClass}
+        >
+          <option value="">None</option>
+          {strains.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+          <option value="__add_new_strain__">Add New...</option>
+        </select>
+      </div>
+
       {/* ---- Variables ---- */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
@@ -244,6 +275,7 @@ export function Step1Details({
         </div>
 
         {variables.map((variable, idx) => {
+          if (variable.name.toLowerCase() === 'strain') return null
           const isNameFree = !!varNameFree[idx]
           const isValueFree = !!varValueFree[idx]
           const valueOptions = variable.name ? (uniqueNames.variables[variable.name] ?? []) : []
