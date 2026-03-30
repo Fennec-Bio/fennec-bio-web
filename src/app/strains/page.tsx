@@ -106,6 +106,20 @@ export default function StrainsPage() {
     return () => { cancelled = true }
   }, [refreshKey, getToken])
 
+  // Merge lineage strains into strainsList so newly created strains appear immediately
+  const mergedStrainsList = useMemo(() => {
+    const byName = new Map<string, StrainOption>()
+    for (const s of strainsList) {
+      byName.set(s.name, s)
+    }
+    for (const s of lineageData) {
+      if (!byName.has(s.name)) {
+        byName.set(s.name, { name: s.name, experiment_count: s.experiment_count })
+      }
+    }
+    return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [strainsList, lineageData])
+
   // Auto-switch tab based on selection
   useEffect(() => {
     setActiveTab(selectedStrain ? 'edit' : 'add')
@@ -140,7 +154,7 @@ export default function StrainsPage() {
               isMobileDrawer
               onStrainSelect={handleStrainSelect}
               selectedStrain={selectedStrain}
-              strains={strainsList}
+              strains={mergedStrainsList}
             />
           </div>
         </div>
@@ -161,7 +175,7 @@ export default function StrainsPage() {
             <StrainList
               onStrainSelect={handleStrainSelect}
               selectedStrain={selectedStrain}
-              strains={strainsList}
+              strains={mergedStrainsList}
             />
           </div>
 
@@ -203,12 +217,12 @@ export default function StrainsPage() {
                     strainName={selectedStrain}
                     strainData={selectedStrainData}
                     onStrainUpdated={handleStrainChanged}
-                    availableStrains={strainsList}
+                    availableStrains={mergedStrainsList}
                   />
                 ) : (
                   <AddStrain
                     onStrainAdded={handleStrainChanged}
-                    availableStrains={strainsList}
+                    availableStrains={mergedStrainsList}
                   />
                 )}
               </div>
