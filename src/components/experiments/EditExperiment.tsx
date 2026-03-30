@@ -118,6 +118,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
   const [editAnomalies, setEditAnomalies] = useState<{ name: string; timepoint: string; description: string }[]>([])
   const [noteImages, setNoteImages] = useState<NoteImage[]>([])
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [strainNames, setStrainNames] = useState<string[]>([])
+  const [selectedStrain, setSelectedStrain] = useState('')
 
   // Unique names for dropdowns
   const [uniqueNames, setUniqueNames] = useState<{
@@ -183,8 +185,26 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       }
     }
 
+    const fetchStrains = async () => {
+      try {
+        const token = await getToken()
+        const params = activeProject ? `?project_id=${activeProject.id}` : ''
+        const res = await fetch(`${apiUrl}/api/strain-lineage/${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const names: string[] = (data.strains || []).map((s: { name: string }) => s.name)
+          setStrainNames(names.sort((a, b) => a.localeCompare(b)))
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+
     fetchUniqueNames()
     fetchTemplates()
+    fetchStrains()
   }, [getToken, apiUrl, activeProject])
 
   useEffect(() => {
@@ -204,6 +224,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       setVarValueFree({})
       setEventNameFree({})
       setAnomalyNameFree({})
+      setSelectedStrain('')
       return
     }
     let cancelled = false
@@ -225,6 +246,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           setEditDate(detail.experiment.date || '')
           setEditNote(detail.experiment.experiment_note || '')
           setEditVariables(detail.variables.map(v => ({ name: v.name, value: v.value })))
+          const strainVar = detail.variables.find(v => v.name.toLowerCase() === 'strain')
+          setSelectedStrain(strainVar?.value || '')
           setEditEvents(detail.events.map(e => ({ name: e.name, timepoint: e.timepoint })))
           setEditAnomalies(detail.anomalies.map(a => ({ name: a.name, timepoint: a.timepoint, description: a.description || '' })))
           setNoteImages(detail.note_images || [])
@@ -524,6 +547,18 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     }
   }
 
+  const handleStrainChange = (strain: string) => {
+    setSelectedStrain(strain)
+    setEditVariables(prev => {
+      const withoutStrain = prev.filter(v => v.name.toLowerCase() !== 'strain')
+      if (strain) {
+        return [...withoutStrain, { name: 'strain', value: strain }]
+      }
+      return withoutStrain
+    })
+    markChanged()
+  }
+
   // Save experiment details
   const handleSaveDetails = async () => {
     if (!data) return
@@ -670,6 +705,31 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           />
         </div>
 
+        {/* Strain */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Strain
+          </label>
+          <select
+            value={selectedStrain}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '__add_new_strain__') {
+                window.open('/strains', '_blank')
+              } else {
+                handleStrainChange(val)
+              }
+            }}
+            className={inputClass}
+          >
+            <option value="">None</option>
+            {strainNames.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+            <option value="__add_new_strain__">Add New...</option>
+          </select>
+        </div>
+
         {/* Variables */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -684,6 +744,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
             </button>
           </div>
           {editVariables.map((variable, idx) => {
+            if (variable.name.toLowerCase() === 'strain') return null
             const isNameFree = !!varNameFree[idx]
             const isValueFree = !!varValueFree[idx]
             const valueOptions = variable.name ? (uniqueNames.variables[variable.name] ?? []) : []
