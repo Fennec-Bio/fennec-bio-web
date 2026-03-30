@@ -26,6 +26,8 @@ export function CreateExperiment() {
   const [experimentNote, setExperimentNote] = useState('')
   const [experimentDate, setExperimentDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [noteImages, setNoteImages] = useState<File[]>([])
+  const [strainNames, setStrainNames] = useState<string[]>([])
+  const [selectedStrain, setSelectedStrain] = useState('')
 
   // UI state
   const [isCreating, setIsCreating] = useState(false)
@@ -75,7 +77,36 @@ export function CreateExperiment() {
       }
     }
     fetchTemplates()
+
+    const fetchStrains = async () => {
+      try {
+        const token = await getToken()
+        const params = activeProject ? `?project_id=${activeProject.id}` : ''
+        const res = await fetch(`${apiUrl}/api/strain-lineage/${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const names: string[] = (data.strains || []).map((s: { name: string }) => s.name)
+          setStrainNames(names.sort((a, b) => a.localeCompare(b)))
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+    fetchStrains()
   }, [getToken, apiUrl, activeProject])
+
+  const handleStrainChange = (strain: string) => {
+    setSelectedStrain(strain)
+    setVariables(prev => {
+      const withoutStrain = prev.filter(v => v.name.toLowerCase() !== 'strain')
+      if (strain) {
+        return [...withoutStrain, { name: 'strain', value: strain }]
+      }
+      return withoutStrain
+    })
+  }
 
   const resetForm = () => {
     setTitle('')
@@ -88,6 +119,7 @@ export function CreateExperiment() {
     setExperimentNote('')
     setExperimentDate(new Date().toISOString().slice(0, 10))
     setNoteImages([])
+    setSelectedStrain('')
   }
 
   const handleCreate = async () => {
@@ -197,6 +229,9 @@ export function CreateExperiment() {
             onTitleChange={setTitle}
             experimentDate={experimentDate}
             onExperimentDateChange={setExperimentDate}
+            strains={strainNames}
+            selectedStrain={selectedStrain}
+            onStrainChange={handleStrainChange}
             variables={variables}
             onVariablesChange={setVariables}
             events={events}

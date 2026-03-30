@@ -232,6 +232,9 @@ export function Step3Review({
             onTitleChange={onTitleChange}
             experimentDate={experimentDate}
             onExperimentDateChange={onExperimentDateChange}
+            strains={[]}
+            selectedStrain=""
+            onStrainChange={() => {}}
             variables={variables}
             onVariablesChange={onVariablesChange}
             events={events}
