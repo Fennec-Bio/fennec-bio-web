@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react'
 
 interface ColumnMapping {
   column: string
@@ -12,10 +12,21 @@ interface ColumnMapping {
   unit: string
 }
 
+interface SheetConfig {
+  sheet_name: string
+  start_row: number
+  timepoint_column: string
+  time_unit: string
+  column_mappings: ColumnMapping[]
+}
+
 interface DataTemplate {
   id: number
   name: string
   project: number
+  sheets: SheetConfig[]
+  // Legacy fields (kept for backward compat)
+  sheet_name: string
   timepoint_column: string
   time_unit: string
   column_mappings: ColumnMapping[]
@@ -38,17 +49,14 @@ const TIME_UNIT_OPTIONS = [
 
 const COLUMN_LETTERS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))
 
-function getCategoryForName(name: string, uniqueNames: UniqueNames): 'product' | 'secondary_product' | 'process_data' | null {
-  if (uniqueNames.products.includes(name)) return 'product'
-  if (uniqueNames.secondary_products.includes(name)) return 'secondary_product'
-  if (uniqueNames.process_data.includes(name)) return 'process_data'
-  return null
-}
-
 const CATEGORY_COLORS: Record<string, { dot: string; label: string }> = {
   product: { dot: 'bg-[#eb5234]', label: 'Product' },
   secondary_product: { dot: 'bg-blue-500', label: 'Secondary' },
   process_data: { dot: 'bg-emerald-500', label: 'Process' },
+}
+
+function emptySheet(): SheetConfig {
+  return { sheet_name: '', start_row: 1, timepoint_column: 'A', time_unit: 'days', column_mappings: [] }
 }
 
 export function DataTemplates() {
@@ -65,9 +73,8 @@ export function DataTemplates() {
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formName, setFormName] = useState('')
-  const [formTimepointColumn, setFormTimepointColumn] = useState('A')
-  const [formTimeUnit, setFormTimeUnit] = useState('days')
-  const [formMappings, setFormMappings] = useState<ColumnMapping[]>([])
+  const [formSheets, setFormSheets] = useState<SheetConfig[]>([emptySheet()])
+  const [activeSheetIdx, setActiveSheetIdx] = useState(0)
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
@@ -124,9 +131,8 @@ export function DataTemplates() {
     setIsEditing(false)
     setEditingId(null)
     setFormName('')
-    setFormTimepointColumn('A')
-    setFormTimeUnit('days')
-    setFormMappings([])
+    setFormSheets([emptySheet()])
+    setActiveSheetIdx(0)
     setFormError('')
   }
 
@@ -138,34 +144,51 @@ export function DataTemplates() {
   const startEdit = (t: DataTemplate) => {
     setEditingId(t.id)
     setFormName(t.name)
-    setFormTimepointColumn(t.timepoint_column)
-    setFormTimeUnit(t.time_unit)
-    setFormMappings([...t.column_mappings])
+    const sheets = t.sheets && t.sheets.length > 0 ? t.sheets.map(s => ({ ...s, column_mappings: [...s.column_mappings] })) : [emptySheet()]
+    setFormSheets(sheets)
+    setActiveSheetIdx(0)
     setFormError('')
     setIsEditing(true)
   }
 
+  // Sheet-level helpers
+  const activeSheet = formSheets[activeSheetIdx] || emptySheet()
+
+  const updateActiveSheet = (updates: Partial<SheetConfig>) => {
+    setFormSheets(prev => prev.map((s, i) => i === activeSheetIdx ? { ...s, ...updates } : s))
+  }
+
+  const addSheet = () => {
+    setFormSheets(prev => [...prev, emptySheet()])
+    setActiveSheetIdx(formSheets.length)
+  }
+
+  const removeSheet = (idx: number) => {
+    if (formSheets.length <= 1) return
+    setFormSheets(prev => prev.filter((_, i) => i !== idx))
+    setActiveSheetIdx(prev => prev >= idx ? Math.max(0, prev - 1) : prev)
+  }
+
   const addMapping = () => {
-    const usedColumns = formMappings.map(m => m.column)
-    const nextColumn = COLUMN_LETTERS.find(l => l !== formTimepointColumn && !usedColumns.includes(l)) || 'B'
-    setFormMappings([...formMappings, { column: nextColumn, name: '', category: 'product', unit: '' }])
+    const usedColumns = activeSheet.column_mappings.map(m => m.column)
+    const nextColumn = COLUMN_LETTERS.find(l => l !== activeSheet.timepoint_column && !usedColumns.includes(l)) || 'B'
+    updateActiveSheet({ column_mappings: [...activeSheet.column_mappings, { column: nextColumn, name: '', category: 'product', unit: '' }] })
   }
 
   const updateMapping = (index: number, field: keyof ColumnMapping, value: string) => {
-    const updated = [...formMappings]
+    const updated = [...activeSheet.column_mappings]
     if (field === 'category') {
-      // When category changes, clear name since it may not belong to the new category
       updated[index] = { ...updated[index], category: value as ColumnMapping['category'], name: '', unit: '' }
     } else if (field === 'name') {
       updated[index] = { ...updated[index], name: value }
     } else {
       updated[index] = { ...updated[index], [field]: value }
     }
-    setFormMappings(updated)
+    updateActiveSheet({ column_mappings: updated })
   }
 
   const removeMapping = (index: number) => {
-    setFormMappings(formMappings.filter((_, i) => i !== index))
+    updateActiveSheet({ column_mappings: activeSheet.column_mappings.filter((_, i) => i !== index) })
   }
 
   const handleSave = async () => {
@@ -173,7 +196,8 @@ export function DataTemplates() {
       setFormError('Template name is required')
       return
     }
-    if (formMappings.length === 0) {
+    const totalMappings = formSheets.reduce((sum, s) => sum + s.column_mappings.length, 0)
+    if (totalMappings === 0) {
       setFormError('Add at least one column mapping')
       return
     }
@@ -183,13 +207,17 @@ export function DataTemplates() {
 
     try {
       const token = await getToken()
+      // Use first sheet's values for legacy fields
+      const first = formSheets[0]
       const payload = {
         name: formName.trim(),
         project_id: activeProject!.id,
         project: activeProject!.id,
-        timepoint_column: formTimepointColumn,
-        time_unit: formTimeUnit,
-        column_mappings: formMappings,
+        sheet_name: first.sheet_name,
+        timepoint_column: first.timepoint_column,
+        time_unit: first.time_unit,
+        column_mappings: first.column_mappings,
+        sheets: formSheets,
       }
 
       const url = editingId
@@ -267,110 +295,177 @@ export function DataTemplates() {
           />
         </div>
 
-        <div className="flex gap-3 mb-6">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Timepoint Column</label>
-            <select
-              value={formTimepointColumn}
-              onChange={e => setFormTimepointColumn(e.target.value)}
-              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        {/* Sheet tabs */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Sheets / Tabs</label>
+          <div className="flex items-center gap-1 border-b border-gray-200">
+            {formSheets.map((sheet, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveSheetIdx(idx)}
+                className={`
+                  relative px-3 py-2 text-sm font-medium rounded-t-md transition-colors
+                  ${idx === activeSheetIdx
+                    ? 'bg-white border border-gray-200 border-b-white -mb-px text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }
+                `}
+              >
+                {sheet.sheet_name || `Sheet ${idx + 1}`}
+                {formSheets.length > 1 && idx === activeSheetIdx && (
+                  <span
+                    onClick={(e) => { e.stopPropagation(); removeSheet(idx) }}
+                    className="ml-2 text-gray-400 hover:text-red-500 inline-flex"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
+            ))}
+            <button
+              onClick={addSheet}
+              className="px-2 py-2 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Add sheet"
             >
-              {COLUMN_LETTERS.map(l => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Time Unit</label>
-            <select
-              value={formTimeUnit}
-              onChange={e => setFormTimeUnit(e.target.value)}
-              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {TIME_UNIT_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
-        <label className="block text-sm font-medium text-gray-700 mb-2">Column Mappings</label>
-
-        {formMappings.length > 0 && (
-          <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
-            <div className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
-              <span>Col</span><span>Category</span><span>Name</span><span>Unit</span><span />
-            </div>
-            {formMappings.map((m, i) => (
-              <div key={i} className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 px-3 py-2 border-t border-gray-100 items-center">
-                <select
-                  value={m.column}
-                  onChange={e => updateMapping(i, 'column', e.target.value)}
-                  className="border border-gray-200 rounded px-1 py-1 text-sm w-12"
-                >
-                  {COLUMN_LETTERS.map(l => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={m.category}
-                  onChange={e => updateMapping(i, 'category', e.target.value)}
-                  className="border border-gray-200 rounded px-1 py-1 text-sm"
-                >
-                  <option value="product">Product</option>
-                  <option value="secondary_product">Secondary</option>
-                  <option value="process_data">Process</option>
-                </select>
-
-                <div className="flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full ${CATEGORY_COLORS[m.category]?.dot || 'bg-gray-300'}`} />
-                  {m.name !== '' && !(namesByCategory[m.category] || []).includes(m.name) ? (
-                    <input
-                      type="text"
-                      value={m.name}
-                      onChange={e => updateMapping(i, 'name', e.target.value)}
-                      className="border border-gray-200 rounded px-1 py-1 text-sm flex-1 min-w-0"
-                      placeholder="Type name..."
-                      autoFocus
-                    />
-                  ) : (
-                    <select
-                      value={m.name}
-                      onChange={e => {
-                        if (e.target.value === '__add_new__') {
-                          updateMapping(i, 'name', '')
-                        } else {
-                          updateMapping(i, 'name', e.target.value)
-                        }
-                      }}
-                      className="border border-gray-200 rounded px-1 py-1 text-sm flex-1 min-w-0"
-                    >
-                      <option value="">Select name...</option>
-                      {(namesByCategory[m.category] || []).map(n => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                      <option value="__add_new__">Add new...</option>
-                    </select>
-                  )}
-                </div>
-
-                <span className="text-sm text-gray-500 truncate">{m.unit || '—'}</span>
-
-                <button onClick={() => removeMapping(i)} className="text-gray-300 hover:text-red-500">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+        {/* Active sheet config */}
+        <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-white">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sheet / Tab Name</label>
+            <input
+              type="text"
+              value={activeSheet.sheet_name}
+              onChange={e => updateActiveSheet({ sheet_name: e.target.value })}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Summary (leave blank for first sheet)"
+            />
           </div>
-        )}
 
-        <button
-          onClick={addMapping}
-          className="w-full border border-dashed border-gray-300 rounded-lg py-2 text-sm text-gray-500 hover:bg-gray-50 mb-4"
-        >
-          + Add Column Mapping
-        </button>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Header Row</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={activeSheet.start_row === 0 ? '' : activeSheet.start_row}
+              onChange={e => {
+                const raw = e.target.value.replace(/\D/g, '')
+                updateActiveSheet({ start_row: raw === '' ? 0 : parseInt(raw) })
+              }}
+              onBlur={() => { if (!activeSheet.start_row) updateActiveSheet({ start_row: 1 }) }}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Row number containing column headers (1-based). Data is read from the row below.</p>
+          </div>
+
+          <div className="flex gap-3 mb-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Timepoint Column</label>
+              <select
+                value={activeSheet.timepoint_column}
+                onChange={e => updateActiveSheet({ timepoint_column: e.target.value })}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {COLUMN_LETTERS.map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Time Unit</label>
+              <select
+                value={activeSheet.time_unit}
+                onChange={e => updateActiveSheet({ time_unit: e.target.value })}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {TIME_UNIT_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <label className="block text-sm font-medium text-gray-700 mb-2">Column Mappings</label>
+
+          {activeSheet.column_mappings.length > 0 && (
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
+              <div className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
+                <span>Col</span><span>Category</span><span>Name</span><span>Unit</span><span />
+              </div>
+              {activeSheet.column_mappings.map((m, i) => (
+                <div key={i} className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 px-3 py-2 border-t border-gray-100 items-center">
+                  <select
+                    value={m.column}
+                    onChange={e => updateMapping(i, 'column', e.target.value)}
+                    className="border border-gray-200 rounded px-1 py-1 text-sm w-12"
+                  >
+                    {COLUMN_LETTERS.map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={m.category}
+                    onChange={e => updateMapping(i, 'category', e.target.value)}
+                    className="border border-gray-200 rounded px-1 py-1 text-sm"
+                  >
+                    <option value="product">Product</option>
+                    <option value="secondary_product">Secondary</option>
+                    <option value="process_data">Process</option>
+                  </select>
+
+                  <div className="flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${CATEGORY_COLORS[m.category]?.dot || 'bg-gray-300'}`} />
+                    {m.name !== '' && !(namesByCategory[m.category] || []).includes(m.name) ? (
+                      <input
+                        type="text"
+                        value={m.name}
+                        onChange={e => updateMapping(i, 'name', e.target.value)}
+                        className="border border-gray-200 rounded px-1 py-1 text-sm flex-1 min-w-0"
+                        placeholder="Type name..."
+                        autoFocus
+                      />
+                    ) : (
+                      <select
+                        value={m.name}
+                        onChange={e => {
+                          if (e.target.value === '__add_new__') {
+                            updateMapping(i, 'name', '')
+                          } else {
+                            updateMapping(i, 'name', e.target.value)
+                          }
+                        }}
+                        className="border border-gray-200 rounded px-1 py-1 text-sm flex-1 min-w-0"
+                      >
+                        <option value="">Select name...</option>
+                        {(namesByCategory[m.category] || []).map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                        <option value="__add_new__">Add new...</option>
+                      </select>
+                    )}
+                  </div>
+
+                  <span className="text-sm text-gray-500 truncate">{m.unit || '—'}</span>
+
+                  <button onClick={() => removeMapping(i)} className="text-gray-300 hover:text-red-500">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={addMapping}
+            className="w-full border border-dashed border-gray-300 rounded-lg py-2 text-sm text-gray-500 hover:bg-gray-50"
+          >
+            + Add Column Mapping
+          </button>
+        </div>
 
         <div className="flex gap-2">
           <button
@@ -419,27 +514,35 @@ export function DataTemplates() {
         </div>
       ) : (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
-          {templates.map((t, i) => (
-            <div
-              key={t.id}
-              className={`px-4 py-3 flex items-center justify-between ${i < templates.length - 1 ? 'border-b border-gray-200' : ''}`}
-            >
-              <div>
-                <div className="font-medium text-sm">{t.name}</div>
-                <div className="text-xs text-gray-500">
-                  {t.column_mappings.length} column{t.column_mappings.length !== 1 ? 's' : ''} · Time unit: {t.time_unit}
+          {templates.map((t, i) => {
+            const sheets = t.sheets && t.sheets.length > 0 ? t.sheets : []
+            const totalCols = sheets.reduce((sum, s) => sum + s.column_mappings.length, 0)
+            return (
+              <div
+                key={t.id}
+                className={`px-4 py-3 flex items-center justify-between ${i < templates.length - 1 ? 'border-b border-gray-200' : ''}`}
+              >
+                <div>
+                  <div className="font-medium text-sm">{t.name}</div>
+                  <div className="text-xs text-gray-500">
+                    {sheets.length} sheet{sheets.length !== 1 ? 's' : ''}
+                    {sheets.length > 0 && (
+                      <> · {sheets.map(s => s.sheet_name || 'Default').join(', ')}</>
+                    )}
+                    {' · '}{totalCols} column{totalCols !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => startEdit(t)} className="text-[#eb5234] hover:text-[#d4462c] text-sm flex items-center gap-1">
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </button>
+                  <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500 text-sm flex items-center gap-1">
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => startEdit(t)} className="text-[#eb5234] hover:text-[#d4462c] text-sm flex items-center gap-1">
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </button>
-                <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500 text-sm flex items-center gap-1">
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

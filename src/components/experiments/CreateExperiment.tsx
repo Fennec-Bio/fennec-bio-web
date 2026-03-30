@@ -35,7 +35,7 @@ export function CreateExperiment() {
     events: string[]
     anomalies: string[]
   }>({ variables: {}, events: [], anomalies: [] })
-  const [dataTemplates, setDataTemplates] = useState<{ id: number; name: string; timepoint_column: string; time_unit: string; column_mappings: { column: string; name: string; category: string; unit: string }[] }[]>([])
+  const [dataTemplates, setDataTemplates] = useState<{ id: number; name: string; sheets: { sheet_name: string; start_row: number; timepoint_column: string; time_unit: string; column_mappings: { column: string; name: string; category: string; unit: string }[] }[]; sheet_name: string; timepoint_column: string; time_unit: string; column_mappings: { column: string; name: string; category: string; unit: string }[] }[]>([])
 
   // Fetch unique_names on mount (and when active project changes)
   useEffect(() => {

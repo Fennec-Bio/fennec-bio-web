@@ -57,9 +57,19 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'process-data', label: 'Process Data' },
 ]
 
+interface SheetConfig {
+  sheet_name: string
+  start_row: number
+  timepoint_column: string
+  time_unit: string
+  column_mappings: { column: string; name: string; category: string; unit: string }[]
+}
+
 interface DataTemplate {
   id: number
   name: string
+  sheets: SheetConfig[]
+  sheet_name: string
   timepoint_column: string
   time_unit: string
   column_mappings: { column: string; name: string; category: string; unit: string }[]
@@ -280,7 +290,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     e.target.value = ''
   }, [])
 
-  // Spreadsheet + template parsing
+  // Spreadsheet + template parsing (supports multi-sheet templates)
   const parseSpreadsheetFile = useCallback((file: File, template: DataTemplate) => {
     setSpreadsheetError(null)
     setSpreadsheetMissing([])
@@ -294,58 +304,90 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         if (!arrayBuffer) throw new Error('Failed to read file')
 
         const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-        const sheetName = workbook.SheetNames[0]
-        const sheet = workbook.Sheets[sheetName]
-        const jsonData: (string | number | null)[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
-        if (jsonData.length < 2) {
-          setSpreadsheetError('Spreadsheet has no data rows.')
-          return
+        // Use sheets array; fall back to legacy single-sheet fields
+        const sheets: SheetConfig[] = template.sheets && template.sheets.length > 0
+          ? template.sheets
+          : [{
+              sheet_name: template.sheet_name || '',
+              start_row: 1,
+              timepoint_column: template.timepoint_column,
+              time_unit: template.time_unit,
+              column_mappings: template.column_mappings,
+            }]
+
+        const allProducts: ClassifiedData['products'] = []
+        const allSecondary: ClassifiedData['secondary_products'] = []
+        const allProcess: ClassifiedData['process_data'] = []
+        const allMissing: string[] = []
+        const warnings: string[] = []
+
+        for (const sheetConfig of sheets) {
+          const sheetLabel = sheetConfig.sheet_name || 'Default'
+          let sheetName: string
+          if (sheetConfig.sheet_name && workbook.SheetNames.includes(sheetConfig.sheet_name)) {
+            sheetName = sheetConfig.sheet_name
+          } else if (sheetConfig.sheet_name && !workbook.SheetNames.includes(sheetConfig.sheet_name)) {
+            warnings.push(`Sheet "${sheetConfig.sheet_name}" not found. Available: ${workbook.SheetNames.join(', ')}.`)
+            sheetName = workbook.SheetNames[0]
+          } else {
+            sheetName = workbook.SheetNames[0]
+          }
+
+          const sheet = workbook.Sheets[sheetName]
+          const jsonData: (string | number | null)[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
+
+          if (jsonData.length < 2) {
+            warnings.push(`Sheet "${sheetLabel}" has no data rows.`)
+            continue
+          }
+
+          // start_row is 1-based; convert to 0-based index
+          const headerRowIdx = Math.max(0, (sheetConfig.start_row || 1) - 1)
+
+          const timepointColIdx = columnLetterToIndex(sheetConfig.timepoint_column)
+          const headerRow = jsonData[headerRowIdx] ?? []
+
+          const resolvedMappings = sheetConfig.column_mappings.map(mapping => {
+            const colIdx = columnLetterToIndex(mapping.column)
+            if (colIdx >= headerRow.length || headerRow[colIdx] === null || headerRow[colIdx] === undefined) {
+              allMissing.push(`${mapping.name} (column ${mapping.column} in "${sheetLabel}")`)
+            }
+            return { ...mapping, colIdx }
+          })
+
+          const dataRows = jsonData.slice(headerRowIdx + 1)
+
+          for (const mapping of resolvedMappings) {
+            const { colIdx, name, category, unit } = mapping
+            const rawPairs: { tp: string; val: number }[] = []
+            for (const row of dataRows) {
+              const tpRaw = row[timepointColIdx]
+              const valRaw = row[colIdx]
+              if (tpRaw === null || tpRaw === undefined || valRaw === null || valRaw === undefined || valRaw === '') continue
+              const numVal = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw))
+              if (isNaN(numVal)) continue
+              rawPairs.push({ tp: String(tpRaw), val: numVal })
+            }
+
+            const dataType = rawPairs.length > 50 ? 'continuous' : 'discrete'
+
+            if (category === 'product') {
+              allProducts.push({ name, column_header: name, unit, data_type: dataType, time_unit: sheetConfig.time_unit, data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })) })
+            } else if (category === 'secondary_product') {
+              allSecondary.push({ name, column_header: name, unit, type: name, data_type: dataType, time_unit: sheetConfig.time_unit, data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })) })
+            } else if (category === 'process_data') {
+              allProcess.push({ name, column_header: name, unit, type: name, data_type: dataType, time_unit: sheetConfig.time_unit, data: rawPairs.map(p => ({ time: p.tp, value: p.val })) })
+            }
+          }
         }
 
-        const timepointColIdx = columnLetterToIndex(template.timepoint_column)
-        const missing: string[] = []
-        const headerRow = jsonData[0] ?? []
-
-        const resolvedMappings = template.column_mappings.map(mapping => {
-          const colIdx = columnLetterToIndex(mapping.column)
-          if (colIdx >= headerRow.length || headerRow[colIdx] === null || headerRow[colIdx] === undefined) {
-            missing.push(`${mapping.name} (column ${mapping.column})`)
-          }
-          return { ...mapping, colIdx }
-        })
-
-        setSpreadsheetMissing(missing)
-
-        const dataRows = jsonData.slice(1)
-        const products: ClassifiedData['products'] = []
-        const secondaryProducts: ClassifiedData['secondary_products'] = []
-        const processData: ClassifiedData['process_data'] = []
-
-        for (const mapping of resolvedMappings) {
-          const { colIdx, name, category, unit } = mapping
-          const rawPairs: { tp: string; val: number }[] = []
-          for (const row of dataRows) {
-            const tpRaw = row[timepointColIdx]
-            const valRaw = row[colIdx]
-            if (tpRaw === null || tpRaw === undefined || valRaw === null || valRaw === undefined || valRaw === '') continue
-            const numVal = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw))
-            if (isNaN(numVal)) continue
-            rawPairs.push({ tp: String(tpRaw), val: numVal })
-          }
-
-          const dataType = rawPairs.length > 50 ? 'continuous' : 'discrete'
-
-          if (category === 'product') {
-            products.push({ name, column_header: name, unit, data_type: dataType, time_unit: template.time_unit, data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })) })
-          } else if (category === 'secondary_product') {
-            secondaryProducts.push({ name, column_header: name, unit, type: name, data_type: dataType, time_unit: template.time_unit, data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })) })
-          } else if (category === 'process_data') {
-            processData.push({ name, column_header: name, unit, type: name, data_type: dataType, time_unit: template.time_unit, data: rawPairs.map(p => ({ time: p.tp, value: p.val })) })
-          }
+        setSpreadsheetMissing(allMissing)
+        if (warnings.length > 0) {
+          setSpreadsheetError(warnings.join(' '))
         }
 
-        setParsedSpreadsheet({ products, secondary_products: secondaryProducts, process_data: processData, ignored: [] })
+        setParsedSpreadsheet({ products: allProducts, secondary_products: allSecondary, process_data: allProcess, ignored: [] })
       } catch (err) {
         setSpreadsheetError(err instanceof Error ? err.message : 'Failed to parse spreadsheet')
       }
@@ -558,6 +600,29 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     console.log('Primary edits:', primaryEdits)
     console.log('Secondary edits:', secondaryEdits)
     setHasChanges(false)
+  }
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!data) return
+    setDeleting(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${apiUrl}/api/experiments/${data.experiment.id}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        window.location.reload()
+      }
+    } catch {
+      // silent
+    } finally {
+      setDeleting(false)
+      setShowDeleteModal(false)
+    }
   }
 
   const getActiveGrid = (): GridData | null => {
@@ -1132,7 +1197,13 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
 
         {/* Buttons */}
         {selectedExperiment && activeTab === 'experiment-details' && (
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-between mt-4">
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="px-4 py-2 text-sm font-medium border border-red-300 text-red-600 rounded-md shadow-xs hover:bg-red-50 transition-all"
+            >
+              Delete Experiment
+            </button>
             <button
               onClick={handleSaveDetails}
               disabled={!hasChanges || saving}
@@ -1164,6 +1235,35 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setShowDeleteModal(false)} />
+          <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Experiment</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete <span className="font-medium">{data?.experiment.title}</span>? This will remove all associated data and cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-all disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -10,9 +10,20 @@ export interface ClassifiedData {
   ignored: string[]
 }
 
+interface SheetConfig {
+  sheet_name: string
+  start_row: number
+  timepoint_column: string
+  time_unit: string
+  column_mappings: { column: string; name: string; category: string; unit: string }[]
+}
+
 interface DataTemplate {
   id: number
   name: string
+  sheets: SheetConfig[]
+  // Legacy fields
+  sheet_name: string
   timepoint_column: string
   time_unit: string
   column_mappings: { column: string; name: string; category: string; unit: string }[]
@@ -41,6 +52,89 @@ function columnLetterToIndex(letter: string): number {
   return index - 1
 }
 
+function parseSheetWithConfig(
+  workbook: XLSX.WorkBook,
+  sheetConfig: SheetConfig,
+  warnings: string[],
+): { products: ClassifiedData['products']; secondary_products: ClassifiedData['secondary_products']; process_data: ClassifiedData['process_data']; missing: string[] } {
+  const sheetLabel = sheetConfig.sheet_name || 'Default'
+
+  // Resolve which workbook sheet to use
+  let sheetName: string
+  if (sheetConfig.sheet_name && workbook.SheetNames.includes(sheetConfig.sheet_name)) {
+    sheetName = sheetConfig.sheet_name
+  } else if (sheetConfig.sheet_name && !workbook.SheetNames.includes(sheetConfig.sheet_name)) {
+    warnings.push(`Sheet "${sheetConfig.sheet_name}" not found. Available: ${workbook.SheetNames.join(', ')}.`)
+    sheetName = workbook.SheetNames[0]
+  } else {
+    sheetName = workbook.SheetNames[0]
+  }
+
+  const sheet = workbook.Sheets[sheetName]
+  const jsonData: (string | number | null)[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
+
+  const products: ClassifiedData['products'] = []
+  const secondaryProducts: ClassifiedData['secondary_products'] = []
+  const processData: ClassifiedData['process_data'] = []
+  const missing: string[] = []
+
+  if (jsonData.length < 2) {
+    warnings.push(`Sheet "${sheetLabel}" has no data rows.`)
+    return { products, secondary_products: secondaryProducts, process_data: processData, missing }
+  }
+
+  // start_row is 1-based; convert to 0-based index
+  const headerRowIdx = Math.max(0, (sheetConfig.start_row || 1) - 1)
+
+  const timepointColIdx = columnLetterToIndex(sheetConfig.timepoint_column)
+  const headerRow = jsonData[headerRowIdx] ?? []
+
+  const resolvedMappings = sheetConfig.column_mappings.map(mapping => {
+    const colIdx = columnLetterToIndex(mapping.column)
+    if (colIdx >= headerRow.length || headerRow[colIdx] === null || headerRow[colIdx] === undefined) {
+      missing.push(`${mapping.name} (column ${mapping.column} in "${sheetLabel}")`)
+    }
+    return { ...mapping, colIdx }
+  })
+
+  const dataRows = jsonData.slice(headerRowIdx + 1)
+
+  for (const mapping of resolvedMappings) {
+    const { colIdx, name, category, unit } = mapping
+
+    const rawPairs: { tp: string; val: number }[] = []
+    for (const row of dataRows) {
+      const tpRaw = row[timepointColIdx]
+      const valRaw = row[colIdx]
+      if (tpRaw === null || tpRaw === undefined || valRaw === null || valRaw === undefined || valRaw === '') continue
+      const numVal = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw))
+      if (isNaN(numVal)) continue
+      rawPairs.push({ tp: String(tpRaw), val: numVal })
+    }
+
+    const dataType = rawPairs.length > 50 ? 'continuous' : 'discrete'
+
+    if (category === 'product') {
+      products.push({
+        name, column_header: name, unit, data_type: dataType, time_unit: sheetConfig.time_unit,
+        data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })),
+      })
+    } else if (category === 'secondary_product') {
+      secondaryProducts.push({
+        name, column_header: name, unit, type: name, data_type: dataType, time_unit: sheetConfig.time_unit,
+        data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })),
+      })
+    } else if (category === 'process_data') {
+      processData.push({
+        name, column_header: name, unit, type: name, data_type: dataType, time_unit: sheetConfig.time_unit,
+        data: rawPairs.map(p => ({ time: p.tp, value: p.val })),
+      })
+    }
+  }
+
+  return { products, secondary_products: secondaryProducts, process_data: processData, missing }
+}
+
 export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTemplates }: Step2UploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -50,6 +144,7 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
   const [missingColumns, setMissingColumns] = useState<string[]>([])
   const [isDragActive, setIsDragActive] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
+  const [parseWarnings, setParseWarnings] = useState<string[]>([])
 
   const selectedTemplate = dataTemplates.find(t => t.id === selectedTemplateId) ?? null
 
@@ -57,6 +152,7 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
     setParseError(null)
     setMissingColumns([])
     setParsedData(null)
+    setParseWarnings([])
     setFileName(file.name)
 
     const reader = new FileReader()
@@ -66,97 +162,41 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
         if (!arrayBuffer) throw new Error('Failed to read file')
 
         const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-        const sheetName = workbook.SheetNames[0]
-        const sheet = workbook.Sheets[sheetName]
-        const jsonData: (string | number | null)[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
-        if (jsonData.length < 2) {
-          setParseError('Spreadsheet has no data rows.')
-          return
+        // Use sheets array; fall back to legacy single-sheet fields
+        const sheets: SheetConfig[] = template.sheets && template.sheets.length > 0
+          ? template.sheets
+          : [{
+              sheet_name: template.sheet_name || '',
+              start_row: 1,
+              timepoint_column: template.timepoint_column,
+              time_unit: template.time_unit,
+              column_mappings: template.column_mappings,
+            }]
+
+        const allProducts: ClassifiedData['products'] = []
+        const allSecondary: ClassifiedData['secondary_products'] = []
+        const allProcess: ClassifiedData['process_data'] = []
+        const allMissing: string[] = []
+        const warnings: string[] = []
+
+        for (const sheetConfig of sheets) {
+          const result = parseSheetWithConfig(workbook, sheetConfig, warnings)
+          allProducts.push(...result.products)
+          allSecondary.push(...result.secondary_products)
+          allProcess.push(...result.process_data)
+          allMissing.push(...result.missing)
         }
 
-        // Find timepoint column
-        const timepointColIdx = columnLetterToIndex(template.timepoint_column)
-        const missing: string[] = []
+        setMissingColumns(allMissing)
+        setParseWarnings(warnings)
 
-        // Check header row for column existence
-        const headerRow = jsonData[0] ?? []
-
-        // Build mappings with resolved column indices
-        const resolvedMappings = template.column_mappings.map(mapping => {
-          const colIdx = columnLetterToIndex(mapping.column)
-          // Check if column exists and has a header
-          if (colIdx >= headerRow.length || headerRow[colIdx] === null || headerRow[colIdx] === undefined) {
-            missing.push(`${mapping.name} (column ${mapping.column})`)
-          }
-          return { ...mapping, colIdx }
-        })
-
-        setMissingColumns(missing)
-
-        // Parse data rows (skip header)
-        const dataRows = jsonData.slice(1)
-
-        const products: ClassifiedData['products'] = []
-        const secondaryProducts: ClassifiedData['secondary_products'] = []
-        const processData: ClassifiedData['process_data'] = []
-
-        for (const mapping of resolvedMappings) {
-          const { colIdx, name, category, unit } = mapping
-
-          // Extract timepoint-value pairs, filtering out empty/non-numeric values
-          const rawPairs: { tp: string; val: number }[] = []
-          for (const row of dataRows) {
-            const tpRaw = row[timepointColIdx]
-            const valRaw = row[colIdx]
-            if (tpRaw === null || tpRaw === undefined || valRaw === null || valRaw === undefined || valRaw === '') continue
-            const numVal = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw))
-            if (isNaN(numVal)) continue
-            rawPairs.push({ tp: String(tpRaw), val: numVal })
-          }
-
-          const dataType = rawPairs.length > 50 ? 'continuous' : 'discrete'
-
-          if (category === 'product') {
-            products.push({
-              name,
-              column_header: name,
-              unit,
-              data_type: dataType,
-              time_unit: template.time_unit,
-              data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })),
-            })
-          } else if (category === 'secondary_product') {
-            secondaryProducts.push({
-              name,
-              column_header: name,
-              unit,
-              type: name,
-              data_type: dataType,
-              time_unit: template.time_unit,
-              data: rawPairs.map(p => ({ timepoint: p.tp, value: p.val })),
-            })
-          } else if (category === 'process_data') {
-            processData.push({
-              name,
-              column_header: name,
-              unit,
-              type: name,
-              data_type: dataType,
-              time_unit: template.time_unit,
-              data: rawPairs.map(p => ({ time: p.tp, value: p.val })),
-            })
-          }
-        }
-
-        const result: ClassifiedData = {
-          products,
-          secondary_products: secondaryProducts,
-          process_data: processData,
+        setParsedData({
+          products: allProducts,
+          secondary_products: allSecondary,
+          process_data: allProcess,
           ignored: [],
-        }
-
-        setParsedData(result)
+        })
       } catch (err) {
         setParseError(err instanceof Error ? err.message : 'Failed to parse spreadsheet')
       }
@@ -180,6 +220,11 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
     ? parsedData.products.length + parsedData.secondary_products.length + parsedData.process_data.length
     : 0
 
+  // Build template info summary
+  const templateSheets = selectedTemplate
+    ? (selectedTemplate.sheets && selectedTemplate.sheets.length > 0 ? selectedTemplate.sheets : null)
+    : null
+
   return (
     <div className="flex flex-col gap-6">
       {/* Template Selector */}
@@ -201,6 +246,7 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
               setFileName(null)
               setMissingColumns([])
               setParseError(null)
+              setParseWarnings([])
             }}
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -213,11 +259,19 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
       </div>
 
       {/* Template Info */}
-      {selectedTemplate && (
-        <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-sm text-gray-600">
-          <span className="font-medium text-gray-700">Timepoint column:</span> {selectedTemplate.timepoint_column} &middot;{' '}
-          <span className="font-medium text-gray-700">Time unit:</span> {selectedTemplate.time_unit} &middot;{' '}
-          <span className="font-medium text-gray-700">Mapped columns:</span> {selectedTemplate.column_mappings.length}
+      {selectedTemplate && templateSheets && (
+        <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-sm text-gray-600 space-y-1">
+          {templateSheets.map((s, idx) => {
+            const label = s.sheet_name || 'Default'
+            return (
+              <div key={idx}>
+                <span className="font-medium text-gray-700">Sheet:</span> {label} &middot;{' '}
+                <span className="font-medium text-gray-700">Timepoint:</span> {s.timepoint_column} &middot;{' '}
+                <span className="font-medium text-gray-700">Time unit:</span> {s.time_unit} &middot;{' '}
+                <span className="font-medium text-gray-700">Columns:</span> {s.column_mappings.length}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -264,6 +318,13 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
       {parseError && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">
           {parseError}
+        </div>
+      )}
+
+      {/* Parse Warnings */}
+      {parseWarnings.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-700">
+          {parseWarnings.map((w, i) => <div key={i}>{w}</div>)}
         </div>
       )}
 

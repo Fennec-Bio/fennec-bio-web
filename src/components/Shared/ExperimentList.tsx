@@ -37,7 +37,7 @@ interface UniqueNamesResponse {
 interface ExperimentSetData {
   id: string
   name: string
-  experiments: { id: number; title: string }[]
+  experiments: { id: number; title: string; benchmark?: boolean }[]
 }
 
 interface ExperimentListProps {
@@ -860,6 +860,9 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                             onClick={() => onExperimentSelect?.({ id: exp.id, title: exp.title, description: '', benchmark: '', created_at: '', updated_at: '' })}
                           >
                             {exp.title}
+                            {exp.benchmark && (
+                              <span className="ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Control</span>
+                            )}
                           </div>
                         ))
                       )}

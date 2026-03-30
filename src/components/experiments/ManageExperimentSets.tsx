@@ -7,6 +7,7 @@ import { useProjectContext } from '@/hooks/useProjectContext'
 interface ExperimentOption {
   id: number
   title: string
+  benchmark?: boolean
 }
 
 interface ExperimentSetData {
@@ -34,6 +35,7 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
   const [hypothesis, setHypothesis] = useState('')
   const [conclusion, setConclusion] = useState('')
   const [selectedExpIds, setSelectedExpIds] = useState<Set<number>>(new Set())
+  const [controlIds, setControlIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -62,7 +64,7 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
     if (res.ok) {
       const data = await res.json()
       const exps = data.experiments?.experiments || []
-      setExperiments(exps.map((e: { id: number; title: string }) => ({ id: e.id, title: e.title })))
+      setExperiments(exps.map((e: { id: number; title: string; benchmark: boolean }) => ({ id: e.id, title: e.title, benchmark: e.benchmark })))
     }
   }, [activeProject, apiUrl, getToken])
 
@@ -83,6 +85,7 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
       setHypothesis('')
       setConclusion('')
       setSelectedExpIds(new Set())
+      setControlIds(new Set())
       setError('')
       setSuccess('')
     } else {
@@ -92,6 +95,7 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
         setHypothesis(set.hypothesis || '')
         setConclusion(set.conclusion || '')
         setSelectedExpIds(new Set(set.experiments.map(e => e.id)))
+        setControlIds(new Set(set.experiments.filter(e => e.benchmark).map(e => e.id)))
         setError('')
         setSuccess('')
       }
@@ -100,6 +104,19 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
 
   const toggleExperiment = (id: number) => {
     setSelectedExpIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+        setControlIds(c => { const n = new Set(c); n.delete(id); return n })
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleControl = (id: number) => {
+    setControlIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -126,6 +143,7 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
           conclusion: conclusion.trim(),
           project: activeProject.id,
           experiment_ids: Array.from(selectedExpIds),
+          benchmark_ids: Array.from(controlIds),
         }),
       })
       if (!res.ok) {
@@ -159,6 +177,7 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
           hypothesis: hypothesis.trim(),
           conclusion: conclusion.trim(),
           experiment_ids: Array.from(selectedExpIds),
+          benchmark_ids: Array.from(controlIds),
         }),
       })
       if (!res.ok) {
@@ -266,20 +285,36 @@ export function ManageExperimentSets({ externalSelectedSetId }: ManageExperiment
           {experiments.length === 0 ? (
             <p className="px-4 py-2 text-sm text-gray-500">No experiments in this project</p>
           ) : (
-            experiments.map(exp => (
-              <label
-                key={exp.id}
-                className="flex items-center px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedExpIds.has(exp.id)}
-                  onChange={() => toggleExperiment(exp.id)}
-                  className="mr-3 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                {exp.title}
-              </label>
-            ))
+            <>
+              <div className="flex items-center px-4 py-2 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <span className="w-7" />
+                <span className="flex-1">Experiment</span>
+                <span className="w-16 text-center">Control</span>
+              </div>
+              {experiments.map(exp => (
+                <div
+                  key={exp.id}
+                  className="flex items-center px-4 py-2 hover:bg-gray-100 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedExpIds.has(exp.id)}
+                    onChange={() => toggleExperiment(exp.id)}
+                    className="mr-3 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="flex-1">{exp.title}</span>
+                  <span className="w-16 flex justify-center">
+                    <input
+                      type="checkbox"
+                      checked={controlIds.has(exp.id)}
+                      onChange={() => toggleControl(exp.id)}
+                      disabled={!selectedExpIds.has(exp.id)}
+                      className="h-4 w-4 rounded border-black text-[#eb5234] focus:ring-[#eb5234] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    />
+                  </span>
+                </div>
+              ))}
+            </>
           )}
         </div>
       </div>
