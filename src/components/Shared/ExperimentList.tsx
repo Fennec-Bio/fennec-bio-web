@@ -45,9 +45,10 @@ interface ExperimentListProps {
   onExperimentsChange?: (experiments: Experiment[]) => void
   onExperimentSetSelect?: (setId: string) => void
   isMobileDrawer?: boolean
+  refreshKey?: number
 }
 
-export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExperimentSetSelect, isMobileDrawer = false }: ExperimentListProps) => {
+export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExperimentSetSelect, isMobileDrawer = false, refreshKey }: ExperimentListProps) => {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
 
@@ -227,7 +228,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     }
     fetchStrains()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProject])
+  }, [activeProject, refreshKey])
 
   useEffect(() => {
     setCurrentPage(1)

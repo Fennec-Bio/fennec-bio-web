@@ -8,7 +8,7 @@ import { Step2Upload, ClassifiedData } from './Step2Upload'
 import { Step3Review } from './Step3Review'
 import { useProjectContext } from '@/hooks/useProjectContext'
 
-export function CreateExperiment() {
+export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {}) {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -51,10 +51,11 @@ export function CreateExperiment() {
         })
         if (!res.ok) return
         const data = await res.json()
+        const names = data.unique_names ?? data
         setUniqueNames({
-          variables: data.unique_names?.variables ?? {},
-          events: data.unique_names?.events ?? [],
-          anomalies: data.unique_names?.anomalies ?? [],
+          variables: names.variables ?? {},
+          events: names.events ?? [],
+          anomalies: names.anomalies ?? [],
         })
       } catch {
         // silently fail — dropdowns will just be empty
@@ -127,6 +128,16 @@ export function CreateExperiment() {
     setErrorMessage('')
 
     try {
+      // Check for duplicate variable names
+      const filledVars = variables.filter((v) => v.name.trim() !== '')
+      const varNames = filledVars.map((v) => v.name)
+      const dupes = varNames.filter((n, i) => varNames.indexOf(n) !== i)
+      if (dupes.length > 0) {
+        setErrorMessage(`Duplicate variable: "${dupes[0]}". Each variable name can only be used once.`)
+        setIsCreating(false)
+        return
+      }
+
       const token = await getToken()
 
       const body = {
@@ -135,7 +146,7 @@ export function CreateExperiment() {
         description: experimentSummary,
         experiment_note: experimentNote,
         date: experimentDate,
-        variables: variables.filter((v) => v.name.trim() !== ''),
+        variables: filledVars,
         events: events.filter((e) => e.name.trim() !== ''),
         anomalies: anomalies.filter((a) => a.name.trim() !== ''),
         products: classifiedData?.products.map((p) => ({
@@ -197,6 +208,7 @@ export function CreateExperiment() {
       setStep(1)
       setSuccessMessage(`Experiment "${title}" created successfully!`)
       setTimeout(() => setSuccessMessage(''), 3000)
+      onCreated?.()
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to create experiment')
     } finally {

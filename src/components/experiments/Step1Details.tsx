@@ -204,7 +204,18 @@ export function Step1Details({
     }
   }
 
-  const varNameKeys = Object.keys(uniqueNames.variables)
+  const varNameKeys = Object.keys(uniqueNames.variables).filter(
+    (k) => k.toLowerCase() !== 'strain'
+  )
+
+  // Names already used by other rows — used to filter dropdowns and flag duplicates
+  const usedVarNames = (idx: number) => {
+    const names = new Set<string>()
+    variables.forEach((v, i) => {
+      if (i !== idx && v.name) names.add(v.name)
+    })
+    return names
+  }
 
   return (
     <div>
@@ -279,9 +290,12 @@ export function Step1Details({
           const isNameFree = !!varNameFree[idx]
           const isValueFree = !!varValueFree[idx]
           const valueOptions = variable.name ? (uniqueNames.variables[variable.name] ?? []) : []
+          const taken = usedVarNames(idx)
+          const isDuplicate = isNameFree && variable.name !== '' && taken.has(variable.name)
 
           return (
-            <div key={idx} className="flex items-center gap-2 mb-1.5">
+            <div key={idx}>
+              <div className="flex items-center gap-2 mb-1.5">
               {/* Name */}
               <div className="flex-1">
                 {isNameFree ? (
@@ -290,7 +304,7 @@ export function Step1Details({
                     value={variable.name}
                     onChange={(e) => updateVariable(idx, 'name', e.target.value)}
                     placeholder="Variable name"
-                    className={inputClass}
+                    className={`${inputClass}${isDuplicate ? ' border-red-400 ring-1 ring-red-400' : ''}`}
                     autoFocus
                   />
                 ) : (
@@ -300,7 +314,7 @@ export function Step1Details({
                     className={selectClass}
                   >
                     <option value="">Select name…</option>
-                    {varNameKeys.map((k) => (
+                    {varNameKeys.filter((k) => !taken.has(k)).map((k) => (
                       <option key={k} value={k}>{k}</option>
                     ))}
                     <option value="__add_new__">Add new…</option>
@@ -345,6 +359,10 @@ export function Step1Details({
               >
                 ×
               </button>
+            </div>
+            {isDuplicate && (
+              <p className="text-xs text-red-500 mb-1.5 ml-1">Variable &ldquo;{variable.name}&rdquo; is already added</p>
+            )}
             </div>
           )
         })}

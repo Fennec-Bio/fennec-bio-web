@@ -25,6 +25,7 @@ export default function ExperimentsPage() {
   const [isEditOpen, setIsEditOpen] = useState(true)
   const [isSetsOpen, setIsSetsOpen] = useState(true)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(true)
+  const [listRefreshKey, setListRefreshKey] = useState(0)
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
@@ -47,6 +48,7 @@ export default function ExperimentsPage() {
             <ExperimentList
               onExperimentSelect={handleExperimentSelect}
               onExperimentSetSelect={handleExperimentSetSelect}
+              refreshKey={listRefreshKey}
               isMobileDrawer
             />
           </div>
@@ -68,6 +70,7 @@ export default function ExperimentsPage() {
             <ExperimentList
               onExperimentSelect={handleExperimentSelect}
               onExperimentSetSelect={handleExperimentSetSelect}
+              refreshKey={listRefreshKey}
             />
           </div>
 
@@ -83,7 +86,7 @@ export default function ExperimentsPage() {
               </button>
               {isCreateOpen && (
                 <div className="p-3 md:p-4 lg:p-6">
-                  <CreateExperiment />
+                  <CreateExperiment onCreated={() => setListRefreshKey(k => k + 1)} />
                 </div>
               )}
             </div>
