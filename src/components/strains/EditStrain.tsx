@@ -198,6 +198,7 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
                   <option value="insertion">Insertion</option>
                   <option value="deletion">Deletion</option>
                   <option value="modification">Modification</option>
+                  <option value="plasmid">Plasmid</option>
                 </select>
                 <input
                   type="text"

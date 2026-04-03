@@ -13,12 +13,23 @@ interface StrainOption {
   experiment_count: number
 }
 
+interface StrainLineageData {
+  name: string
+  parent: string | null
+  modifications: {
+    id: number
+    modification_type: string
+    gene_name: string
+  }[]
+}
+
 interface AddStrainProps {
   onStrainAdded: () => void
   availableStrains: StrainOption[]
+  lineageData?: StrainLineageData[]
 }
 
-export function AddStrain({ onStrainAdded, availableStrains }: AddStrainProps) {
+export function AddStrain({ onStrainAdded, availableStrains, lineageData = [] }: AddStrainProps) {
   const { getToken } = useAuth()
 
   const [name, setName] = useState('')
@@ -38,6 +49,21 @@ export function AddStrain({ onStrainAdded, availableStrains }: AddStrainProps) {
 
   const updateModification = (index: number, field: keyof Modification, value: string) => {
     setModifications(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m))
+  }
+
+  const handleParentChange = (parentName: string) => {
+    setParent(parentName)
+    if (parentName) {
+      const parentStrain = lineageData.find(s => s.name === parentName)
+      if (parentStrain && parentStrain.modifications.length > 0) {
+        setModifications(
+          parentStrain.modifications.map(m => ({
+            modification_type: m.modification_type,
+            gene_name: m.gene_name,
+          }))
+        )
+      }
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,7 +151,7 @@ export function AddStrain({ onStrainAdded, availableStrains }: AddStrainProps) {
           </label>
           <select
             value={parent}
-            onChange={e => setParent(e.target.value)}
+            onChange={e => handleParentChange(e.target.value)}
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">None (root strain)</option>
@@ -154,6 +180,7 @@ export function AddStrain({ onStrainAdded, availableStrains }: AddStrainProps) {
                   <option value="insertion">Insertion</option>
                   <option value="deletion">Deletion</option>
                   <option value="modification">Modification</option>
+                  <option value="plasmid">Plasmid</option>
                 </select>
                 <input
                   type="text"

@@ -223,6 +223,7 @@ export default function StrainsPage() {
                   <AddStrain
                     onStrainAdded={handleStrainChanged}
                     availableStrains={mergedStrainsList}
+                    lineageData={lineageData}
                   />
                 )}
               </div>
