@@ -318,30 +318,36 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   }, [renderGraph])
 
   const saveField = async (field: 'description' | 'experiment_note', value: string) => {
-    console.log('[Notebook] saveField called:', field, 'data.experiment:', data?.experiment?.id)
-    if (!data?.experiment) {
-      console.log('[Notebook] no experiment data, aborting')
-      return
-    }
+    const experimentId = data?.experiment?.id ?? selectedExperiment?.id
+    if (!experimentId) return
     setSaveError('')
     setSaving(true)
     try {
       const token = await getToken()
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/`
-      console.log('[Notebook] PATCH:', url)
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${experimentId}/`
       const res = await fetch(url, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: value }),
       })
-      console.log('[Notebook] response status:', res.status)
       if (!res.ok) {
         const errText = await res.text()
-        console.log('[Notebook] error body:', errText)
         throw new Error(`Failed to save (${res.status}): ${errText}`)
       }
       const json = await res.json()
-      setData(prev => prev ? { ...prev, experiment: json.experiment } : prev)
+      setData(prev => {
+        if (prev) return { ...prev, experiment: { ...prev.experiment, ...json.experiment } }
+        // No fetched data yet — seed a minimal ExperimentDetail so future edits work
+        return {
+          experiment: json.experiment,
+          products: [],
+          secondary_products: [],
+          process_data: [],
+          note_images: [],
+          comments: [],
+          unique_names: { products: [], secondary_products: [], process_data: [] },
+        }
+      })
       if (field === 'description') setEditingDescription(false)
       else setEditingNotes(false)
     } catch (err) {
@@ -657,16 +663,15 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
             </div>
           </div>
 
-          <div ref={containerRef} className="w-full">
-            {loading ? (
-              <div className="h-[400px] flex items-center justify-center">
+          <div ref={containerRef} className="w-full relative">
+            {loading && (
+              <div className="absolute inset-0 h-[400px] flex items-center justify-center bg-white/70 z-10">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600" />
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <svg ref={svgRef} />
-              </div>
             )}
+            <div className="overflow-x-auto">
+              <svg ref={svgRef} />
+            </div>
           </div>
         </div>
 
