@@ -8,6 +8,7 @@ import { AddStrain } from '@/components/strains/AddStrain'
 import { EditStrain } from '@/components/strains/EditStrain'
 import { StrainStats } from '@/components/strains/StrainStats'
 import { StrainLineageChart } from '@/components/strains/StrainLineageChart'
+import { useProjectContext } from '@/hooks/useProjectContext'
 
 interface StrainLineageData {
   name: string
@@ -51,6 +52,7 @@ function CollapsibleSection({ title, isOpen, onToggle, children }: CollapsibleSe
 
 export default function StrainsPage() {
   const { getToken } = useAuth()
+  const { activeProject } = useProjectContext()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isStrainSectionOpen, setIsStrainSectionOpen] = useState(true)
   const [isLineageOpen, setIsLineageOpen] = useState(true)
@@ -61,13 +63,15 @@ export default function StrainsPage() {
   const [availableProducts, setAvailableProducts] = useState<string[]>(['total'])
   const [strainsList, setStrainsList] = useState<StrainOption[]>([])
 
-  // Fetch lineage data (shared across StrainStats, EditStrain, StrainLineageChart)
+  // Fetch lineage data (shared across StrainStats, EditStrain, StrainLineageChart).
+  // Scoped to the active project so the backend aggregation stays fast in production.
   useEffect(() => {
     let cancelled = false
     const fetchLineage = async () => {
       try {
         const token = await getToken()
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strain-lineage/`, {
+        const qs = activeProject ? `?project_id=${activeProject.id}` : ''
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strain-lineage/${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) {
@@ -83,7 +87,7 @@ export default function StrainsPage() {
     }
     fetchLineage()
     return () => { cancelled = true }
-  }, [refreshKey, getToken])
+  }, [refreshKey, getToken, activeProject])
 
   // Fetch strains list once (shared across StrainList, AddStrain, EditStrain)
   useEffect(() => {

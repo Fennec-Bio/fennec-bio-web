@@ -264,19 +264,27 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
         throw new Error(data.error || data.detail || `Request failed (${res.status})`)
       }
 
-      // Parse response and upload images if any
+      // Parse response and kick off image uploads in parallel.
+      // We don't await them — the experiment is already created and the
+      // user shouldn't have to wait on N sequential GCS uploads to see
+      // the success banner.
       const responseData = await res.json()
       if (noteImages.length > 0) {
         const experimentId = responseData.experiment.id
-        for (const imageFile of noteImages) {
-          const formData = new FormData()
-          formData.append('image', imageFile)
-          await fetch(`${apiUrl}/api/experiments/${experimentId}/note-images/`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData,
+        const imagesToUpload = noteImages
+        void Promise.all(
+          imagesToUpload.map((imageFile) => {
+            const formData = new FormData()
+            formData.append('image', imageFile)
+            return fetch(`${apiUrl}/api/experiments/${experimentId}/note-images/`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData,
+            }).catch(() => {
+              // Non-critical: image upload failure shouldn't block experiment creation
+            })
           })
-        }
+        )
       }
 
       // Success — reset everything and show banner
