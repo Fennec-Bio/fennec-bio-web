@@ -150,6 +150,8 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [imageToDelete, setImageToDelete] = useState<NoteImage | null>(null)
+  const [deletingImage, setDeletingImage] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [postingComment, setPostingComment] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -374,20 +376,25 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
     }
   }
 
-  const uploadImages = async (files: FileList) => {
+  const uploadImages = async (files: File[]) => {
     if (!data?.experiment) return
+    if (files.length === 0) return
     setUploading(true)
+    setSaveError('')
     try {
       const token = await getToken()
       const newImages: NoteImage[] = []
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const formData = new FormData()
         formData.append('image', file)
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/note-images/`,
           { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }
         )
-        if (!res.ok) throw new Error('Failed to upload')
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}))
+          throw new Error(errJson.error || `Upload failed (${res.status})`)
+        }
         const json = await res.json()
         newImages.push(json.image)
       }
@@ -395,24 +402,35 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
       setData(prev => prev ? { ...prev, note_images: [...(prev.note_images || []), ...newImages] } : prev)
     } catch (err) {
       console.error('Error uploading:', err)
+      setSaveError(err instanceof Error ? err.message : 'Failed to upload image')
     } finally {
       setUploading(false)
     }
   }
 
-  const deleteImage = async (imageId: number) => {
-    if (!data?.experiment) return
+  const confirmDeleteImage = async () => {
+    if (!data?.experiment || !imageToDelete) return
+    setDeletingImage(true)
+    setSaveError('')
     try {
       const token = await getToken()
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/note-images/${imageId}/`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/note-images/${imageToDelete.id}/`,
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
       )
-      if (!res.ok) throw new Error('Failed to delete')
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}))
+        throw new Error(errJson.error || `Delete failed (${res.status})`)
+      }
       if (selectedExperiment) notebookExperimentCache.delete(selectedExperiment.title)
-      setData(prev => prev ? { ...prev, note_images: (prev.note_images || []).filter(img => img.id !== imageId) } : prev)
+      const deletedId = imageToDelete.id
+      setData(prev => prev ? { ...prev, note_images: (prev.note_images || []).filter(img => img.id !== deletedId) } : prev)
+      setImageToDelete(null)
     } catch (err) {
       console.error('Error deleting image:', err)
+      setSaveError(err instanceof Error ? err.message : 'Failed to delete image')
+    } finally {
+      setDeletingImage(false)
     }
   }
 
@@ -613,7 +631,15 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
                 accept="image/*"
                 multiple
                 className="hidden"
-                onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }}
+                onChange={e => {
+                  // Snapshot the FileList into a real array BEFORE resetting
+                  // the input value. Resetting the input clears the same
+                  // FileList object, so an async upload that hasn't started
+                  // iterating yet would otherwise see zero files.
+                  const picked = e.target.files ? Array.from(e.target.files) : []
+                  e.target.value = ''
+                  if (picked.length) uploadImages(picked)
+                }}
               />
               <div className="mb-3">
                 <button
@@ -640,7 +666,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
                           />
                         </a>
                         <button
-                          onClick={() => deleteImage(img.id)}
+                          onClick={() => setImageToDelete(img)}
                           className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                           title="Delete image"
                         >
@@ -756,6 +782,38 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
           </div>
         </div>
       </div>
+
+      {/* Delete image confirmation modal */}
+      {imageToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => { if (!deletingImage) setImageToDelete(null) }}
+          />
+          <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Image</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete <span className="font-medium">{imageToDelete.filename}</span>? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setImageToDelete(null)}
+                disabled={deletingImage}
+                className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md hover:bg-gray-50 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteImage}
+                disabled={deletingImage}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-all disabled:opacity-50"
+              >
+                {deletingImage ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

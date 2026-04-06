@@ -253,9 +253,11 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   useEffect(() => {
     if (!activeExperiment || prefetchedData) return
     const title = activeExperiment.title
+    // Cache/dedupe by id+title since titles are not unique within an org.
+    const cacheKey = `${activeExperiment.id}:${title}`
 
     // Check cache
-    const cached = experimentCache.get(title)
+    const cached = experimentCache.get(cacheKey)
     if (cached) {
       setExperimentData(cached)
       setCurrentTitle(title)
@@ -264,14 +266,16 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       return
     }
 
-    // Skip if we're already fetching this title
-    if (fetchingTitleRef.current === title) return
+    // Skip if we're already fetching this experiment
+    if (fetchingTitleRef.current === cacheKey) return
 
-    fetchingTitleRef.current = title
+    fetchingTitleRef.current = cacheKey
     setCurrentTitle(title)
 
     const encodedTitle = encodeURIComponent(title)
-    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodedTitle}/?fields=products,secondary_products,process_data,variables,events,anomalies,note_images,comments,unique_names&max_points=200`
+    // Pass ?id= so the backend disambiguates when multiple experiments share
+    // a title within the same org (no DB-level uniqueness on title).
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodedTitle}/?id=${activeExperiment.id}&fields=products,secondary_products,process_data,variables,events,anomalies,note_images,comments,unique_names&max_points=200`
 
     const fetchData = async () => {
       setIsLoading(true)
@@ -282,7 +286,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
         if (!res.ok) throw new Error('Failed to fetch')
         const data = await res.json()
 
-        if (fetchingTitleRef.current !== title) return
+        if (fetchingTitleRef.current !== cacheKey) return
         const full: ExperimentDetail = {
           experiment: data.experiment,
           products: data.products || [],
@@ -296,11 +300,11 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
           unique_names: data.unique_names,
         }
         setExperimentData(full)
-        experimentCache.set(title, full)
+        experimentCache.set(cacheKey, full)
       } catch (err) {
         console.error('Error fetching experiment data:', err)
       } finally {
-        if (fetchingTitleRef.current === title) {
+        if (fetchingTitleRef.current === cacheKey) {
           setIsLoading(false)
           setIsLoadingExtra(false)
         }
