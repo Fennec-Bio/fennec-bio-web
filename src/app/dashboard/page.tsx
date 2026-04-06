@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { ChevronDown, ChevronRight } from 'lucide-react'
@@ -51,6 +51,10 @@ export default function Dashboard() {
 
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
+  // First experiment of the current project — held stable across pagination
+  // so the right-hand QuickGraph doesn't flip every time the user pages.
+  const [rightGraphDefault, setRightGraphDefault] = useState<Experiment | null>(null)
+  const expectingFreshDefaultRef = useRef(true)
   const [overlayPreselected, setOverlayPreselected] = useState<Experiment[] | null>(null)
   const [selectedSetData, setSelectedSetData] = useState<{ experiments: Experiment[]; hypothesis: string; conclusion: string; batchData?: unknown[] } | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -69,8 +73,24 @@ export default function Dashboard() {
     setExperiments(experiments)
     if (experiments.length === 0) {
       setSelectedExperiment(null)
+      setRightGraphDefault(null)
+      return
+    }
+    // Capture the first experiment of the project once. We only refresh this
+    // when the project changes (see effect below) — pagination doesn't reset
+    // expectingFreshDefaultRef, so paging keeps the original default.
+    if (expectingFreshDefaultRef.current) {
+      setRightGraphDefault(experiments[0])
+      expectingFreshDefaultRef.current = false
     }
   }, [])
+
+  // When the active project changes, mark that the right-hand graph default
+  // needs to be re-captured from the next experiments list to arrive.
+  useEffect(() => {
+    expectingFreshDefaultRef.current = true
+    setRightGraphDefault(null)
+  }, [activeProject?.id])
 
   const handleExperimentSetSelect = useCallback(async (setId: string) => {
     try {
@@ -197,6 +217,8 @@ export default function Dashboard() {
                 onExperimentSelect={handleExperimentSelect}
                 experiments={experiments}
                 experimentSetData={selectedSetData}
+                rightGraphDefault={rightGraphDefault}
+                resetKey={activeProject?.id ?? null}
               />
             </CollapsibleSection>
 

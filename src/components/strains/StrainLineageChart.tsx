@@ -166,7 +166,7 @@ export function StrainLineageChart({ selectedStrain, strains, availableProducts,
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b flex items-center justify-end">
+      <div className="p-4 border-b border-gray-200 flex items-center justify-end">
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">Size by:</label>
           <select

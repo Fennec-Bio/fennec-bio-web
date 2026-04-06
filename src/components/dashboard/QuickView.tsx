@@ -24,9 +24,15 @@ interface QuickViewProps {
   onExperimentSelect?: (experiment: Experiment) => void
   experiments: Experiment[]
   experimentSetData?: ExperimentSetData | null
+  /** First experiment of the current context (project), held stable across
+   *  pagination by the dashboard so the right-hand graph doesn't flip every
+   *  time the user changes pages. */
+  rightGraphDefault?: Experiment | null
+  /** Reset signal for graph state — changes only on real context switches. */
+  resetKey?: string | number | null
 }
 
-export function QuickView({ selectedExperiment, onExperimentSelect, experiments, experimentSetData }: QuickViewProps) {
+export function QuickView({ selectedExperiment, onExperimentSelect, experiments, experimentSetData, rightGraphDefault, resetKey }: QuickViewProps) {
   console.log('[QuickView] render', {
     hasSetData: !!experimentSetData,
     setExpCount: experimentSetData?.experiments?.length,
@@ -88,15 +94,18 @@ export function QuickView({ selectedExperiment, onExperimentSelect, experiments,
             selectedExperiment={selectedExperiment}
             onExperimentSelect={onExperimentSelect}
             experiments={experiments}
+            resetKey={resetKey}
           />
         </div>
-        {/* Second graph - hidden on mobile, defaults to first experiment */}
+        {/* Second graph - hidden on mobile, defaults to first experiment of
+            the current context (held stable across pagination by the parent). */}
         <div className="hidden md:block md:flex-1 md:min-w-[380px]">
           <QuickGraph
             selectedExperiment={selectedExperiment}
             onExperimentSelect={onExperimentSelect}
             experiments={experiments}
-            defaultExperiment={experiments[0] ?? null}
+            defaultExperiment={rightGraphDefault ?? experiments[0] ?? null}
+            resetKey={resetKey}
           />
         </div>
       </div>

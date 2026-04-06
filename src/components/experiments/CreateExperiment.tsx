@@ -264,27 +264,57 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
         throw new Error(data.error || data.detail || `Request failed (${res.status})`)
       }
 
-      // Parse response and kick off image uploads in parallel.
-      // We don't await them — the experiment is already created and the
-      // user shouldn't have to wait on N sequential GCS uploads to see
-      // the success banner.
+      // Parse response and upload note images in parallel. We MUST await
+      // and surface failures — previously this was fire-and-forget with
+      // errors silently swallowed, which let the user think their images
+      // had been attached when in fact every upload had failed (size limit,
+      // GCS auth, network blip, etc.) and there was no way to tell.
       const responseData = await res.json()
       if (noteImages.length > 0) {
         const experimentId = responseData.experiment.id
-        const imagesToUpload = noteImages
-        void Promise.all(
-          imagesToUpload.map((imageFile) => {
-            const formData = new FormData()
-            formData.append('image', imageFile)
-            return fetch(`${apiUrl}/api/experiments/${experimentId}/note-images/`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
-              body: formData,
-            }).catch(() => {
-              // Non-critical: image upload failure shouldn't block experiment creation
-            })
-          })
+        const uploadResults = await Promise.all(
+          noteImages.map(async (imageFile) => {
+            try {
+              const formData = new FormData()
+              formData.append('image', imageFile)
+              const uploadRes = await fetch(
+                `${apiUrl}/api/experiments/${experimentId}/note-images/`,
+                {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${token}` },
+                  body: formData,
+                },
+              )
+              if (!uploadRes.ok) {
+                const errJson = await uploadRes.json().catch(() => ({}))
+                return {
+                  ok: false as const,
+                  name: imageFile.name,
+                  error: errJson.error || `HTTP ${uploadRes.status}`,
+                }
+              }
+              return { ok: true as const, name: imageFile.name }
+            } catch (uploadErr) {
+              return {
+                ok: false as const,
+                name: imageFile.name,
+                error: uploadErr instanceof Error ? uploadErr.message : 'Upload failed',
+              }
+            }
+          }),
         )
+        const failed = uploadResults.filter((r) => !r.ok)
+        if (failed.length > 0) {
+          const detail = failed.map((f) => `${f.name}: ${f.error}`).join('; ')
+          // Experiment was created successfully — surface partial failure
+          // instead of pretending nothing went wrong.
+          setErrorMessage(
+            `Experiment created, but ${failed.length} of ${noteImages.length} image upload(s) failed — ${detail}`,
+          )
+          setIsCreating(false)
+          onCreated?.()
+          return
+        }
       }
 
       // Success — reset everything and show banner

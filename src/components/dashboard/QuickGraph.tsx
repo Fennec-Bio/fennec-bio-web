@@ -85,6 +85,10 @@ interface QuickGraphProps {
   experiments: Experiment[]
   /** When set, the graph starts on this experiment via the dropdown (not sidebar-tracking mode). */
   defaultExperiment?: Experiment | null
+  /** Changes only on real context switches (e.g. project change). The reset
+   *  effect listens to this — NOT the `experiments` array — so that paginating
+   *  the experiment list does not wipe graph state or refetch. */
+  resetKey?: string | number | null
   /** Pre-fetched data from batch endpoint — skips the API call when provided. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prefetchedData?: any
@@ -163,7 +167,7 @@ function decimateData<T>(data: T[], maxPoints: number = 1000): T[] {
 // Simple in-memory cache so switching between experiments is instant on revisit
 const experimentCache = new Map<string, ExperimentDetail>()
 
-export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments, defaultExperiment, prefetchedData }: QuickGraphProps) {
+export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments, defaultExperiment, resetKey = null, prefetchedData }: QuickGraphProps) {
   const { getToken } = useAuth()
   const [experimentData, setExperimentData] = useState<ExperimentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -184,8 +188,15 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
 
   const activeExperiment = manualExperiment || selectedExperiment
 
-  // Reset graph state when experiments list changes (e.g. project switch)
-  // Skip reset when prefetched data is provided — the prefetch effect handles initialization
+  // Reset graph state on real context switches only (driven by `resetKey`,
+  // typically the active project id). We deliberately do NOT depend on the
+  // `experiments` array here — that array also changes on pagination, and
+  // resetting on every pagination click would wipe graph state, clear the
+  // module-level cache, and force a refetch on every QuickGraph instance.
+  // We also re-run when `defaultExperiment` arrives after a context switch,
+  // so the right-hand graph picks up the new project's first experiment as
+  // soon as it's available.
+  // Skip reset when prefetched data is provided — the prefetch effect handles initialization.
   useEffect(() => {
     if (prefetchedData) return
     setExperimentData(null)
@@ -199,7 +210,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       d3.select(svgRef.current).selectAll('*').remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [experiments])
+  }, [resetKey, defaultExperiment])
 
   // Follow sidebar selection when no manual override — reset fetch ref to allow new fetch
   useEffect(() => {

@@ -92,7 +92,7 @@ export function StrainStats({ strainName, lineageData, onSelectStrain }: StrainS
 
   return (
     <div className="bg-white rounded-lg shadow">
-      <div className="px-4 py-3 border-b">
+      <div className="px-4 py-3 border-b border-gray-200">
         <h3 className="text-xl font-bold text-gray-900">{strainName} Statistics</h3>
       </div>
 

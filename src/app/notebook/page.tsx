@@ -161,9 +161,12 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   useEffect(() => {
     if (!selectedExperiment) return
     const title = selectedExperiment.title
+    // Cache key by id+title — titles are not unique within an org and a
+    // title-only key would collide between distinct experiments.
+    const cacheKey = `${selectedExperiment.id}:${title}`
 
     // Instant revisit from cache
-    const cached = notebookExperimentCache.get(title)
+    const cached = notebookExperimentCache.get(cacheKey)
     if (cached) {
       setData(cached)
       setLoading(false)
@@ -175,14 +178,15 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
       setLoading(true)
       try {
         const token = await getToken()
-        // Match QuickGraph: request only needed fields and server-side decimate process_data
-        const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/?fields=products,secondary_products,process_data,note_images,comments,unique_names&max_points=200`
+        // Match QuickGraph: request only needed fields, decimate process_data,
+        // and pass ?id= so the backend disambiguates duplicate-title experiments.
+        const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodeURIComponent(title)}/?id=${selectedExperiment.id}&fields=products,secondary_products,process_data,note_images,comments,unique_names&max_points=200`
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (!res.ok) throw new Error('Failed to fetch')
         const json = await res.json()
         if (!cancelled) {
           setData(json)
-          notebookExperimentCache.set(title, json)
+          notebookExperimentCache.set(cacheKey, json)
         }
       } catch (err) {
         console.error('Error fetching experiment:', err)
@@ -352,7 +356,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
         throw new Error(`Failed to save (${res.status}): ${errText}`)
       }
       const json = await res.json()
-      if (selectedExperiment) notebookExperimentCache.delete(selectedExperiment.title)
+      if (selectedExperiment) notebookExperimentCache.delete(`${selectedExperiment.id}:${selectedExperiment.title}`)
       setData(prev => {
         if (prev) return { ...prev, experiment: { ...prev.experiment, ...json.experiment } }
         // No fetched data yet — seed a minimal ExperimentDetail so future edits work
@@ -398,7 +402,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
         const json = await res.json()
         newImages.push(json.image)
       }
-      if (selectedExperiment) notebookExperimentCache.delete(selectedExperiment.title)
+      if (selectedExperiment) notebookExperimentCache.delete(`${selectedExperiment.id}:${selectedExperiment.title}`)
       setData(prev => prev ? { ...prev, note_images: [...(prev.note_images || []), ...newImages] } : prev)
     } catch (err) {
       console.error('Error uploading:', err)
@@ -422,7 +426,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
         const errJson = await res.json().catch(() => ({}))
         throw new Error(errJson.error || `Delete failed (${res.status})`)
       }
-      if (selectedExperiment) notebookExperimentCache.delete(selectedExperiment.title)
+      if (selectedExperiment) notebookExperimentCache.delete(`${selectedExperiment.id}:${selectedExperiment.title}`)
       const deletedId = imageToDelete.id
       setData(prev => prev ? { ...prev, note_images: (prev.note_images || []).filter(img => img.id !== deletedId) } : prev)
       setImageToDelete(null)
@@ -449,7 +453,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
       )
       if (!res.ok) throw new Error('Failed to post comment')
       const json = await res.json()
-      if (selectedExperiment) notebookExperimentCache.delete(selectedExperiment.title)
+      if (selectedExperiment) notebookExperimentCache.delete(`${selectedExperiment.id}:${selectedExperiment.title}`)
       setData(prev => prev ? { ...prev, comments: [...(prev.comments || []), json.comment] } : prev)
       setCommentText('')
     } catch (err) {
@@ -468,7 +472,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
       )
       if (!res.ok) throw new Error('Failed to delete comment')
-      if (selectedExperiment) notebookExperimentCache.delete(selectedExperiment.title)
+      if (selectedExperiment) notebookExperimentCache.delete(`${selectedExperiment.id}:${selectedExperiment.title}`)
       setData(prev => prev ? { ...prev, comments: (prev.comments || []).filter(c => c.id !== commentId) } : prev)
     } catch (err) {
       console.error('Error deleting comment:', err)

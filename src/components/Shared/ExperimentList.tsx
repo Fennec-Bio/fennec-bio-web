@@ -230,15 +230,33 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProject, refreshKey])
 
+  // Refetch whenever the page, sort, filters, or project change.
   useEffect(() => {
-    setCurrentPage(1)
     fetchExperiments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, currentSortBy, currentSortOrder, activeFilters, activeProject])
 
+  // Reset to page 1 when sort/filters/project change — but NOT when the user
+  // changes the page itself, otherwise pagination clicks get stomped back to 1.
   useEffect(() => {
+    setCurrentPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSortBy, currentSortOrder, activeFilters, activeProject])
+
+  // Auto-select the first experiment only on initial load and when the user
+  // changes filters/sort/project — NOT on pagination. Paging through the list
+  // updates the dropdown contents but should leave the currently displayed
+  // experiment (e.g. in QuickGraph) untouched.
+  const shouldAutoSelectRef = useRef(true)
+  useEffect(() => {
+    shouldAutoSelectRef.current = true
+  }, [currentSortBy, currentSortOrder, activeFilters, activeProject])
+
+  useEffect(() => {
+    if (!shouldAutoSelectRef.current) return
     if (experiments.length > 0 && onExperimentSelect) {
       onExperimentSelect(experiments[0])
+      shouldAutoSelectRef.current = false
     }
   }, [experiments, onExperimentSelect])
 

@@ -191,7 +191,7 @@ export default function StrainsPage() {
               onToggle={() => setIsStrainSectionOpen(!isStrainSectionOpen)}
             >
               {/* Tabs */}
-              <div className="flex border-b px-4">
+              <div className="flex border-b border-gray-200 px-4">
                 <button
                   onClick={() => setActiveTab('edit')}
                   disabled={!selectedStrain}
