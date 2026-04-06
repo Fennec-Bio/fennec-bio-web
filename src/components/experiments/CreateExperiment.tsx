@@ -28,8 +28,12 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
   const [noteImages, setNoteImages] = useState<File[]>([])
   const [strainNames, setStrainNames] = useState<string[]>([])
   const [selectedStrain, setSelectedStrain] = useState('')
+  const [extractEventsWithAI, setExtractEventsWithAI] = useState(false)
+  const [extractAnomaliesWithAI, setExtractAnomaliesWithAI] = useState(false)
 
   // UI state
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
+  const [isExtractingAI, setIsExtractingAI] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -80,10 +84,10 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
     fetchTemplates()
 
     const fetchStrains = async () => {
+      if (!activeProject) return
       try {
         const token = await getToken()
-        const params = activeProject ? `?project_id=${activeProject.id}` : ''
-        const res = await fetch(`${apiUrl}/api/strain-lineage/${params}`, {
+        const res = await fetch(`${apiUrl}/api/strains/?project_id=${activeProject.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) {
@@ -109,6 +113,73 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
     })
   }
 
+  const handleGenerateSummary = async () => {
+    if (!experimentNote.trim()) return
+    setIsGeneratingSummary(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${apiUrl}/api/generate-experiment-summary/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes: experimentNote }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setExperimentSummary(data.summary)
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        setErrorMessage(errData.error || 'Failed to generate summary')
+      }
+    } catch {
+      setErrorMessage('Failed to generate summary')
+    } finally {
+      setIsGeneratingSummary(false)
+    }
+  }
+
+  const handleNextFromStep1 = async () => {
+    setErrorMessage('')
+
+    // If no AI extraction needed, just advance
+    if ((!extractEventsWithAI && !extractAnomaliesWithAI) || !experimentNote.trim()) {
+      setStep(2)
+      return
+    }
+
+    setIsExtractingAI(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${apiUrl}/api/extract-events-anomalies/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes: experimentNote }),
+      })
+      if (res.ok) {
+        const extracted = await res.json()
+        if (extractEventsWithAI && Array.isArray(extracted.events)) {
+          setEvents(extracted.events)
+        }
+        if (extractAnomaliesWithAI && Array.isArray(extracted.anomalies)) {
+          setAnomalies(extracted.anomalies)
+        }
+        setStep(2)
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        setErrorMessage(errData.error || 'AI extraction failed')
+      }
+    } catch {
+      setErrorMessage('AI extraction failed')
+    } finally {
+      setIsExtractingAI(false)
+    }
+  }
+
   const resetForm = () => {
     setTitle('')
     setVariables([])
@@ -121,6 +192,8 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
     setExperimentDate(new Date().toISOString().slice(0, 10))
     setNoteImages([])
     setSelectedStrain('')
+    setExtractEventsWithAI(false)
+    setExtractAnomaliesWithAI(false)
   }
 
   const handleCreate = async () => {
@@ -140,6 +213,9 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
 
       const token = await getToken()
 
+      const finalEvents = events.filter((e) => e.name.trim() !== '')
+      const finalAnomalies = anomalies.filter((a) => a.name.trim() !== '')
+
       const body = {
         title,
         project_id: activeProject?.id,
@@ -147,8 +223,8 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
         experiment_note: experimentNote,
         date: experimentDate,
         variables: filledVars,
-        events: events.filter((e) => e.name.trim() !== ''),
-        anomalies: anomalies.filter((a) => a.name.trim() !== ''),
+        events: finalEvents,
+        anomalies: finalAnomalies,
         products: classifiedData?.products.map((p) => ({
           name: p.name,
           unit: p.unit,
@@ -257,15 +333,21 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
             onExperimentNoteChange={setExperimentNote}
             noteImages={noteImages}
             onNoteImagesChange={setNoteImages}
+            extractEventsWithAI={extractEventsWithAI}
+            onExtractEventsWithAIChange={setExtractEventsWithAI}
+            extractAnomaliesWithAI={extractAnomaliesWithAI}
+            onExtractAnomaliesWithAIChange={setExtractAnomaliesWithAI}
+            onGenerateSummaryWithAI={handleGenerateSummary}
+            isGeneratingSummary={isGeneratingSummary}
           />
           <div className="flex justify-end pt-4 border-t border-gray-200">
             <button
               type="button"
-              onClick={() => setStep(2)}
-              disabled={!title.trim()}
+              onClick={handleNextFromStep1}
+              disabled={!title.trim() || isExtractingAI}
               className="px-5 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next: Upload Data →
+              {isExtractingAI ? 'Extracting with AI...' : 'Next: Upload Data →'}
             </button>
           </div>
         </>

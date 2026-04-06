@@ -27,6 +27,12 @@ interface Step1DetailsProps {
   onExperimentNoteChange: (note: string) => void
   noteImages: File[]
   onNoteImagesChange: (images: File[]) => void
+  extractEventsWithAI?: boolean
+  onExtractEventsWithAIChange?: (val: boolean) => void
+  extractAnomaliesWithAI?: boolean
+  onExtractAnomaliesWithAIChange?: (val: boolean) => void
+  onGenerateSummaryWithAI?: () => void
+  isGeneratingSummary?: boolean
 }
 
 const inputClass =
@@ -59,6 +65,12 @@ export function Step1Details({
   onExperimentNoteChange,
   noteImages,
   onNoteImagesChange,
+  extractEventsWithAI = false,
+  onExtractEventsWithAIChange,
+  extractAnomaliesWithAI = false,
+  onExtractAnomaliesWithAIChange,
+  onGenerateSummaryWithAI,
+  isGeneratingSummary = false,
 }: Step1DetailsProps) {
   // Ref for hidden image file input
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -371,168 +383,208 @@ export function Step1Details({
       {/* ---- Events ---- */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
-          <span className="block text-sm font-medium text-gray-700">Events</span>
-          <button
-            type="button"
-            onClick={addEvent}
-            className="text-xs font-medium"
-            style={{ color: '#eb5234' }}
-          >
-            + Add Event
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="block text-sm font-medium text-gray-700">Events</span>
+            {onExtractEventsWithAIChange && (
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={extractEventsWithAI}
+                  onChange={(e) => {
+                    onExtractEventsWithAIChange(e.target.checked)
+                    if (e.target.checked) onEventsChange([])
+                  }}
+                  className="rounded border-gray-300 text-[#eb5234] focus:ring-[#eb5234]"
+                />
+                <span className="text-xs text-gray-500">Extract with AI</span>
+              </label>
+            )}
+          </div>
+          {!extractEventsWithAI && (
+            <button
+              type="button"
+              onClick={addEvent}
+              className="text-xs font-medium"
+              style={{ color: '#eb5234' }}
+            >
+              + Add Event
+            </button>
+          )}
         </div>
 
-        {events.map((event, idx) => {
-          const isNameFree = !!eventNameFree[idx]
+        {extractEventsWithAI ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-sm text-gray-500">
+            Events will be automatically extracted from your lab notes using AI.
+          </div>
+        ) : (
+          events.map((event, idx) => {
+            const isNameFree = !!eventNameFree[idx]
 
-          return (
-            <div key={idx} className="flex items-center gap-2 mb-1.5">
-              {/* Name */}
-              <div className="flex-1">
-                {isNameFree ? (
+            return (
+              <div key={idx} className="flex items-center gap-2 mb-1.5">
+                {/* Name */}
+                <div className="flex-1">
+                  {isNameFree ? (
+                    <input
+                      type="text"
+                      value={event.name}
+                      onChange={(e) => updateEvent(idx, 'name', e.target.value)}
+                      placeholder="Event name"
+                      className={inputClass}
+                      autoFocus
+                    />
+                  ) : (
+                    <select
+                      value={event.name}
+                      onChange={(e) => handleEventNameSelect(idx, e.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="">Select event…</option>
+                      {uniqueNames.events.map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                      {event.name && !uniqueNames.events.includes(event.name) && (
+                        <option key={`custom-${event.name}`} value={event.name}>{event.name}</option>
+                      )}
+                      <option value="__add_new__">Add new…</option>
+                    </select>
+                  )}
+                </div>
+
+                {/* Timepoint */}
+                <div className="flex-1">
                   <input
                     type="text"
-                    value={event.name}
-                    onChange={(e) => updateEvent(idx, 'name', e.target.value)}
-                    placeholder="Event name"
+                    value={event.timepoint}
+                    onChange={(e) => updateEvent(idx, 'timepoint', e.target.value)}
+                    placeholder="Timepoint (h)"
                     className={inputClass}
-                    autoFocus
                   />
-                ) : (
-                  <select
-                    value={event.name}
-                    onChange={(e) => handleEventNameSelect(idx, e.target.value)}
-                    className={selectClass}
-                  >
-                    <option value="">Select event…</option>
-                    {uniqueNames.events.map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                    <option value="__add_new__">Add new…</option>
-                  </select>
-                )}
-              </div>
+                </div>
 
-              {/* Timepoint */}
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={event.timepoint}
-                  onChange={(e) => updateEvent(idx, 'timepoint', e.target.value)}
-                  placeholder="Timepoint (h)"
-                  className={inputClass}
-                />
+                {/* Remove */}
+                <button
+                  type="button"
+                  onClick={() => removeEvent(idx)}
+                  className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
+                  style={{ width: 28, height: 28 }}
+                  aria-label="Remove event"
+                >
+                  ×
+                </button>
               </div>
-
-              {/* Remove */}
-              <button
-                type="button"
-                onClick={() => removeEvent(idx)}
-                className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
-                style={{ width: 28, height: 28 }}
-                aria-label="Remove event"
-              >
-                ×
-              </button>
-            </div>
-          )
-        })}
+            )
+          })
+        )}
       </div>
 
       {/* ---- Anomalies ---- */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
-          <span className="block text-sm font-medium text-gray-700">Anomalies</span>
-          <button
-            type="button"
-            onClick={addAnomaly}
-            className="text-xs font-medium"
-            style={{ color: '#eb5234' }}
-          >
-            + Add Anomaly
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="block text-sm font-medium text-gray-700">Anomalies</span>
+            {onExtractAnomaliesWithAIChange && (
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={extractAnomaliesWithAI}
+                  onChange={(e) => {
+                    onExtractAnomaliesWithAIChange(e.target.checked)
+                    if (e.target.checked) onAnomaliesChange([])
+                  }}
+                  className="rounded border-gray-300 text-[#eb5234] focus:ring-[#eb5234]"
+                />
+                <span className="text-xs text-gray-500">Extract with AI</span>
+              </label>
+            )}
+          </div>
+          {!extractAnomaliesWithAI && (
+            <button
+              type="button"
+              onClick={addAnomaly}
+              className="text-xs font-medium"
+              style={{ color: '#eb5234' }}
+            >
+              + Add Anomaly
+            </button>
+          )}
         </div>
 
-        {anomalies.map((anomaly, idx) => {
-          const isNameFree = !!anomalyNameFree[idx]
+        {extractAnomaliesWithAI ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-sm text-gray-500">
+            Anomalies will be automatically extracted from your lab notes using AI.
+          </div>
+        ) : (
+          anomalies.map((anomaly, idx) => {
+            const isNameFree = !!anomalyNameFree[idx]
 
-          return (
-            <div key={idx} className="flex items-center gap-2 mb-1.5">
-              {/* Name */}
-              <div className="flex-1">
-                {isNameFree ? (
+            return (
+              <div key={idx} className="flex items-center gap-2 mb-1.5">
+                {/* Name */}
+                <div className="flex-1">
+                  {isNameFree ? (
+                    <input
+                      type="text"
+                      value={anomaly.name}
+                      onChange={(e) => updateAnomaly(idx, 'name', e.target.value)}
+                      placeholder="Anomaly name"
+                      className={inputClass}
+                      autoFocus
+                    />
+                  ) : (
+                    <select
+                      value={anomaly.name}
+                      onChange={(e) => handleAnomalyNameSelect(idx, e.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="">Select anomaly…</option>
+                      {uniqueNames.anomalies.map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                      {anomaly.name && !uniqueNames.anomalies.includes(anomaly.name) && (
+                        <option key={`custom-${anomaly.name}`} value={anomaly.name}>{anomaly.name}</option>
+                      )}
+                      <option value="__add_new__">Add new…</option>
+                    </select>
+                  )}
+                </div>
+
+                {/* Timepoint */}
+                <div className="w-28">
                   <input
                     type="text"
-                    value={anomaly.name}
-                    onChange={(e) => updateAnomaly(idx, 'name', e.target.value)}
-                    placeholder="Anomaly name"
+                    value={anomaly.timepoint}
+                    onChange={(e) => updateAnomaly(idx, 'timepoint', e.target.value)}
+                    placeholder="Timepoint (h)"
                     className={inputClass}
-                    autoFocus
                   />
-                ) : (
-                  <select
-                    value={anomaly.name}
-                    onChange={(e) => handleAnomalyNameSelect(idx, e.target.value)}
-                    className={selectClass}
-                  >
-                    <option value="">Select anomaly…</option>
-                    {uniqueNames.anomalies.map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                    <option value="__add_new__">Add new…</option>
-                  </select>
-                )}
+                </div>
+
+                {/* Description */}
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={anomaly.description}
+                    onChange={(e) => updateAnomaly(idx, 'description', e.target.value)}
+                    placeholder="Description"
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Remove */}
+                <button
+                  type="button"
+                  onClick={() => removeAnomaly(idx)}
+                  className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
+                  style={{ width: 28, height: 28 }}
+                  aria-label="Remove anomaly"
+                >
+                  ×
+                </button>
               </div>
-
-              {/* Timepoint */}
-              <div className="w-28">
-                <input
-                  type="text"
-                  value={anomaly.timepoint}
-                  onChange={(e) => updateAnomaly(idx, 'timepoint', e.target.value)}
-                  placeholder="Timepoint (h)"
-                  className={inputClass}
-                />
-              </div>
-
-              {/* Description */}
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={anomaly.description}
-                  onChange={(e) => updateAnomaly(idx, 'description', e.target.value)}
-                  placeholder="Description"
-                  className={inputClass}
-                />
-              </div>
-
-              {/* Remove */}
-              <button
-                type="button"
-                onClick={() => removeAnomaly(idx)}
-                className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
-                style={{ width: 28, height: 28 }}
-                aria-label="Remove anomaly"
-              >
-                ×
-              </button>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* ---- Experiment Summary ---- */}
-      <div className="mb-5">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Experiment Summary
-        </label>
-        <textarea
-          rows={3}
-          value={experimentSummary}
-          onChange={(e) => onExperimentSummaryChange(e.target.value)}
-          placeholder="Brief summary of the experiment's purpose, goals, or hypothesis..."
-          className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-y"
-        />
+            )
+          })
+        )}
       </div>
 
       {/* ---- Experiment Notes ---- */}
@@ -601,6 +653,32 @@ export function Step1Details({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ---- Experiment Summary ---- */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm font-medium text-gray-700">
+            Experiment Summary
+          </label>
+        </div>
+        <textarea
+          rows={3}
+          value={experimentSummary}
+          onChange={(e) => onExperimentSummaryChange(e.target.value)}
+          placeholder="Brief summary of the experiment's purpose, goals, or hypothesis..."
+          className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-y"
+        />
+        {onGenerateSummaryWithAI && (
+          <button
+            type="button"
+            onClick={onGenerateSummaryWithAI}
+            disabled={isGeneratingSummary || !experimentNote.trim()}
+            className="mt-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isGeneratingSummary ? 'Generating...' : 'Write with AI'}
+          </button>
+        )}
       </div>
     </div>
   )

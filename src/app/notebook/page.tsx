@@ -145,6 +145,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   const [descriptionDraft, setDescriptionDraft] = useState('')
   const [notesDraft, setNotesDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -317,25 +318,35 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   }, [renderGraph])
 
   const saveField = async (field: 'description' | 'experiment_note', value: string) => {
-    if (!data?.experiment) return
+    console.log('[Notebook] saveField called:', field, 'data.experiment:', data?.experiment?.id)
+    if (!data?.experiment) {
+      console.log('[Notebook] no experiment data, aborting')
+      return
+    }
+    setSaveError('')
     setSaving(true)
     try {
       const token = await getToken()
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/`,
-        {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [field]: value }),
-        }
-      )
-      if (!res.ok) throw new Error('Failed to save')
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiments/${data.experiment.id}/`
+      console.log('[Notebook] PATCH:', url)
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      console.log('[Notebook] response status:', res.status)
+      if (!res.ok) {
+        const errText = await res.text()
+        console.log('[Notebook] error body:', errText)
+        throw new Error(`Failed to save (${res.status}): ${errText}`)
+      }
       const json = await res.json()
       setData(prev => prev ? { ...prev, experiment: json.experiment } : prev)
       if (field === 'description') setEditingDescription(false)
       else setEditingNotes(false)
     } catch (err) {
-      console.error('Error saving:', err)
+      console.error('[Notebook] Error saving:', err)
+      setSaveError(err instanceof Error ? err.message : 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -475,14 +486,19 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
                 onChange={e => setDescriptionDraft(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
               />
+              {saveError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{saveError}</div>
+              )}
               <div className="flex gap-2 justify-end">
                 <button
-                  onClick={() => setEditingDescription(false)}
+                  type="button"
+                  onClick={() => { setEditingDescription(false); setSaveError('') }}
                   className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => saveField('description', descriptionDraft)}
                   disabled={saving}
                   className="h-8 px-3 rounded-md text-sm font-medium text-white transition-all disabled:opacity-50"
@@ -515,14 +531,19 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
                     onChange={e => setNotesDraft(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[200px]"
                   />
+                  {saveError && (
+                    <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{saveError}</div>
+                  )}
                   <div className="flex gap-2 justify-end">
                     <button
-                      onClick={() => setEditingNotes(false)}
+                      type="button"
+                      onClick={() => { setEditingNotes(false); setSaveError('') }}
                       className="h-8 px-3 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all"
                     >
                       Cancel
                     </button>
                     <button
+                      type="button"
                       onClick={() => saveField('experiment_note', notesDraft)}
                       disabled={saving}
                       className="h-8 px-3 rounded-md text-sm font-medium text-white transition-all disabled:opacity-50"

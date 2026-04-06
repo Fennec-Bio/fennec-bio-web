@@ -189,7 +189,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       try {
         const token = await getToken()
         const params = activeProject ? `?project_id=${activeProject.id}` : ''
-        const res = await fetch(`${apiUrl}/api/strain-lineage/${params}`, {
+        const res = await fetch(`${apiUrl}/api/strains/${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) {

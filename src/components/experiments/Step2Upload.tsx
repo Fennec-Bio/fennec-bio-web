@@ -135,6 +135,12 @@ function parseSheetWithConfig(
   return { products, secondary_products: secondaryProducts, process_data: processData, missing }
 }
 
+interface AccumulatedUpload {
+  fileName: string
+  templateName: string
+  data: ClassifiedData
+}
+
 export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTemplates }: Step2UploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -145,6 +151,7 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
   const [isDragActive, setIsDragActive] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
+  const [accumulatedUploads, setAccumulatedUploads] = useState<AccumulatedUpload[]>([])
 
   const selectedTemplate = dataTemplates.find(t => t.id === selectedTemplateId) ?? null
 
@@ -216,9 +223,43 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
     handleFileSelect(e.dataTransfer.files)
   }, [handleFileSelect])
 
+  const handleAddUpload = useCallback(() => {
+    if (!parsedData || !selectedTemplate || !fileName) return
+    setAccumulatedUploads(prev => [...prev, {
+      fileName,
+      templateName: selectedTemplate.name,
+      data: parsedData,
+    }])
+    // Reset for next upload
+    setParsedData(null)
+    setFileName(null)
+    setSelectedTemplateId(null)
+    setMissingColumns([])
+    setParseError(null)
+    setParseWarnings([])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [parsedData, selectedTemplate, fileName])
+
+  const handleRemoveUpload = useCallback((index: number) => {
+    setAccumulatedUploads(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const mergeAllData = useCallback((): ClassifiedData => {
+    const all = accumulatedUploads.map(u => u.data)
+    return {
+      products: all.flatMap(d => d.products),
+      secondary_products: all.flatMap(d => d.secondary_products),
+      process_data: all.flatMap(d => d.process_data),
+      ignored: all.flatMap(d => d.ignored),
+    }
+  }, [accumulatedUploads])
+
   const totalItems = parsedData
     ? parsedData.products.length + parsedData.secondary_products.length + parsedData.process_data.length
     : 0
+
+  const accumulatedTotalItems = accumulatedUploads.reduce((sum, u) =>
+    sum + u.data.products.length + u.data.secondary_products.length + u.data.process_data.length, 0)
 
   // Build template info summary
   const templateSheets = selectedTemplate
@@ -389,6 +430,41 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
         </div>
       )}
 
+      {/* Accumulated Uploads */}
+      {accumulatedUploads.length > 0 && (
+        <div className="border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">
+            Uploaded Files ({accumulatedUploads.length})
+          </h3>
+          <div className="flex flex-col gap-2">
+            {accumulatedUploads.map((upload, idx) => {
+              const itemCount = upload.data.products.length + upload.data.secondary_products.length + upload.data.process_data.length
+              return (
+                <div key={idx} className="flex items-center justify-between bg-gray-50 rounded-md px-3 py-2">
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="font-medium text-gray-700">{upload.fileName}</span>
+                    <span className="text-gray-400">&middot;</span>
+                    <span className="text-gray-500">{upload.templateName}</span>
+                    <span className="text-gray-400">&middot;</span>
+                    <span className="text-gray-500">{itemCount} series</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveUpload(idx)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
         <button
@@ -400,17 +476,46 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
         </button>
 
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onSkip}
-            className="px-5 py-2 text-sm font-medium text-gray-500 border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all"
-          >
-            Skip (no data)
-          </button>
           {parsedData && totalItems > 0 && (
             <button
               type="button"
-              onClick={() => onClassified(parsedData)}
+              onClick={handleAddUpload}
+              className="px-5 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all"
+            >
+              + Add &amp; Upload Another
+            </button>
+          )}
+          {accumulatedUploads.length === 0 && !parsedData && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="px-5 py-2 text-sm font-medium text-gray-500 border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all"
+            >
+              Skip (no data)
+            </button>
+          )}
+          {(accumulatedUploads.length > 0 || (parsedData && totalItems > 0)) && (
+            <button
+              type="button"
+              onClick={() => {
+                // If there's current parsed data not yet added, include it
+                if (parsedData && totalItems > 0) {
+                  const finalUploads = [...accumulatedUploads, {
+                    fileName: fileName!,
+                    templateName: selectedTemplate!.name,
+                    data: parsedData,
+                  }]
+                  const merged: ClassifiedData = {
+                    products: finalUploads.flatMap(u => u.data.products),
+                    secondary_products: finalUploads.flatMap(u => u.data.secondary_products),
+                    process_data: finalUploads.flatMap(u => u.data.process_data),
+                    ignored: finalUploads.flatMap(u => u.data.ignored),
+                  }
+                  onClassified(merged)
+                } else {
+                  onClassified(mergeAllData())
+                }
+              }}
               className="px-5 py-2 text-sm font-medium text-white bg-[#eb5234] rounded-md shadow-xs hover:bg-[#d4482e] transition-all"
             >
               Confirm &amp; Review &rarr;

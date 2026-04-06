@@ -247,6 +247,7 @@ export default function StrainsPage() {
                   selectedStrain={selectedStrain}
                   strains={lineageData}
                   availableProducts={availableProducts}
+                  onSelectStrain={handleStrainSelect}
                 />
               </div>
             </CollapsibleSection>

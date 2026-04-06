@@ -21,9 +21,10 @@ interface StrainLineageChartProps {
   selectedStrain?: string | null
   strains: StrainData[]
   availableProducts: string[]
+  onSelectStrain?: (name: string) => void
 }
 
-export function StrainLineageChart({ selectedStrain, strains, availableProducts }: StrainLineageChartProps) {
+export function StrainLineageChart({ selectedStrain, strains, availableProducts, onSelectStrain }: StrainLineageChartProps) {
   const [selectedProduct, setSelectedProduct] = useState('total')
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -111,6 +112,8 @@ export function StrainLineageChart({ selectedStrain, strains, availableProducts 
     // Nodes
     const nodes = g.selectAll('.node').data(treeRoot.descendants()).enter().append('g')
       .attr('transform', d => `translate(${d.x},${d.y})`)
+      .style('cursor', onSelectStrain ? 'pointer' : 'default')
+      .on('click', (_event, d) => { onSelectStrain?.(d.data.name) })
 
     nodes.append('circle')
       .attr('r', d => rScale(d.data.max_titers[selectedProduct] || 0))
@@ -142,7 +145,7 @@ export function StrainLineageChart({ selectedStrain, strains, availableProducts 
         .join('\n')
       return `Strain: ${d.data.name}\nExperiments: ${d.data.experiment_count}\n${titers}\nTotal: ${d.data.max_titers.total?.toFixed(1) || 0}`
     })
-  }, [strains, selectedProduct, selectedStrain, buildTree])
+  }, [strains, selectedProduct, selectedStrain, buildTree, onSelectStrain])
 
   useEffect(() => { renderTree() }, [renderTree])
 
