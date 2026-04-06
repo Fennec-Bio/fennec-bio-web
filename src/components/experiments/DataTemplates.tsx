@@ -38,6 +38,11 @@ interface UniqueNames {
   products: string[]
   secondary_products: string[]
   process_data: string[]
+  units: {
+    product: Record<string, string>
+    secondary_product: Record<string, string>
+    process_data: Record<string, string>
+  }
 }
 
 const TIME_UNIT_OPTIONS = [
@@ -65,7 +70,12 @@ export function DataTemplates() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [templates, setTemplates] = useState<DataTemplate[]>([])
-  const [uniqueNames, setUniqueNames] = useState<UniqueNames>({ products: [], secondary_products: [], process_data: [] })
+  const [uniqueNames, setUniqueNames] = useState<UniqueNames>({
+    products: [],
+    secondary_products: [],
+    process_data: [],
+    units: { product: {}, secondary_product: {}, process_data: {} },
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -109,6 +119,11 @@ export function DataTemplates() {
           products: data.products || [],
           secondary_products: data.secondary_products || [],
           process_data: data.process_data || [],
+          units: {
+            product: data.units?.product || {},
+            secondary_product: data.units?.secondary_product || {},
+            process_data: data.units?.process_data || {},
+          },
         })
       }
     } catch {
@@ -125,6 +140,11 @@ export function DataTemplates() {
     product: uniqueNames.products,
     secondary_product: uniqueNames.secondary_products,
     process_data: uniqueNames.process_data,
+  }
+
+  const lookupUnit = (category: ColumnMapping['category'], name: string): string => {
+    if (!name) return ''
+    return uniqueNames.units[category]?.[name] || ''
   }
 
   const resetForm = () => {
@@ -144,7 +164,17 @@ export function DataTemplates() {
   const startEdit = (t: DataTemplate) => {
     setEditingId(t.id)
     setFormName(t.name)
-    const sheets = t.sheets && t.sheets.length > 0 ? t.sheets.map(s => ({ ...s, column_mappings: [...s.column_mappings] })) : [emptySheet()]
+    // Back-fill missing units from the catalog so existing templates created
+    // before unit auto-fill existed don't display blank units after the fix.
+    const sheets = t.sheets && t.sheets.length > 0
+      ? t.sheets.map(s => ({
+          ...s,
+          column_mappings: s.column_mappings.map(m => ({
+            ...m,
+            unit: m.unit || lookupUnit(m.category, m.name),
+          })),
+        }))
+      : [emptySheet()]
     setFormSheets(sheets)
     setActiveSheetIdx(0)
     setFormError('')
@@ -180,7 +210,14 @@ export function DataTemplates() {
     if (field === 'category') {
       updated[index] = { ...updated[index], category: value as ColumnMapping['category'], name: '', unit: '' }
     } else if (field === 'name') {
-      updated[index] = { ...updated[index], name: value }
+      // Auto-fill unit from the catalog when picking a known name. If the
+      // user later types a custom name we leave whatever unit is already there.
+      const catalogUnit = lookupUnit(updated[index].category, value)
+      updated[index] = {
+        ...updated[index],
+        name: value,
+        unit: catalogUnit || updated[index].unit,
+      }
     } else {
       updated[index] = { ...updated[index], [field]: value }
     }
@@ -393,7 +430,7 @@ export function DataTemplates() {
           {activeSheet.column_mappings.length > 0 && (
             <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
               <div className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
-                <span>Col</span><span>Category</span><span>Name</span><span>Unit</span><span />
+                <span>Col</span><span>Category</span><span>Name</span><span className="pl-4">Unit</span><span />
               </div>
               {activeSheet.column_mappings.map((m, i) => (
                 <div key={i} className="grid grid-cols-[60px_120px_1fr_80px_32px] gap-0 px-3 py-2 border-t border-gray-100 items-center">
@@ -441,15 +478,18 @@ export function DataTemplates() {
                         className="border border-gray-200 rounded px-1 py-1 text-sm flex-1 min-w-0"
                       >
                         <option value="">Select name...</option>
-                        {(namesByCategory[m.category] || []).map(n => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
+                        {(namesByCategory[m.category] || []).map(n => {
+                          const u = lookupUnit(m.category, n)
+                          return (
+                            <option key={n} value={n}>{u ? `${n} (${u})` : n}</option>
+                          )
+                        })}
                         <option value="__add_new__">Add new...</option>
                       </select>
                     )}
                   </div>
 
-                  <span className="text-sm text-gray-500 truncate">{m.unit || '—'}</span>
+                  <span className="text-sm text-gray-500 truncate pl-4">{m.unit || '—'}</span>
 
                   <button onClick={() => removeMapping(i)} className="text-gray-300 hover:text-red-500">
                     <X className="h-4 w-4" />

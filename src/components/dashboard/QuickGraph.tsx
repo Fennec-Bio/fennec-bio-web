@@ -487,12 +487,14 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     svg.append('text').attr('x', w / 2).attr('y', h + margin.bottom).attr('text-anchor', 'middle').attr('font-size', '12px').text('Time (hr)')
     svg.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -margin.left + 20).attr('text-anchor', 'middle').attr('font-size', '12px').text('Value')
 
-    // Legend
+    // Legend (label includes unit when known: "CBDa (mg/L)")
     const legend = svg.append('g').attr('transform', `translate(${w + 10}, ${h / 2 - groups.size * 10})`)
-    Array.from(groups.keys()).forEach((name, i) => {
+    Array.from(groups.entries()).forEach(([name, pts], i) => {
       const g = legend.append('g').attr('transform', `translate(0, ${i * 20})`)
       g.append('rect').attr('width', 12).attr('height', 12).attr('fill', color(name))
-      g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(name)
+      const unit = pts[0]?.unit
+      const label = unit ? `${name} (${unit})` : name
+      g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(label)
     })
   }, [experimentData, dataPoints, getGraphDimensions, drawMarkers])
 
@@ -549,13 +551,16 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     svg.append('text').attr('x', w / 2).attr('y', h + margin.bottom).attr('text-anchor', 'middle').attr('font-size', '12px').text('Time (hr)')
     svg.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -margin.left + 20).attr('text-anchor', 'middle').attr('font-size', '12px').text('Value')
 
-    // Legend
+    // Legend (label includes unit when known: "CBDa (mg/L)")
     const uniqueNames = [...new Set(barData.map(d => d.name))]
+    const unitByName = new Map(barData.map(d => [d.name, d.unit]))
     const legend = svg.append('g').attr('transform', `translate(${w + 10}, ${h / 2 - uniqueNames.length * 10})`)
     uniqueNames.forEach((name, i) => {
       const g = legend.append('g').attr('transform', `translate(0, ${i * 20})`)
       g.append('rect').attr('width', 12).attr('height', 12).attr('fill', color(name))
-      g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(name)
+      const unit = unitByName.get(name)
+      const label = unit ? `${name} (${unit})` : name
+      g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(label)
     })
   }, [experimentData, selectedMetabolites, getGraphDimensions])
 
@@ -670,7 +675,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
                 { label: 'Process Data', items: experimentData.unique_names?.process_data },
               ] as const).map(section => (
                 section.items && section.items.length > 0 && (
-                  <div key={section.label} className="p-3 border-b last:border-b-0">
+                  <div key={section.label} className="p-3 border-b border-gray-200 last:border-b-0">
                     <h4 className="font-medium text-gray-900 mb-2 text-sm">{section.label}</h4>
                     <div className="space-y-1.5">
                       {section.items.map(name => (

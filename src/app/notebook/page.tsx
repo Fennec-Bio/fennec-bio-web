@@ -317,12 +317,14 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
     svg.append('text').attr('x', w / 2).attr('y', h + margin.bottom).attr('text-anchor', 'middle').attr('font-size', '12px').text('Time (hr)')
     svg.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -margin.left + 20).attr('text-anchor', 'middle').attr('font-size', '12px').text('Value')
 
-    // Legend
+    // Legend (label includes unit when known: "CBDa (mg/L)")
     const legend = svg.append('g').attr('transform', `translate(${w + 10}, ${h / 2 - groups.size * 10})`)
-    Array.from(groups.keys()).forEach((name, i) => {
+    Array.from(groups.entries()).forEach(([name, pts], i) => {
       const g = legend.append('g').attr('transform', `translate(0, ${i * 20})`)
       g.append('rect').attr('width', 12).attr('height', 12).attr('fill', color(name))
-      g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(name)
+      const unit = pts[0]?.unit
+      const label = unit ? `${name} (${unit})` : name
+      g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(label)
     })
   }, [data, selected, buildDataPoints, getGraphDimensions])
 
@@ -490,7 +492,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   const checkboxSection = (label: string, names: string[] | undefined) => {
     if (!names?.length) return null
     return (
-      <div className="p-3 border-b last:border-b-0">
+      <div className="p-3 border-b border-gray-200 last:border-b-0">
         <h4 className="font-medium text-gray-900 mb-2 text-sm">{label}</h4>
         <div className="space-y-1">
           {names.map(name => (
