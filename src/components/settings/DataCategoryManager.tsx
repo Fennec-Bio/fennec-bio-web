@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
-import { Plus, Pencil, Trash2, X, Check } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, ArrowRightLeft } from 'lucide-react'
 
 interface DataCategory {
   id: number
@@ -50,6 +50,12 @@ export function DataCategoryManager() {
   const [deleteTarget, setDeleteTarget] = useState<DataCategory | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
+  // Convert popover + modal state
+  const [convertPopoverId, setConvertPopoverId] = useState<number | null>(null)
+  const [convertTarget, setConvertTarget] = useState<{ cat: DataCategory; newCategory: CategoryTab } | null>(null)
+  const [convertError, setConvertError] = useState('')
+  const [isConverting, setIsConverting] = useState(false)
+
   const fetchCategories = useCallback(async () => {
     if (!activeProject) return
     setIsLoading(true)
@@ -72,6 +78,25 @@ export function DataCategoryManager() {
   useEffect(() => {
     fetchCategories()
   }, [fetchCategories])
+
+  useEffect(() => {
+    if (convertPopoverId === null) return
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-convert-popover]') && !target.closest('[data-convert-trigger]')) {
+        setConvertPopoverId(null)
+      }
+    }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConvertPopoverId(null)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [convertPopoverId])
 
   const filtered = categories.filter(c => c.category === activeTab)
 
@@ -206,13 +231,13 @@ export function DataCategoryManager() {
 
           {filtered.length > 0 && (
             <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
-              <div className="grid grid-cols-[1fr_120px_72px] gap-0 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+              <div className="grid grid-cols-[1fr_120px_96px] gap-0 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
                 <span>Name</span><span>Unit</span><span />
               </div>
               {filtered.map((cat) => (
                 <div
                   key={cat.id}
-                  className="grid grid-cols-[1fr_120px_72px] gap-0 px-4 py-2 border-t border-gray-100 items-center"
+                  className="grid grid-cols-[1fr_120px_96px] gap-0 px-4 py-2 border-t border-gray-100 items-center"
                 >
                   {editingId === cat.id ? (
                     <>
@@ -248,7 +273,7 @@ export function DataCategoryManager() {
                     <>
                       <span className="text-sm font-medium text-gray-900">{cat.name}</span>
                       <span className="text-sm text-gray-500">{cat.unit}</span>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 relative">
                         <button
                           onClick={() => startEdit(cat)}
                           className="text-gray-400 hover:text-[#eb5234]"
@@ -256,11 +281,44 @@ export function DataCategoryManager() {
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
+                          data-convert-trigger
+                          onClick={() => setConvertPopoverId(convertPopoverId === cat.id ? null : cat.id)}
+                          className="text-gray-400 hover:text-[#eb5234]"
+                          title="Convert to another category type"
+                        >
+                          <ArrowRightLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
                           onClick={() => { setDeleteTarget(cat); setDeleteConfirmText('') }}
                           className="text-gray-400 hover:text-red-500"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
+
+                        {convertPopoverId === cat.id && (
+                          <div
+                            data-convert-popover
+                            className="absolute right-0 top-7 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]"
+                          >
+                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200">
+                              Convert &ldquo;{cat.name}&rdquo; to:
+                            </div>
+                            {TABS.filter(t => t.key !== cat.category).map(t => (
+                              <button
+                                key={t.key}
+                                onClick={() => {
+                                  setConvertPopoverId(null)
+                                  setConvertTarget({ cat, newCategory: t.key })
+                                  setConvertError('')
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
+                              >
+                                <ArrowRightLeft className="h-3.5 w-3.5 text-gray-400" />
+                                {t.label.replace(/s$/, '')}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
