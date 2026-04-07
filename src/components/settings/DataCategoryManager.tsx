@@ -183,6 +183,36 @@ export function DataCategoryManager() {
     }
   }
 
+  const handleConvert = async (cat: DataCategory, newCategory: CategoryTab) => {
+    if (!activeProject) return
+    setIsConverting(true)
+    setConvertError('')
+    try {
+      const token = await getToken()
+      const res = await fetch(`${apiUrl}/api/data-categories/${cat.id}/convert/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ category: newCategory }),
+      })
+      if (res.ok) {
+        const updated: DataCategory = await res.json()
+        setCategories(prev => prev.map(c => c.id === cat.id ? updated : c))
+        setActiveTab(newCategory)
+        setConvertTarget(null)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setConvertError(data.error || 'Failed to convert category')
+      }
+    } catch {
+      setConvertError('Failed to convert category')
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
   const startEdit = (cat: DataCategory) => {
     setEditingId(cat.id)
     setEditName(cat.name)
@@ -421,6 +451,41 @@ export function DataCategoryManager() {
                 className="flex-1 h-9 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-all"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Convert confirmation modal */}
+      {convertTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Convert data category?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Convert <span className="font-medium">{convertTarget.cat.name}</span> from{' '}
+              <span className="font-medium">{TABS.find(t => t.key === convertTarget.cat.category)?.label.replace(/s$/, '')}</span>{' '}
+              to{' '}
+              <span className="font-medium">{TABS.find(t => t.key === convertTarget.newCategory)?.label.replace(/s$/, '')}</span>?
+              {' '}This will move all data points attached to this category to the new type.
+              Charts and filters will reflect the change immediately.
+            </p>
+            {convertError && (
+              <div className="text-red-600 bg-red-50 p-2 rounded mb-3 text-sm">{convertError}</div>
+            )}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => { setConvertTarget(null); setConvertError('') }}
+                className="flex-1 h-9 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleConvert(convertTarget.cat, convertTarget.newCategory)}
+                disabled={isConverting}
+                className="flex-1 h-9 text-sm font-medium text-white rounded-md hover:opacity-90 disabled:opacity-50 transition-all"
+                style={{ backgroundColor: '#eb5234' }}
+              >
+                {isConverting ? 'Converting...' : 'Convert'}
               </button>
             </div>
           </div>
