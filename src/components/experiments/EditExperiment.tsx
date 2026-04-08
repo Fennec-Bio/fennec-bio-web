@@ -25,6 +25,7 @@ interface Product {
   timepoint: string
   value: number
   time_unit?: string
+  data_type?: 'discrete' | 'continuous' | 'point'
 }
 
 interface NoteImage {
@@ -40,6 +41,13 @@ interface DataCategoryEntry {
   name: string
   unit: string
   data_type: 'discrete' | 'continuous' | 'point'
+}
+
+interface PointValue {
+  name: string
+  value: string  // string for input binding; converted to number on save
+  unit: string
+  data_type: 'point'
 }
 
 interface ExperimentDetail {
@@ -90,6 +98,34 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
   process_data: { bg: 'bg-emerald-50', text: 'text-emerald-500' },
 }
 
+function partitionByDataType(rows: Product[]): { timeSeries: Product[]; points: PointValue[] } {
+  const timeSeries: Product[] = []
+  const points: PointValue[] = []
+  // Group point-type rows by name so each name produces exactly one PointValue.
+  const pointSeen = new Set<string>()
+
+  for (const row of rows) {
+    if (row.data_type === 'point') {
+      if (pointSeen.has(row.name)) {
+        console.warn(`Multiple data rows for point series "${row.name}" — using the first.`)
+        continue
+      }
+      pointSeen.add(row.name)
+      points.push({
+        name: row.name,
+        value: String(row.value ?? ''),
+        unit: row.unit ?? '',
+        data_type: 'point',
+      })
+    } else {
+      // discrete, continuous, or undefined (legacy) → time series
+      timeSeries.push(row)
+    }
+  }
+
+  return { timeSeries, points }
+}
+
 function columnLetterToIndex(letter: string): number {
   let index = 0
   const upper = letter.toUpperCase()
@@ -113,6 +149,9 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
   const [primaryEdits, setPrimaryEdits] = useState<GridData | null>(null)
   const [secondaryEdits, setSecondaryEdits] = useState<GridData | null>(null)
   const [processEdits, setProcessEdits] = useState<GridData | null>(null)
+  const [primaryPoints, setPrimaryPoints] = useState<PointValue[]>([])
+  const [secondaryPoints, setSecondaryPoints] = useState<PointValue[]>([])
+  const [processPoints, setProcessPoints] = useState<PointValue[]>([])
   const [hasChanges, setHasChanges] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -247,6 +286,9 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       setPrimaryEdits(null)
       setSecondaryEdits(null)
       setProcessEdits(null)
+      setPrimaryPoints([])
+      setSecondaryPoints([])
+      setProcessPoints([])
       setEditTitle('')
       setEditNote('')
       setEditVariables([])
@@ -273,9 +315,15 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         if (res.ok && !cancelled) {
           const detail: ExperimentDetail = await res.json()
           setData(detail)
-          setPrimaryEdits(buildSpreadsheet(detail.products))
-          setSecondaryEdits(buildSpreadsheet(detail.secondary_products))
-          setProcessEdits(buildSpreadsheet(detail.process_data))
+          const primary = partitionByDataType(detail.products)
+          const secondary = partitionByDataType(detail.secondary_products)
+          const process = partitionByDataType(detail.process_data)
+          setPrimaryEdits(buildSpreadsheet(primary.timeSeries))
+          setSecondaryEdits(buildSpreadsheet(secondary.timeSeries))
+          setProcessEdits(buildSpreadsheet(process.timeSeries))
+          setPrimaryPoints(primary.points)
+          setSecondaryPoints(secondary.points)
+          setProcessPoints(process.points)
           setEditTitle(detail.experiment.title)
           setEditDate(detail.experiment.date || '')
           setEditNote(detail.experiment.experiment_note || '')
@@ -503,9 +551,15 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         if (detailRes.ok) {
           const detail: ExperimentDetail = await detailRes.json()
           setData(detail)
-          setPrimaryEdits(buildSpreadsheet(detail.products))
-          setSecondaryEdits(buildSpreadsheet(detail.secondary_products))
-          setProcessEdits(buildSpreadsheet(detail.process_data))
+          const primaryR = partitionByDataType(detail.products)
+          const secondaryR = partitionByDataType(detail.secondary_products)
+          const processR = partitionByDataType(detail.process_data)
+          setPrimaryEdits(buildSpreadsheet(primaryR.timeSeries))
+          setSecondaryEdits(buildSpreadsheet(secondaryR.timeSeries))
+          setProcessEdits(buildSpreadsheet(processR.timeSeries))
+          setPrimaryPoints(primaryR.points)
+          setSecondaryPoints(secondaryR.points)
+          setProcessPoints(processR.points)
         }
         // Clear upload state
         setParsedSpreadsheet(null)
