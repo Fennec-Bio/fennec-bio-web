@@ -34,6 +34,14 @@ interface NoteImage {
   uploaded_at: string
 }
 
+interface DataCategoryEntry {
+  id: number
+  category: 'product' | 'secondary_product' | 'process_data'
+  name: string
+  unit: string
+  data_type: 'discrete' | 'continuous' | 'point'
+}
+
 interface ExperimentDetail {
   experiment: Experiment
   products: Product[]
@@ -134,6 +142,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
   const [eventNameFree, setEventNameFree] = useState<Record<number, boolean>>({})
   const [anomalyNameFree, setAnomalyNameFree] = useState<Record<number, boolean>>({})
 
+  const [dataCategories, setDataCategories] = useState<DataCategoryEntry[]>([])
+
   // Spreadsheet upload state
   const [dataTemplates, setDataTemplates] = useState<DataTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null)
@@ -202,9 +212,33 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       }
     }
 
+    const fetchDataCategories = async () => {
+      if (!activeProject) {
+        setDataCategories([])
+        return
+      }
+      try {
+        const token = await getToken()
+        const res = await fetch(
+          `${apiUrl}/api/data-categories/?project_id=${activeProject.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (res.ok) {
+          const list: DataCategoryEntry[] = await res.json()
+          setDataCategories(list)
+        } else {
+          setDataCategories([])
+        }
+      } catch (err) {
+        console.error('Error fetching data categories:', err)
+        setDataCategories([])
+      }
+    }
+
     fetchUniqueNames()
     fetchTemplates()
     fetchStrains()
+    fetchDataCategories()
   }, [getToken, apiUrl, activeProject])
 
   useEffect(() => {
