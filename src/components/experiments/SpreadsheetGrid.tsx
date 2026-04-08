@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 export interface GridData {
   names: string[]
@@ -70,8 +71,10 @@ interface SpreadsheetGridProps {
   readOnly?: boolean
   truncated?: boolean
   showAddRow?: boolean
+  showAddColumn?: boolean
   timeUnit?: string
   onTimeUnitChange?: (unit: string) => void
+  collapseAfter?: number
 }
 
 export function SpreadsheetGrid({
@@ -80,12 +83,15 @@ export function SpreadsheetGrid({
   readOnly = false,
   truncated = false,
   showAddRow = false,
+  showAddColumn = false,
   timeUnit,
   onTimeUnitChange,
+  collapseAfter,
 }: SpreadsheetGridProps) {
   const [selAnchor, setSelAnchor] = useState<CellPos | null>(null)
   const [selEnd, setSelEnd] = useState<CellPos | null>(null)
   const [editingCell, setEditingCell] = useState<CellPos | null>(null)
+  const [isCollapsed, setIsCollapsed] = useState(true)
   const isDragging = useRef(false)
   const tableRef = useRef<HTMLDivElement>(null)
 
@@ -94,6 +100,7 @@ export function SpreadsheetGrid({
   useEffect(() => {
     if (prevGridRef.current !== grid) {
       prevGridRef.current = grid
+      setIsCollapsed(true)
     }
   }, [grid])
 
@@ -326,11 +333,16 @@ export function SpreadsheetGrid({
     )
   }
 
-  // Compute rows to display for truncated mode
+  // Compute rows to display for collapsed (edit) and truncated (review) modes
   const displayRows: { originalIndex: number; row: GridData['rows'][number] }[] = []
   let hiddenCount = 0
 
-  if (truncated && grid.rows.length > 20) {
+  if (collapseAfter && isCollapsed && grid.rows.length > collapseAfter) {
+    for (let i = 0; i < collapseAfter; i++) {
+      displayRows.push({ originalIndex: i, row: grid.rows[i] })
+    }
+    hiddenCount = grid.rows.length - collapseAfter
+  } else if (truncated && grid.rows.length > 20) {
     for (let i = 0; i < 10; i++) {
       displayRows.push({ originalIndex: i, row: grid.rows[i] })
     }
