@@ -50,6 +50,14 @@ interface PointValue {
   data_type: 'point'
 }
 
+type SerializedSeries = {
+  name: string
+  unit: string
+  data_type: 'discrete' | 'continuous' | 'point'
+  time_unit: string
+  data: { timepoint: number; value: number }[]
+}
+
 interface ExperimentDetail {
   experiment: Experiment
   products: Product[]
@@ -724,9 +732,51 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
   }
 
   const handleUpdate = async () => {
-    console.log('Primary edits:', primaryEdits)
-    console.log('Secondary edits:', secondaryEdits)
-    setHasChanges(false)
+    if (!data) return
+    setSaving(true)
+    try {
+      const token = await getToken()
+      const body = {
+        products: serializeTabForSave('product', primaryEdits, primaryPoints),
+        secondary_products: serializeTabForSave('secondary_product', secondaryEdits, secondaryPoints),
+        process_data: serializeTabForSave('process_data', processEdits, processPoints),
+      }
+      const res = await fetch(`${apiUrl}/api/experiments/${data.experiment.id}/`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        console.error('Failed to save experiment data')
+        return
+      }
+      // Re-fetch the experiment so all tabs reflect the freshly persisted state.
+      const detailRes = await fetch(
+        `${apiUrl}/api/experiment/title/${encodeURIComponent(data.experiment.title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,note_images`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (detailRes.ok) {
+        const detail: ExperimentDetail = await detailRes.json()
+        setData(detail)
+        const primary = partitionByDataType(detail.products)
+        const secondary = partitionByDataType(detail.secondary_products)
+        const process = partitionByDataType(detail.process_data)
+        setPrimaryEdits(buildSpreadsheet(primary.timeSeries))
+        setSecondaryEdits(buildSpreadsheet(secondary.timeSeries))
+        setProcessEdits(buildSpreadsheet(process.timeSeries))
+        setPrimaryPoints(primary.points)
+        setSecondaryPoints(secondary.points)
+        setProcessPoints(process.points)
+      }
+      setHasChanges(false)
+    } catch (err) {
+      console.error('Error saving experiment data:', err)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -773,6 +823,53 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     if (activeTab === 'secondary-products') return 'No more secondary products available to add'
     if (activeTab === 'process-data') return 'No more process data available to add'
     return ''
+  }
+
+  const serializeTabForSave = (
+    category: 'product' | 'secondary_product' | 'process_data',
+    grid: GridData | null,
+    points: PointValue[],
+  ): SerializedSeries[] => {
+    const out: SerializedSeries[] = []
+
+    // Time-series columns: one group per column, with each non-empty cell as a data point.
+    if (grid && grid.names.length > 0) {
+      grid.names.forEach((name, colIdx) => {
+        const catalog = dataCategories.find(c => c.category === category && c.name === name)
+        const data: { timepoint: number; value: number }[] = []
+        for (const row of grid.rows) {
+          const raw = row.values[colIdx]
+          if (raw === undefined || raw === null || String(raw).trim() === '') continue
+          const tp = parseFloat(row.timepoint)
+          const val = parseFloat(raw)
+          if (isNaN(val)) continue
+          data.push({ timepoint: isNaN(tp) ? 0 : tp, value: val })
+        }
+        out.push({
+          name,
+          unit: catalog?.unit ?? 'mg/L',
+          data_type: (catalog?.data_type as 'discrete' | 'continuous') ?? 'discrete',
+          time_unit: 'hours',
+          data,
+        })
+      })
+    }
+
+    // Point series: one group per scalar, single data row at timepoint 0.
+    for (const p of points) {
+      if (p.value === '' || p.value === null || p.value === undefined) continue
+      const val = parseFloat(p.value)
+      if (isNaN(val)) continue
+      out.push({
+        name: p.name,
+        unit: p.unit,
+        data_type: 'point',
+        time_unit: 'hours',
+        data: [{ timepoint: 0, value: val }],
+      })
+    }
+
+    return out
   }
 
   const eligibleCatalogEntries = (): DataCategoryEntry[] => {
