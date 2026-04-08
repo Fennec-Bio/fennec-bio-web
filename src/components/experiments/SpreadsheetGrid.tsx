@@ -95,14 +95,17 @@ export function SpreadsheetGrid({
   const isDragging = useRef(false)
   const tableRef = useRef<HTMLDivElement>(null)
 
-  // Reset selection when grid identity changes (e.g. tab switch)
-  const prevGridRef = useRef(grid)
+  // Reset collapsed state when the grid's structure changes (tab switch
+  // or Add Column). Compare the names array reference, not the full grid
+  // object — the parent produces a new grid object on every cell edit,
+  // and we don't want those to reset the toggle.
+  const prevNamesRef = useRef(grid.names)
   useEffect(() => {
-    if (prevGridRef.current !== grid) {
-      prevGridRef.current = grid
+    if (prevNamesRef.current !== grid.names) {
+      prevNamesRef.current = grid.names
       setIsCollapsed(true)
     }
-  }, [grid])
+  }, [grid.names])
 
   const updateCell = useCallback((row: number, col: number, value: string) => {
     const newRows = grid.rows.map((r, i) => {
