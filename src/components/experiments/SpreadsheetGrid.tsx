@@ -238,6 +238,14 @@ export function SpreadsheetGrid({
       const startRow = selAnchor.row
       const startCol = selAnchor.col
 
+      // Auto-expand if the paste would write into a hidden row.
+      // React batches the state update with the onChange below, so the
+      // user sees the expanded grid with pasted data in a single render.
+      const maxTargetRow = startRow + pastedRows.length - 1
+      if (collapseAfter && isCollapsed && maxTargetRow >= collapseAfter) {
+        setIsCollapsed(false)
+      }
+
       const newRows = grid.rows.map(r => ({ ...r, values: [...r.values] }))
       pastedRows.forEach((pastedCols, ri) => {
         const targetRow = startRow + ri
@@ -261,12 +269,15 @@ export function SpreadsheetGrid({
       el.removeEventListener('copy', handleCopy)
       el.removeEventListener('paste', handlePaste)
     }
-  }, [selAnchor, selEnd, editingCell, grid, onChange, readOnly, truncated])
+  }, [selAnchor, selEnd, editingCell, grid, onChange, readOnly, truncated, isCollapsed, collapseAfter])
 
   const handleAddRow = useCallback(() => {
+    if (collapseAfter && isCollapsed) {
+      setIsCollapsed(false)
+    }
     const newRow = { timepoint: '0.00', values: grid.names.map(() => '0.00') }
     onChange({ ...grid, rows: [...grid.rows, newRow] })
-  }, [grid, onChange])
+  }, [grid, onChange, collapseAfter, isCollapsed])
 
   const renderCell = (
     row: number,
@@ -414,6 +425,21 @@ export function SpreadsheetGrid({
           </tbody>
         </table>
       </div>
+
+      {/* Collapse / expand toggle */}
+      {collapseAfter && grid.rows.length > collapseAfter && !readOnly && !truncated && (
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="w-full flex items-center justify-center gap-2 mt-2 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 border border-dashed border-gray-200 rounded-md transition-colors"
+        >
+          {isCollapsed ? (
+            <>Show all {grid.rows.length} rows <ChevronDown className="h-4 w-4" /></>
+          ) : (
+            <>Show first {collapseAfter} rows <ChevronUp className="h-4 w-4" /></>
+          )}
+        </button>
+      )}
 
       {showAddRow && !readOnly && !truncated && (
         <div className="flex justify-end gap-2 mt-4">
