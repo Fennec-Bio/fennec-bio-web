@@ -1068,7 +1068,6 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               grid={processEdits}
               onChange={handleGridChange('process-data')}
               showAddRow
-              showAddColumn
             />
           )}
           <input
@@ -1096,7 +1095,6 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           grid={activeGrid}
           onChange={handleGridChange(activeTab)}
           showAddRow
-          showAddColumn
         />
       )
     }

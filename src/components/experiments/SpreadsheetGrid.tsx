@@ -70,7 +70,6 @@ interface SpreadsheetGridProps {
   readOnly?: boolean
   truncated?: boolean
   showAddRow?: boolean
-  showAddColumn?: boolean
   timeUnit?: string
   onTimeUnitChange?: (unit: string) => void
 }
@@ -81,7 +80,6 @@ export function SpreadsheetGrid({
   readOnly = false,
   truncated = false,
   showAddRow = false,
-  showAddColumn = false,
   timeUnit,
   onTimeUnitChange,
 }: SpreadsheetGridProps) {
@@ -90,10 +88,6 @@ export function SpreadsheetGrid({
   const [editingCell, setEditingCell] = useState<CellPos | null>(null)
   const isDragging = useRef(false)
   const tableRef = useRef<HTMLDivElement>(null)
-
-  // Add column modal
-  const [showAddColumnModal, setShowAddColumnModal] = useState(false)
-  const [newColumnName, setNewColumnName] = useState('')
 
   // Reset selection when grid identity changes (e.g. tab switch)
   const prevGridRef = useRef(grid)
@@ -267,22 +261,6 @@ export function SpreadsheetGrid({
     onChange({ ...grid, rows: [...grid.rows, newRow] })
   }, [grid, onChange])
 
-  const handleAddColumn = useCallback(() => {
-    setNewColumnName('')
-    setShowAddColumnModal(true)
-  }, [])
-
-  const handleConfirmAddColumn = useCallback(() => {
-    if (!newColumnName.trim()) return
-    if (grid.names.includes(newColumnName.trim())) return
-    onChange({
-      names: [...grid.names, newColumnName.trim()],
-      rows: grid.rows.map(r => ({ ...r, values: [...r.values, ''] })),
-    })
-    setShowAddColumnModal(false)
-    setNewColumnName('')
-  }, [grid, onChange, newColumnName])
-
   const renderCell = (
     row: number,
     col: number,
@@ -425,70 +403,17 @@ export function SpreadsheetGrid({
         </table>
       </div>
 
-      {/* Action buttons */}
-      {(showAddRow || showAddColumn) && !readOnly && !truncated && (
+      {showAddRow && !readOnly && !truncated && (
         <div className="flex justify-end gap-2 mt-4">
-          {showAddColumn && (
-            <button
-              onClick={handleAddColumn}
-              className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all"
-            >
-              Add Column
-            </button>
-          )}
-          {showAddRow && (
-            <button
-              onClick={handleAddRow}
-              className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all"
-            >
-              Add Row
-            </button>
-          )}
+          <button
+            onClick={handleAddRow}
+            className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all"
+          >
+            Add Row
+          </button>
         </div>
       )}
 
-      {/* Add Column Modal */}
-      {showAddColumnModal && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setShowAddColumnModal(false)}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Column</h3>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Column Name</label>
-                <input
-                  type="text"
-                  value={newColumnName}
-                  onChange={e => setNewColumnName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleConfirmAddColumn() }}
-                  placeholder="e.g. CBDa"
-                  autoFocus
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setShowAddColumnModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmAddColumn}
-                  disabled={!newColumnName.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-                  style={{ backgroundColor: '#eb5234' }}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </>
   )
 }
