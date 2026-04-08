@@ -731,6 +731,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showAddSeriesModal, setShowAddSeriesModal] = useState(false)
+  const [pendingAddName, setPendingAddName] = useState('')
 
   const handleDelete = async () => {
     if (!data) return
@@ -757,6 +759,71 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     if (activeTab === 'secondary-products') return secondaryEdits
     if (activeTab === 'process-data') return processEdits
     return null
+  }
+
+  const addButtonLabel = (): string => {
+    if (activeTab === 'primary-products') return 'Add Product'
+    if (activeTab === 'secondary-products') return 'Add Secondary Product'
+    if (activeTab === 'process-data') return 'Add Process Data'
+    return ''
+  }
+
+  const addButtonEmptyTitle = (): string => {
+    if (activeTab === 'primary-products') return 'No more products available to add'
+    if (activeTab === 'secondary-products') return 'No more secondary products available to add'
+    if (activeTab === 'process-data') return 'No more process data available to add'
+    return ''
+  }
+
+  const eligibleCatalogEntries = (): DataCategoryEntry[] => {
+    const cat = activeTabCategory()
+    if (!cat) return []
+    const grid = getActiveGrid()
+    const usedNames = new Set<string>([
+      ...(grid?.names ?? []),
+      ...getActivePoints().map(p => p.name),
+    ])
+    return dataCategories
+      .filter(c => c.category === cat && !usedNames.has(c.name))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  const handleConfirmAddSeries = () => {
+    if (!pendingAddName) return
+    const entry = dataCategories.find(
+      c => c.category === activeTabCategory() && c.name === pendingAddName
+    )
+    if (!entry) {
+      setShowAddSeriesModal(false)
+      setPendingAddName('')
+      return
+    }
+
+    if (entry.data_type === 'point') {
+      const next = [...getActivePoints(), {
+        name: entry.name,
+        value: '',
+        unit: entry.unit,
+        data_type: 'point' as const,
+      }]
+      setActivePoints(next)
+    } else {
+      // discrete / continuous → append a column to the time-series grid
+      const grid = getActiveGrid() ?? { names: [], rows: [] }
+      const newGrid: GridData = {
+        names: [...grid.names, entry.name],
+        rows: grid.rows.length === 0
+          ? [{ timepoint: '0.00', values: [''] }]
+          : grid.rows.map(r => ({ ...r, values: [...r.values, ''] })),
+      }
+      if (activeTab === 'primary-products') setPrimaryEdits(newGrid)
+      else if (activeTab === 'secondary-products') setSecondaryEdits(newGrid)
+      else if (activeTab === 'process-data') setProcessEdits(newGrid)
+    }
+
+    markChanged()
+    setShowAddSeriesModal(false)
+    setPendingAddName('')
   }
 
   const getActivePoints = (): PointValue[] => {
@@ -1450,6 +1517,24 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         )}
         {selectedExperiment && isGridTab && (
           <div className="flex justify-end gap-2 mt-4">
+            {(() => {
+              const eligible = eligibleCatalogEntries()
+              const disabled = eligible.length === 0
+              return (
+                <button
+                  onClick={() => {
+                    if (disabled) return
+                    setPendingAddName(eligible[0].name)
+                    setShowAddSeriesModal(true)
+                  }}
+                  disabled={disabled}
+                  title={disabled ? addButtonEmptyTitle() : undefined}
+                  className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {addButtonLabel()}
+                </button>
+              )
+            })()}
             {activeTab === 'process-data' && (
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -1469,6 +1554,45 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           </div>
         )}
       </div>
+
+      {/* Add Series modal */}
+      {showAddSeriesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => { setShowAddSeriesModal(false); setPendingAddName('') }} />
+          <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{addButtonLabel()}</h3>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Choose from project catalog</label>
+            <select
+              value={pendingAddName}
+              onChange={(e) => setPendingAddName(e.target.value)}
+              className={inputClass}
+              autoFocus
+            >
+              {eligibleCatalogEntries().map(entry => (
+                <option key={entry.id} value={entry.name}>
+                  {entry.name} · {entry.data_type}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => { setShowAddSeriesModal(false); setPendingAddName('') }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmAddSeries}
+                disabled={!pendingAddName}
+                className="px-4 py-2 text-sm font-medium text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                style={{ backgroundColor: '#eb5234' }}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {showDeleteModal && (
