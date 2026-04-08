@@ -1382,6 +1382,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               grid={processEdits}
               onChange={handleGridChange('process-data')}
               showAddRow
+              collapseAfter={15}
             />
           )}
           <input
@@ -1414,6 +1415,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               grid={activeGrid!}
               onChange={handleGridChange(activeTab)}
               showAddRow
+              collapseAfter={15}
             />
           )}
           {renderPointValues()}
@@ -1642,11 +1644,11 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
             )}
             <button
               onClick={handleUpdate}
-              disabled={!hasChanges}
+              disabled={!hasChanges || saving}
               className="px-6 py-2 text-sm font-medium text-white rounded-md shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
               style={{ backgroundColor: '#eb5234' }}
             >
-              Update
+              {saving ? 'Saving...' : 'Update'}
             </button>
           </div>
         )}
