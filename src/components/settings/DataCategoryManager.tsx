@@ -199,6 +199,10 @@ export function DataCategoryManager() {
       })
       if (res.ok) {
         const updated: DataCategory = await res.json()
+        if (!updated || typeof updated.id !== 'number' || updated.category !== newCategory) {
+          setConvertError('Unexpected server response. Please refresh.')
+          return
+        }
         setCategories(prev => prev.map(c => c.id === cat.id ? updated : c))
         setActiveTab(newCategory)
         setConvertTarget(null)
@@ -475,7 +479,8 @@ export function DataCategoryManager() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => { setConvertTarget(null); setConvertError('') }}
-                className="flex-1 h-9 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-all"
+                disabled={isConverting}
+                className="flex-1 h-9 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 Cancel
               </button>
