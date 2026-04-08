@@ -1382,6 +1382,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               grid={processEdits}
               onChange={handleGridChange('process-data')}
               showAddRow
+              collapseAfter={15}
             />
           )}
           <input
@@ -1414,6 +1415,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               grid={activeGrid!}
               onChange={handleGridChange(activeTab)}
               showAddRow
+              collapseAfter={15}
             />
           )}
           {renderPointValues()}
