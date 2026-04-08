@@ -759,6 +759,26 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     return null
   }
 
+  const getActivePoints = (): PointValue[] => {
+    if (activeTab === 'primary-products') return primaryPoints
+    if (activeTab === 'secondary-products') return secondaryPoints
+    if (activeTab === 'process-data') return processPoints
+    return []
+  }
+
+  const setActivePoints = (next: PointValue[]) => {
+    if (activeTab === 'primary-products') setPrimaryPoints(next)
+    else if (activeTab === 'secondary-products') setSecondaryPoints(next)
+    else if (activeTab === 'process-data') setProcessPoints(next)
+  }
+
+  const activeTabCategory = (): 'product' | 'secondary_product' | 'process_data' | null => {
+    if (activeTab === 'primary-products') return 'product'
+    if (activeTab === 'secondary-products') return 'secondary_product'
+    if (activeTab === 'process-data') return 'process_data'
+    return null
+  }
+
   const isGridTab = activeTab === 'primary-products' || activeTab === 'secondary-products' || activeTab === 'process-data'
 
   const varNameKeys = Object.keys(uniqueNames.variables)
@@ -1113,6 +1133,48 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     )
   }
 
+  const renderPointValues = () => {
+    const points = getActivePoints()
+    if (points.length === 0) return null
+    return (
+      <div className="mt-4 border border-gray-200 rounded-lg p-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Point values</div>
+        <div className="space-y-2">
+          {points.map((p, idx) => (
+            <div key={`${p.name}-${idx}`} className="flex items-center gap-2">
+              <label className="flex-1 text-sm text-gray-700">{p.name}</label>
+              <input
+                type="number"
+                step="any"
+                value={p.value}
+                onChange={(e) => {
+                  const next = [...points]
+                  next[idx] = { ...next[idx], value: e.target.value }
+                  setActivePoints(next)
+                  markChanged()
+                }}
+                className="w-32 border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="w-16 text-xs text-gray-500">{p.unit}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePoints(points.filter((_, i) => i !== idx))
+                  markChanged()
+                }}
+                className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
+                style={{ width: 28, height: 28 }}
+                aria-label={`Remove ${p.name}`}
+              >
+                x
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   const renderTabContent = () => {
     if (!selectedExperiment) {
       return (
@@ -1165,13 +1227,16 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
             onChange={handleFileUpload}
             className="hidden"
           />
+          {renderPointValues()}
         </>
       )
     }
 
     if (activeTab === 'primary-products' || activeTab === 'secondary-products') {
-      if (!activeGrid || activeGrid.names.length === 0) {
-        const emptyMessage = activeTab === 'primary-products' ? 'No primary product data' : 'No secondary product data'
+      const emptyMessage = activeTab === 'primary-products' ? 'No primary product data' : 'No secondary product data'
+      const hasGrid = !!(activeGrid && activeGrid.names.length > 0)
+      const hasPoints = getActivePoints().length > 0
+      if (!hasGrid && !hasPoints) {
         return (
           <div className="flex items-center justify-center h-[400px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
             <p className="text-gray-400 text-sm">{emptyMessage}</p>
@@ -1179,11 +1244,16 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         )
       }
       return (
-        <SpreadsheetGrid
-          grid={activeGrid}
-          onChange={handleGridChange(activeTab)}
-          showAddRow
-        />
+        <>
+          {hasGrid && (
+            <SpreadsheetGrid
+              grid={activeGrid!}
+              onChange={handleGridChange(activeTab)}
+              showAddRow
+            />
+          )}
+          {renderPointValues()}
+        </>
       )
     }
 
