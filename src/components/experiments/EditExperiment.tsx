@@ -943,6 +943,48 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     return null
   }
 
+  // Header column controls — rename selects pull from the same category catalog,
+  // excluding names already taken by other columns or point series. Delete drops
+  // the column and its values from every row.
+  const namesAvailableForColumn = (col: number): string[] => {
+    const cat = activeTabCategory()
+    const grid = getActiveGrid()
+    if (!cat || !grid) return []
+    const taken = new Set<string>([
+      ...grid.names.filter((_, i) => i !== col),
+      ...getActivePoints().map(p => p.name),
+    ])
+    return dataCategories
+      .filter(c => c.category === cat && c.data_type !== 'point' && !taken.has(c.name))
+      .map(c => c.name)
+      .sort((a, b) => a.localeCompare(b))
+  }
+
+  const renameColumn = (col: number, newName: string) => {
+    const grid = getActiveGrid()
+    if (!grid || newName === grid.names[col]) return
+    const nextNames = [...grid.names]
+    nextNames[col] = newName
+    const nextGrid: GridData = { ...grid, names: nextNames }
+    if (activeTab === 'primary-products') setPrimaryEdits(nextGrid)
+    else if (activeTab === 'secondary-products') setSecondaryEdits(nextGrid)
+    else if (activeTab === 'process-data') setProcessEdits(nextGrid)
+    markChanged()
+  }
+
+  const deleteColumn = (col: number) => {
+    const grid = getActiveGrid()
+    if (!grid) return
+    const nextGrid: GridData = {
+      names: grid.names.filter((_, i) => i !== col),
+      rows: grid.rows.map(r => ({ ...r, values: r.values.filter((_, i) => i !== col) })),
+    }
+    if (activeTab === 'primary-products') setPrimaryEdits(nextGrid)
+    else if (activeTab === 'secondary-products') setSecondaryEdits(nextGrid)
+    else if (activeTab === 'process-data') setProcessEdits(nextGrid)
+    markChanged()
+  }
+
   const isGridTab = activeTab === 'primary-products' || activeTab === 'secondary-products' || activeTab === 'process-data'
 
   const varNameKeys = Object.keys(uniqueNames.variables)
@@ -1301,56 +1343,62 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     const points = getActivePoints()
     if (points.length === 0) return null
     return (
-      <div className="mt-4 space-y-3">
-        {points.map((p, idx) => (
-          <div key={`${p.name}-${idx}`} className="flex items-start gap-2">
-            <div className="overflow-x-auto">
-              <table className="border-collapse text-sm font-mono">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[140px]">
-                      {p.name}
-                    </th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[120px]">
-                      Value{p.unit ? ` (${p.unit})` : ''}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="bg-white">
-                    <td className="px-3 py-1.5 text-left text-xs text-gray-400 italic border border-gray-200">point</td>
-                    <td className="p-0 border border-gray-200">
-                      <input
-                        type="number"
-                        step="any"
-                        value={p.value}
-                        onChange={(e) => {
-                          const next = [...points]
-                          next[idx] = { ...next[idx], value: e.target.value }
-                          setActivePoints(next)
-                          markChanged()
-                        }}
-                        className="w-full px-3 py-1.5 text-right text-gray-900 tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setActivePoints(points.filter((_, i) => i !== idx))
-                markChanged()
-              }}
-              className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0 mt-1"
-              style={{ width: 28, height: 28 }}
-              aria-label={`Remove ${p.name}`}
-            >
-              x
-            </button>
-          </div>
-        ))}
+      <div className="mt-4 overflow-x-auto">
+        <table className="border-collapse text-sm font-mono">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[160px]">
+                Name
+              </th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[120px]">
+                Value
+              </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[80px]">
+                Unit
+              </th>
+              <th className="px-2 py-2 border border-gray-200 w-8" aria-label="actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {points.map((p, idx) => (
+              <tr key={`${p.name}-${idx}`} className="bg-white">
+                <td className="px-3 py-1.5 text-left text-gray-900 border border-gray-200">
+                  {p.name}
+                </td>
+                <td className="p-0 border border-gray-200">
+                  <input
+                    type="number"
+                    step="any"
+                    value={p.value}
+                    onChange={(e) => {
+                      const next = [...points]
+                      next[idx] = { ...next[idx], value: e.target.value }
+                      setActivePoints(next)
+                      markChanged()
+                    }}
+                    className="w-full px-3 py-1.5 text-right text-gray-900 tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </td>
+                <td className="px-3 py-1.5 text-left text-gray-500 border border-gray-200">
+                  {p.unit || ''}
+                </td>
+                <td className="px-2 py-1.5 text-center border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePoints(points.filter((_, i) => i !== idx))
+                      markChanged()
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                    aria-label={`Remove ${p.name}`}
+                  >
+                    x
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     )
   }
@@ -1399,6 +1447,9 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               onChange={handleGridChange('process-data')}
               showAddRow
               collapseAfter={15}
+              availableNamesForColumn={namesAvailableForColumn}
+              onRenameColumn={renameColumn}
+              onDeleteColumn={deleteColumn}
             />
           )}
           <input
@@ -1432,6 +1483,9 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               onChange={handleGridChange(activeTab)}
               showAddRow
               collapseAfter={15}
+              availableNamesForColumn={namesAvailableForColumn}
+              onRenameColumn={renameColumn}
+              onDeleteColumn={deleteColumn}
             />
           )}
           {renderPointValues()}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { StepIndicator } from './StepIndicator'
 import { Step1Details } from './Step1Details'
-import { Step2Upload, ClassifiedData } from './Step2Upload'
+import { Step2Upload, ClassifiedData, DataCategoryEntry } from './Step2Upload'
 import { Step3Review } from './Step3Review'
 import { useProjectContext } from '@/hooks/useProjectContext'
 
@@ -43,6 +43,7 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
     anomalies: string[]
   }>({ variables: {}, events: [], anomalies: [] })
   const [dataTemplates, setDataTemplates] = useState<{ id: number; name: string; sheets: { sheet_name: string; start_row: number; timepoint_column: string; time_unit: string; column_mappings: { column: string; name: string; category: string; unit: string }[] }[]; sheet_name: string; timepoint_column: string; time_unit: string; column_mappings: { column: string; name: string; category: string; unit: string }[] }[]>([])
+  const [dataCategories, setDataCategories] = useState<DataCategoryEntry[]>([])
 
   // Fetch unique_names on mount (and when active project changes)
   useEffect(() => {
@@ -100,6 +101,26 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
       }
     }
     fetchStrains()
+
+    // Fetch data categories — single source of truth for data_type
+    const fetchDataCategories = async () => {
+      if (!activeProject) {
+        setDataCategories([])
+        return
+      }
+      try {
+        const token = await getToken()
+        const res = await fetch(
+          `${apiUrl}/api/data-categories/?project_id=${activeProject.id}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        )
+        if (res.ok) setDataCategories(await res.json())
+        else setDataCategories([])
+      } catch {
+        setDataCategories([])
+      }
+    }
+    fetchDataCategories()
   }, [getToken, apiUrl, activeProject])
 
   const handleStrainChange = (strain: string) => {
@@ -404,6 +425,7 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
             onBack={() => setStep(1)}
             projectId={activeProject?.id ?? 0}
             dataTemplates={dataTemplates}
+            dataCategories={dataCategories}
           />
         </>
       )}

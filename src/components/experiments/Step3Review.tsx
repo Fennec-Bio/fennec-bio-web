@@ -142,19 +142,6 @@ export function Step3Review({
     })
   }
 
-  const handleTimeUnitChange = (
-    category: 'products' | 'secondary_products' | 'process_data',
-    columnHeader: string,
-    newTimeUnit: string
-  ) => {
-    onDataChange({
-      ...classifiedData,
-      [category]: classifiedData[category].map((item: any) =>
-        item.column_header === columnHeader ? { ...item, time_unit: newTimeUnit } : item
-      ),
-    })
-  }
-
   const handleProcessGridChange = (columnHeader: string, grid: GridData) => {
     onDataChange({
       ...classifiedData,
@@ -170,6 +157,51 @@ export function Step3Review({
       }),
     })
   }
+
+  // Point items are time-independent scalars — render a single Value field
+  // (no time) instead of the spreadsheet grid used for time-series data.
+  // The stored timepoint is pinned to '0' / 0 since it has no meaning here.
+  const updatePointValue = (
+    category: 'products' | 'secondary_products' | 'process_data',
+    columnHeader: string,
+    nextValue: string
+  ) => {
+    const numVal = parseFloat(nextValue)
+    const valueOrZero = isNaN(numVal) ? 0 : numVal
+    onDataChange({
+      ...classifiedData,
+      [category]: classifiedData[category].map((item: any) => {
+        if (item.column_header !== columnHeader) return item
+        const row = category === 'process_data'
+          ? { time: '0', value: valueOrZero }
+          : { timepoint: '0', value: valueOrZero }
+        return { ...item, data: [row] }
+      }),
+    })
+  }
+
+  const PointFields = ({
+    category,
+    columnHeader,
+    value,
+    unit,
+  }: {
+    category: 'products' | 'secondary_products' | 'process_data'
+    columnHeader: string
+    value: string
+    unit: string
+  }) => (
+    <div className="flex flex-col">
+      <label className="text-xs font-medium text-gray-500 mb-1">Value{unit ? ` (${unit})` : ''}</label>
+      <input
+        type="number"
+        step="any"
+        value={value}
+        onChange={e => updatePointValue(category, columnHeader, e.target.value)}
+        className="w-32 border border-gray-200 rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+  )
 
   const buildSingleColumnGrid = (
     name: string,
@@ -190,18 +222,17 @@ export function Step3Review({
     return `${min.toFixed(2)} – ${max.toFixed(2)}`
   }
 
-  const TimeUnitSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className="h-6 px-1.5 text-xs font-medium border border-gray-200 rounded-md bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
-    >
-      <option value="hours">Hours</option>
-      <option value="minutes">Minutes</option>
-      <option value="days">Days</option>
-      <option value="hh:mm:ss">HH:MM:SS</option>
-    </select>
-  )
+  const dataTypeBadgeClass = (dt: string): string => {
+    if (dt === 'continuous') return 'bg-blue-100 text-blue-800'
+    if (dt === 'point') return 'bg-purple-100 text-purple-800'
+    return 'bg-green-100 text-green-800'
+  }
+
+  const dataTypeLabel = (dt: string): string => {
+    if (dt === 'continuous') return 'Continuous'
+    if (dt === 'point') return 'Point'
+    return 'Discrete'
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -266,20 +297,9 @@ export function Step3Review({
                   {/* Header row */}
                   <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 flex-wrap">
                     <span className="font-bold text-sm text-gray-900">{item.name}</span>
-                    <span
-                      className={[
-                        'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                        item.data_type === 'continuous'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-green-100 text-green-800',
-                      ].join(' ')}
-                    >
-                      {item.data_type === 'continuous' ? 'Continuous' : 'Discrete'}
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${dataTypeBadgeClass(item.data_type)}`}>
+                      {dataTypeLabel(item.data_type)}
                     </span>
-                    <TimeUnitSelect
-                      value={item.time_unit}
-                      onChange={v => handleTimeUnitChange('products', item.column_header, v)}
-                    />
                     <span className="text-xs text-gray-500">
                       {item.data.length} point{item.data.length !== 1 ? 's' : ''} &middot; {getValueRange(item.data)} {item.unit}
                     </span>
@@ -307,14 +327,24 @@ export function Step3Review({
                         data={item.data}
                         name={item.name}
                         unit={item.unit}
+                        dataType={item.data_type}
                       />
                     )}
-                    <SpreadsheetGrid
-                      grid={grid}
-                      onChange={newGrid => handleProductGridChange(item.column_header, newGrid)}
-                      readOnly={isTruncated}
-                      truncated={isTruncated}
-                    />
+                    {item.data_type === 'point' ? (
+                      <PointFields
+                        category="products"
+                        columnHeader={item.column_header}
+                        value={String(item.data[0]?.value ?? '')}
+                        unit={item.unit}
+                      />
+                    ) : (
+                      <SpreadsheetGrid
+                        grid={grid}
+                        onChange={newGrid => handleProductGridChange(item.column_header, newGrid)}
+                        readOnly={isTruncated}
+                        truncated={isTruncated}
+                      />
+                    )}
                   </div>
                 </div>
               )
@@ -337,20 +367,9 @@ export function Step3Review({
                   {/* Header row */}
                   <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 flex-wrap">
                     <span className="font-bold text-sm text-gray-900">{item.name}</span>
-                    <span
-                      className={[
-                        'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                        item.data_type === 'continuous'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-green-100 text-green-800',
-                      ].join(' ')}
-                    >
-                      {item.data_type === 'continuous' ? 'Continuous' : 'Discrete'}
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${dataTypeBadgeClass(item.data_type)}`}>
+                      {dataTypeLabel(item.data_type)}
                     </span>
-                    <TimeUnitSelect
-                      value={item.time_unit}
-                      onChange={v => handleTimeUnitChange('secondary_products', item.column_header, v)}
-                    />
                     <span className="text-xs text-gray-500">
                       {item.data.length} point{item.data.length !== 1 ? 's' : ''} &middot; {getValueRange(item.data)} {item.unit}
                     </span>
@@ -378,14 +397,24 @@ export function Step3Review({
                         data={item.data}
                         name={item.name}
                         unit={item.unit}
+                        dataType={item.data_type}
                       />
                     )}
-                    <SpreadsheetGrid
-                      grid={grid}
-                      onChange={newGrid => handleSecondaryGridChange(item.column_header, newGrid)}
-                      readOnly={isTruncated}
-                      truncated={isTruncated}
-                    />
+                    {item.data_type === 'point' ? (
+                      <PointFields
+                        category="secondary_products"
+                        columnHeader={item.column_header}
+                        value={String(item.data[0]?.value ?? '')}
+                        unit={item.unit}
+                      />
+                    ) : (
+                      <SpreadsheetGrid
+                        grid={grid}
+                        onChange={newGrid => handleSecondaryGridChange(item.column_header, newGrid)}
+                        readOnly={isTruncated}
+                        truncated={isTruncated}
+                      />
+                    )}
                   </div>
                 </div>
               )
@@ -410,20 +439,9 @@ export function Step3Review({
                   {/* Header row */}
                   <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 flex-wrap">
                     <span className="font-bold text-sm text-gray-900">{item.name}</span>
-                    <span
-                      className={[
-                        'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                        item.data_type === 'continuous'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-green-100 text-green-800',
-                      ].join(' ')}
-                    >
-                      {item.data_type === 'continuous' ? 'Continuous' : 'Discrete'}
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${dataTypeBadgeClass(item.data_type)}`}>
+                      {dataTypeLabel(item.data_type)}
                     </span>
-                    <TimeUnitSelect
-                      value={item.time_unit}
-                      onChange={v => handleTimeUnitChange('process_data', item.column_header, v)}
-                    />
                     <span className="text-xs text-gray-500">
                       {item.data.length} point{item.data.length !== 1 ? 's' : ''} &middot; {getValueRange(item.data)} {item.unit}
                     </span>
@@ -451,14 +469,24 @@ export function Step3Review({
                         data={normalizedData}
                         name={item.name}
                         unit={item.unit}
+                        dataType={item.data_type}
                       />
                     )}
-                    <SpreadsheetGrid
-                      grid={grid}
-                      onChange={newGrid => handleProcessGridChange(item.column_header, newGrid)}
-                      readOnly={isTruncated}
-                      truncated={isTruncated}
-                    />
+                    {item.data_type === 'point' ? (
+                      <PointFields
+                        category="process_data"
+                        columnHeader={item.column_header}
+                        value={String(item.data[0]?.value ?? '')}
+                        unit={item.unit}
+                      />
+                    ) : (
+                      <SpreadsheetGrid
+                        grid={grid}
+                        onChange={newGrid => handleProcessGridChange(item.column_header, newGrid)}
+                        readOnly={isTruncated}
+                        truncated={isTruncated}
+                      />
+                    )}
                   </div>
                 </div>
               )

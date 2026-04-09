@@ -10,6 +10,25 @@ export interface ClassifiedData {
   ignored: string[]
 }
 
+export interface DataCategoryEntry {
+  id: number
+  category: 'product' | 'secondary_product' | 'process_data'
+  name: string
+  unit: string
+  data_type: 'discrete' | 'continuous' | 'point'
+}
+
+type DataTypeLookup = Map<string, 'discrete' | 'continuous' | 'point'>
+
+// Key shape: `${category}::${name}` so we don't collide across categories.
+function buildDataTypeLookup(categories: DataCategoryEntry[]): DataTypeLookup {
+  const map: DataTypeLookup = new Map()
+  for (const c of categories) {
+    map.set(`${c.category}::${c.name}`, c.data_type)
+  }
+  return map
+}
+
 interface SheetConfig {
   sheet_name: string
   start_row: number
@@ -35,6 +54,7 @@ interface Step2UploadProps {
   onSkip: () => void
   projectId: number
   dataTemplates: DataTemplate[]
+  dataCategories: DataCategoryEntry[]
 }
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
@@ -56,6 +76,7 @@ function parseSheetWithConfig(
   workbook: XLSX.WorkBook,
   sheetConfig: SheetConfig,
   warnings: string[],
+  dataTypeLookup: DataTypeLookup,
 ): { products: ClassifiedData['products']; secondary_products: ClassifiedData['secondary_products']; process_data: ClassifiedData['process_data']; missing: string[] } {
   const sheetLabel = sheetConfig.sheet_name || 'Default'
 
@@ -102,6 +123,42 @@ function parseSheetWithConfig(
   for (const mapping of resolvedMappings) {
     const { colIdx, name, category, unit } = mapping
 
+    // Resolve data_type from the project's DataCategories (single source of truth).
+    // Fall back to the row-count heuristic only when the spreadsheet column refers
+    // to a name that has no matching category yet.
+    const lookedUp = dataTypeLookup.get(`${category}::${name}`)
+
+    if (lookedUp === 'point') {
+      // Point series: read only the first row under the header for this column.
+      // No timepoint binding — the value is time-independent.
+      const firstRow = dataRows[0]
+      const valRaw = firstRow ? firstRow[colIdx] : null
+      if (valRaw === null || valRaw === undefined || valRaw === '') {
+        continue
+      }
+      const numVal = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw))
+      if (isNaN(numVal)) continue
+
+      if (category === 'product') {
+        products.push({
+          name, column_header: name, unit, data_type: 'point', time_unit: sheetConfig.time_unit,
+          data: [{ timepoint: '0', value: numVal }],
+        })
+      } else if (category === 'secondary_product') {
+        secondaryProducts.push({
+          name, column_header: name, unit, type: name, data_type: 'point', time_unit: sheetConfig.time_unit,
+          data: [{ timepoint: '0', value: numVal }],
+        })
+      } else if (category === 'process_data') {
+        processData.push({
+          name, column_header: name, unit, type: name, data_type: 'point', time_unit: sheetConfig.time_unit,
+          data: [{ time: '0', value: numVal }],
+        })
+      }
+      continue
+    }
+
+    // Time-series (discrete / continuous): collect all (timepoint, value) pairs.
     const rawPairs: { tp: string; val: number }[] = []
     for (const row of dataRows) {
       const tpRaw = row[timepointColIdx]
@@ -112,7 +169,7 @@ function parseSheetWithConfig(
       rawPairs.push({ tp: String(tpRaw), val: numVal })
     }
 
-    const dataType = rawPairs.length > 50 ? 'continuous' : 'discrete'
+    const dataType = lookedUp ?? (rawPairs.length > 50 ? 'continuous' : 'discrete')
 
     if (category === 'product') {
       products.push({
@@ -141,8 +198,10 @@ interface AccumulatedUpload {
   data: ClassifiedData
 }
 
-export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTemplates }: Step2UploadProps) {
+export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTemplates, dataCategories }: Step2UploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Built once per categories change; passed to the parser as the source of truth.
+  const dataTypeLookup = React.useMemo(() => buildDataTypeLookup(dataCategories), [dataCategories])
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
@@ -188,7 +247,7 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
         const warnings: string[] = []
 
         for (const sheetConfig of sheets) {
-          const result = parseSheetWithConfig(workbook, sheetConfig, warnings)
+          const result = parseSheetWithConfig(workbook, sheetConfig, warnings, dataTypeLookup)
           allProducts.push(...result.products)
           allSecondary.push(...result.secondary_products)
           allProcess.push(...result.process_data)
@@ -210,7 +269,7 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
     }
     reader.onerror = () => setParseError('Failed to read file')
     reader.readAsArrayBuffer(file)
-  }, [])
+  }, [dataTypeLookup])
 
   const handleFileSelect = useCallback((files: FileList | null) => {
     if (!files || files.length === 0 || !selectedTemplate) return

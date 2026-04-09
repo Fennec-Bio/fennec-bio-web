@@ -5,12 +5,15 @@ import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { Plus, Pencil, Trash2, X, Check, ArrowRightLeft } from 'lucide-react'
 
+type DataType = 'discrete' | 'continuous' | 'point'
+
 interface DataCategory {
   id: number
   project: number
   category: 'product' | 'secondary_product' | 'process_data'
   name: string
   unit: string
+  data_type: DataType
 }
 
 type CategoryTab = 'product' | 'secondary_product' | 'process_data'
@@ -20,6 +23,30 @@ const TABS: { key: CategoryTab; label: string }[] = [
   { key: 'secondary_product', label: 'Secondary Products' },
   { key: 'process_data', label: 'Process Data' },
 ]
+
+const DATA_TYPE_OPTIONS: { value: DataType; label: string }[] = [
+  { value: 'discrete', label: 'Discrete' },
+  { value: 'continuous', label: 'Continuous' },
+  { value: 'point', label: 'Point' },
+]
+
+const DATA_TYPE_DESCRIPTIONS: Record<DataType, string> = {
+  point:
+    'Data that is a single time independent point. E.g total protein harvested after a run.',
+  discrete:
+    'A set of data timepoints, e.g the concentration of a metabolite sampled every 24 hours.',
+  continuous:
+    'A set of datapoints with over 100 samples e.g measurements of a pH probe.',
+}
+
+const dataTypeBadgeClass = (dt: DataType): string => {
+  if (dt === 'continuous') return 'bg-blue-100 text-blue-800'
+  if (dt === 'point') return 'bg-purple-100 text-purple-800'
+  return 'bg-green-100 text-green-800'
+}
+
+const dataTypeLabel = (dt: DataType): string =>
+  DATA_TYPE_OPTIONS.find(o => o.value === dt)?.label ?? dt
 
 const inputClass =
   'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -38,6 +65,7 @@ export function DataCategoryManager() {
   const [isAdding, setIsAdding] = useState(false)
   const [addName, setAddName] = useState('')
   const [addUnit, setAddUnit] = useState('mg/L')
+  const [addDataType, setAddDataType] = useState<DataType>('discrete')
   const [addError, setAddError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
@@ -45,6 +73,7 @@ export function DataCategoryManager() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
   const [editUnit, setEditUnit] = useState('')
+  const [editDataType, setEditDataType] = useState<DataType>('discrete')
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<DataCategory | null>(null)
@@ -55,6 +84,15 @@ export function DataCategoryManager() {
   const [convertTarget, setConvertTarget] = useState<{ cat: DataCategory; newCategory: CategoryTab } | null>(null)
   const [convertError, setConvertError] = useState('')
   const [isConverting, setIsConverting] = useState(false)
+
+  // Data-type change confirmation: pending edit waits for the user to acknowledge
+  // that any existing rows recorded under the old shape may not render correctly
+  // under the new one (e.g. switching a multi-row series to "point").
+  const [dataTypeChangeConfirm, setDataTypeChangeConfirm] = useState<{
+    id: number
+    oldType: DataType
+    newType: DataType
+  } | null>(null)
 
   const fetchCategories = useCallback(async () => {
     if (!activeProject) return
@@ -121,6 +159,7 @@ export function DataCategoryManager() {
           category: activeTab,
           name: addName.trim(),
           unit: addUnit.trim() || 'mg/L',
+          data_type: addDataType,
         }),
       })
       if (res.ok) {
@@ -128,6 +167,7 @@ export function DataCategoryManager() {
         setCategories(prev => [...prev, created])
         setAddName('')
         setAddUnit('mg/L')
+        setAddDataType('discrete')
         setIsAdding(false)
       } else {
         const data = await res.json()
@@ -138,6 +178,21 @@ export function DataCategoryManager() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // Save click from inline edit row. If the user changed data_type we don't
+  // commit straight away — we surface a warning first because the change
+  // rewrites every attached DataPoint and may make existing rows render
+  // incorrectly (e.g. a multi-point series flipped to "point").
+  const handleSaveClick = (id: number) => {
+    if (!editName.trim()) return
+    const cat = categories.find(c => c.id === id)
+    if (!cat) return
+    if (cat.data_type !== editDataType) {
+      setDataTypeChangeConfirm({ id, oldType: cat.data_type, newType: editDataType })
+      return
+    }
+    handleUpdate(id)
   }
 
   const handleUpdate = async (id: number) => {
@@ -156,6 +211,7 @@ export function DataCategoryManager() {
           category: cat.category,
           name: editName.trim(),
           unit: editUnit.trim() || 'mg/L',
+          data_type: editDataType,
         }),
       })
       if (res.ok) {
@@ -221,6 +277,7 @@ export function DataCategoryManager() {
     setEditingId(cat.id)
     setEditName(cat.name)
     setEditUnit(cat.unit)
+    setEditDataType(cat.data_type)
   }
 
   if (!activeProject) {
@@ -265,13 +322,13 @@ export function DataCategoryManager() {
 
           {filtered.length > 0 && (
             <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
-              <div className="grid grid-cols-[1fr_120px_96px] gap-0 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
-                <span>Name</span><span>Unit</span><span />
+              <div className="grid grid-cols-[1fr_120px_120px_96px] gap-0 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                <span>Name</span><span>Unit</span><span>Data Type</span><span />
               </div>
               {filtered.map((cat) => (
                 <div
                   key={cat.id}
-                  className="grid grid-cols-[1fr_120px_96px] gap-0 px-4 py-2 border-t border-gray-100 items-center"
+                  className="grid grid-cols-[1fr_120px_120px_96px] gap-0 px-4 py-2 border-t border-gray-100 items-center"
                 >
                   {editingId === cat.id ? (
                     <>
@@ -286,11 +343,28 @@ export function DataCategoryManager() {
                         type="text"
                         value={editUnit}
                         onChange={e => setEditUnit(e.target.value)}
-                        className="border border-gray-200 rounded px-2 py-1 text-sm"
+                        className="border border-gray-200 rounded px-2 py-1 text-sm mr-2"
                       />
+                      <div className="relative group mr-2">
+                        <select
+                          value={editDataType}
+                          onChange={e => setEditDataType(e.target.value as DataType)}
+                          className="border border-gray-200 rounded px-2 py-1 text-sm bg-white"
+                        >
+                          {DATA_TYPE_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                        <div
+                          role="tooltip"
+                          className="pointer-events-none absolute bottom-full left-0 mb-2 w-[260px] rounded-md bg-gray-900 px-3 py-2 text-xs leading-snug text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        >
+                          {DATA_TYPE_DESCRIPTIONS[editDataType]}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => handleUpdate(cat.id)}
+                          onClick={() => handleSaveClick(cat.id)}
                           className="text-green-600 hover:text-green-700"
                         >
                           <Check className="h-4 w-4" />
@@ -307,7 +381,12 @@ export function DataCategoryManager() {
                     <>
                       <span className="text-sm font-medium text-gray-900">{cat.name}</span>
                       <span className="text-sm text-gray-500">{cat.unit}</span>
-                      <div className="flex items-center gap-1 relative">
+                      <span>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${dataTypeBadgeClass(cat.data_type)}`}>
+                          {dataTypeLabel(cat.data_type)}
+                        </span>
+                      </span>
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => startEdit(cat)}
                           className="text-gray-400 hover:text-[#eb5234]"
@@ -328,31 +407,6 @@ export function DataCategoryManager() {
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
-
-                        {convertPopoverId === cat.id && (
-                          <div
-                            data-convert-popover
-                            className="absolute right-0 top-7 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]"
-                          >
-                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200">
-                              Convert &ldquo;{cat.name}&rdquo; to:
-                            </div>
-                            {TABS.filter(t => t.key !== cat.category).map(t => (
-                              <button
-                                key={t.key}
-                                onClick={() => {
-                                  setConvertPopoverId(null)
-                                  setConvertTarget({ cat, newCategory: t.key })
-                                  setConvertError('')
-                                }}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
-                              >
-                                <ArrowRightLeft className="h-3.5 w-3.5 text-gray-400" />
-                                {t.label.replace(/s$/, '')}
-                              </button>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </>
                   )}
@@ -389,6 +443,26 @@ export function DataCategoryManager() {
                     className={inputClass}
                   />
                 </div>
+                <div className="w-36">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data Type</label>
+                  <div className="relative group">
+                    <select
+                      value={addDataType}
+                      onChange={e => setAddDataType(e.target.value as DataType)}
+                      className={inputClass}
+                    >
+                      {DATA_TYPE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <div
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-full left-0 mb-2 w-[260px] rounded-md bg-gray-900 px-3 py-2 text-xs leading-snug text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                    >
+                      {DATA_TYPE_DESCRIPTIONS[addDataType]}
+                    </div>
+                  </div>
+                </div>
                 <button
                   onClick={handleAdd}
                   disabled={isSaving}
@@ -398,7 +472,7 @@ export function DataCategoryManager() {
                   {isSaving ? 'Adding...' : 'Add'}
                 </button>
                 <button
-                  onClick={() => { setIsAdding(false); setAddName(''); setAddUnit('mg/L'); setAddError('') }}
+                  onClick={() => { setIsAdding(false); setAddName(''); setAddUnit('mg/L'); setAddDataType('discrete'); setAddError('') }}
                   className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-md hover:bg-gray-50"
                 >
                   Cancel
@@ -418,6 +492,84 @@ export function DataCategoryManager() {
           )}
         </>
       )}
+
+      {/* Data-type change confirmation */}
+      {dataTypeChangeConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Change data type?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              You&rsquo;re changing this category from{' '}
+              <span className="font-medium">{dataTypeLabel(dataTypeChangeConfirm.oldType)}</span>{' '}
+              to{' '}
+              <span className="font-medium">{dataTypeLabel(dataTypeChangeConfirm.newType)}</span>.
+              All existing data points attached to this category will be updated.
+              Data recorded under the old type may not display correctly under the new one
+              (for example, a multi-row series switched to <span className="font-medium">Point</span>{' '}
+              will only show its first value).
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDataTypeChangeConfirm(null)}
+                className="flex-1 h-9 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const id = dataTypeChangeConfirm.id
+                  setDataTypeChangeConfirm(null)
+                  await handleUpdate(id)
+                }}
+                className="flex-1 h-9 text-sm font-medium text-white rounded-md hover:opacity-90 transition-all"
+                style={{ backgroundColor: '#eb5234' }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convert picker modal — choose target category type */}
+      {convertPopoverId !== null && (() => {
+        const cat = categories.find(c => c.id === convertPopoverId)
+        if (!cat) return null
+        return (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+            <div data-convert-popover className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Convert data category</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Convert <span className="font-medium">{cat.name}</span> from{' '}
+                <span className="font-medium">{TABS.find(t => t.key === cat.category)?.label.replace(/s$/, '')}</span>{' '}
+                to which type?
+              </p>
+              <div className="flex flex-col gap-2">
+                {TABS.filter(t => t.key !== cat.category).map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => {
+                      setConvertPopoverId(null)
+                      setConvertTarget({ cat, newCategory: t.key })
+                      setConvertError('')
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm border border-gray-200 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5 text-gray-400" />
+                    {t.label.replace(/s$/, '')}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setConvertPopoverId(null)}
+                className="w-full mt-4 h-9 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Delete confirmation modal */}
       {deleteTarget && (

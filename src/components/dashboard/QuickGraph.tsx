@@ -18,7 +18,7 @@ interface Product {
   unit: string
   timepoint: string
   value: number
-  data_type?: 'discrete' | 'continuous'
+  data_type?: 'discrete' | 'continuous' | 'point'
   time_unit?: string
 }
 
@@ -30,6 +30,7 @@ interface ProcessData {
   value: number
   type?: string
   time_unit?: string
+  data_type?: 'discrete' | 'continuous' | 'point'
 }
 
 interface Variable {
@@ -76,7 +77,14 @@ interface DataPoint {
   name: string
   unit: string
   type: string
-  dataType?: 'discrete' | 'continuous'
+  dataType?: 'discrete' | 'continuous' | 'point'
+}
+
+interface PointSeries {
+  name: string
+  value: number
+  unit: string
+  type: string
 }
 
 interface QuickGraphProps {
@@ -360,9 +368,10 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   }, [metabolitesOpen, experimentDropdownOpen, graphTypeOpen])
 
   // Build combined data points from selected metabolites (memoized to avoid
-  // recomputing on every render — only recalculates when data or selections change)
-  const dataPoints = useMemo((): DataPoint[] => {
-    if (!experimentData) return []
+  // recomputing on every render — only recalculates when data or selections change).
+  // Point-typed series are partitioned out and shown below the chart instead of plotted.
+  const { dataPoints, pointSeries } = useMemo((): { dataPoints: DataPoint[]; pointSeries: PointSeries[] } => {
+    if (!experimentData) return { dataPoints: [], pointSeries: [] }
 
     const productData = [
       ...experimentData.products.map(p => ({ ...p, type: 'product' })),
@@ -394,11 +403,40 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
         name: p.name,
         unit: p.unit,
         type: 'process_data',
+        dataType: p.data_type,
       }))
 
     const allPoints = [...productData, ...processPoints]
-    normalizeWallClockSeries(allPoints)
-    return allPoints.sort((a, b) => a.time - b.time)
+
+    // Partition by series name: a series is "point-typed" only if every row has dataType === 'point'.
+    const groups = new Map<string, DataPoint[]>()
+    for (const p of allPoints) {
+      if (!groups.has(p.name)) groups.set(p.name, [])
+      groups.get(p.name)!.push(p)
+    }
+
+    const plotPoints: DataPoint[] = []
+    const points: PointSeries[] = []
+    for (const [name, rows] of groups) {
+      const allPoint = rows.every(r => r.dataType === 'point')
+      const anyPoint = rows.some(r => r.dataType === 'point')
+      if (allPoint) {
+        if (rows.length > 1) {
+          console.warn(`[QuickGraph] point series "${name}" has ${rows.length} rows; showing only the first`)
+        }
+        const first = rows[0]
+        points.push({ name, value: first.value, unit: first.unit, type: first.type })
+      } else {
+        if (anyPoint) {
+          console.warn(`[QuickGraph] series "${name}" mixes 'point' and other data_types; rendering as time series`)
+        }
+        plotPoints.push(...rows)
+      }
+    }
+
+    normalizeWallClockSeries(plotPoints)
+    plotPoints.sort((a, b) => a.time - b.time)
+    return { dataPoints: plotPoints, pointSeries: points }
   }, [experimentData, selectedMetabolites])
 
   // Draw vertical marker lines for events/anomalies with numbered labels
@@ -514,8 +552,8 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     // Bar graph only shows products/secondary products (not continuous process data)
     // Normalize timepoints to hours for display using stored time_unit
     const barData = [
-      ...experimentData.products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'product' })),
-      ...experimentData.secondary_products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous').map(p => ({ ...p, type: 'secondary_product' })),
+      ...experimentData.products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous' && p.data_type !== 'point').map(p => ({ ...p, type: 'product' })),
+      ...experimentData.secondary_products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous' && p.data_type !== 'point').map(p => ({ ...p, type: 'secondary_product' })),
     ].map(p => ({ time: normalizeToHours(parseTimepoint(p.timepoint), p.time_unit), value: p.value, name: p.name, unit: p.unit, type: p.type }))
 
     const timepoints = [...new Set(barData.map(p => p.time))].sort((a, b) => a - b)
@@ -745,6 +783,21 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
           >
             <svg ref={svgRef} className="min-w-max" />
           </div>
+
+          {/* Point-typed series (single scalar values, not plotted) */}
+          {pointSeries.length > 0 && (
+            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
+              <div className="text-xs font-medium text-gray-500 mb-1.5">Single-point measurements</div>
+              <div className="flex flex-wrap gap-x-6 gap-y-1">
+                {pointSeries.map(p => (
+                  <div key={p.name} className="text-sm text-gray-700">
+                    <span className="font-medium">{p.name}:</span>{' '}
+                    <span>{p.value}{p.unit ? ` ${p.unit}` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Toggle switches */}
           <div className="flex gap-6 justify-center">

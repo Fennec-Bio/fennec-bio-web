@@ -21,7 +21,7 @@ interface Product {
   unit: string
   timepoint: string
   value: number
-  data_type?: 'discrete' | 'continuous'
+  data_type?: 'discrete' | 'continuous' | 'point'
   time_unit?: string
 }
 
@@ -33,6 +33,7 @@ interface ProcessData {
   value: number
   type?: string
   time_unit?: string
+  data_type?: 'discrete' | 'continuous' | 'point'
 }
 
 interface DataPoint {
@@ -42,7 +43,13 @@ interface DataPoint {
   name: string
   unit: string
   type: string
-  dataType?: 'discrete' | 'continuous'
+  dataType?: 'discrete' | 'continuous' | 'point'
+}
+
+interface PointSeries {
+  name: string
+  value: number
+  unit: string
 }
 
 interface NoteImage {
@@ -220,8 +227,8 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
     return () => document.removeEventListener('mousedown', handler)
   }, [dropdownOpen])
 
-  const buildDataPoints = useCallback((): DataPoint[] => {
-    if (!data) return []
+  const buildDataPoints = useCallback((): { plot: DataPoint[]; points: PointSeries[] } => {
+    if (!data) return { plot: [], points: [] }
 
     const productData = [
       ...data.products.map(p => ({ ...p, type: 'product' })),
@@ -253,11 +260,39 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
         name: p.name,
         unit: p.unit,
         type: 'process_data',
+        dataType: p.data_type,
       }))
 
     const allPoints = [...productData, ...processPoints]
-    normalizeWallClockSeries(allPoints)
-    return allPoints.sort((a, b) => a.time - b.time)
+
+    const groups = new Map<string, DataPoint[]>()
+    for (const p of allPoints) {
+      if (!groups.has(p.name)) groups.set(p.name, [])
+      groups.get(p.name)!.push(p)
+    }
+
+    const plot: DataPoint[] = []
+    const points: PointSeries[] = []
+    for (const [name, rows] of groups) {
+      const allPoint = rows.every(r => r.dataType === 'point')
+      const anyPoint = rows.some(r => r.dataType === 'point')
+      if (allPoint) {
+        if (rows.length > 1) {
+          console.warn(`[Notebook] point series "${name}" has ${rows.length} rows; showing only the first`)
+        }
+        const first = rows[0]
+        points.push({ name, value: first.value, unit: first.unit })
+      } else {
+        if (anyPoint) {
+          console.warn(`[Notebook] series "${name}" mixes 'point' and other data_types; rendering as time series`)
+        }
+        plot.push(...rows)
+      }
+    }
+
+    normalizeWallClockSeries(plot)
+    plot.sort((a, b) => a.time - b.time)
+    return { plot, points }
   }, [data, selected])
 
   const getGraphDimensions = useCallback(() => {
@@ -282,7 +317,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
       .attr('width', tw + 150).attr('height', th)
       .append('g').attr('transform', `translate(${margin.left},${margin.top})`)
 
-    const points = buildDataPoints()
+    const points = buildDataPoints().plot
     if (points.length === 0) {
       svg.append('text').attr('x', w / 2).attr('y', h / 2)
         .attr('text-anchor', 'middle').attr('fill', '#666')
@@ -724,6 +759,23 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
             <div className="overflow-x-auto">
               <svg ref={svgRef} />
             </div>
+            {(() => {
+              const { points } = buildDataPoints()
+              if (points.length === 0) return null
+              return (
+                <div className="mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50/50">
+                  <div className="text-xs font-medium text-gray-500 mb-1.5">Single-point measurements</div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1">
+                    {points.map(p => (
+                      <div key={p.name} className="text-sm text-gray-700">
+                        <span className="font-medium">{p.name}:</span>{' '}
+                        <span>{p.value}{p.unit ? ` ${p.unit}` : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
 

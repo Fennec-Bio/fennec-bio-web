@@ -75,6 +75,13 @@ interface SpreadsheetGridProps {
   timeUnit?: string
   onTimeUnitChange?: (unit: string) => void
   collapseAfter?: number
+  /** Names that may replace the column at `col`. Should NOT include the current
+   *  name. When provided alongside `onRenameColumn`, the column header becomes
+   *  a select. */
+  availableNamesForColumn?: (col: number) => string[]
+  onRenameColumn?: (col: number, newName: string) => void
+  /** When provided, an × button is rendered next to each non-time column header. */
+  onDeleteColumn?: (col: number) => void
 }
 
 export function SpreadsheetGrid({
@@ -87,6 +94,9 @@ export function SpreadsheetGrid({
   timeUnit,
   onTimeUnitChange,
   collapseAfter,
+  availableNamesForColumn,
+  onRenameColumn,
+  onDeleteColumn,
 }: SpreadsheetGridProps) {
   const [selAnchor, setSelAnchor] = useState<CellPos | null>(null)
   const [selEnd, setSelEnd] = useState<CellPos | null>(null)
@@ -393,11 +403,44 @@ export function SpreadsheetGrid({
                   'Time'
                 )}
               </th>
-              {grid.names.map(name => (
-                <th key={name} className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[100px]">
-                  {name}
-                </th>
-              ))}
+              {grid.names.map((name, colIdx) => {
+                const canEditHeader = !readOnly && !truncated
+                const renameOptions = canEditHeader && onRenameColumn && availableNamesForColumn
+                  ? availableNamesForColumn(colIdx)
+                  : null
+                return (
+                  <th key={`${name}-${colIdx}`} className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[100px]">
+                    <div className="flex items-center justify-end gap-1">
+                      {renameOptions ? (
+                        <select
+                          value={name}
+                          onChange={e => onRenameColumn!(colIdx, e.target.value)}
+                          className="bg-transparent text-xs font-semibold text-gray-500 uppercase cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 rounded max-w-[140px]"
+                          title="Rename column"
+                        >
+                          <option value={name}>{name}</option>
+                          {renameOptions.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span>{name}</span>
+                      )}
+                      {canEditHeader && onDeleteColumn && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteColumn(colIdx)}
+                          className="text-gray-400 hover:text-red-500 leading-none px-1"
+                          aria-label={`Delete column ${name}`}
+                          title={`Delete column ${name}`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>

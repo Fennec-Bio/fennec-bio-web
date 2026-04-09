@@ -12,6 +12,8 @@ interface DataChartProps {
   data: DataPoint[]
   name: string
   unit?: string
+  /** When 'point', the value is shown as a single scalar instead of a time-series chart. */
+  dataType?: string
 }
 
 function parseTime(tp: string): number {
@@ -19,10 +21,12 @@ function parseTime(tp: string): number {
   return isNaN(n) ? 0 : n
 }
 
-export function DataChart({ data, name, unit }: DataChartProps) {
+export function DataChart({ data, name, unit, dataType }: DataChartProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const isPoint = dataType === 'point'
 
   useEffect(() => {
+    if (isPoint) return
     if (!svgRef.current || data.length === 0) return
 
     const svg = d3.select(svgRef.current)
@@ -80,7 +84,29 @@ export function DataChart({ data, name, unit }: DataChartProps) {
       .call(d3.axisLeft(y).ticks(4))
       .call(g => g.select('.domain').attr('stroke', '#e5e7eb'))
 
-  }, [data, name, unit])
+  }, [data, name, unit, isPoint])
+
+  if (isPoint) {
+    if (data.length > 1) {
+      console.warn(`[DataChart] point series "${name}" has ${data.length} rows; showing only the first`)
+    }
+    const first = data[0]
+    return (
+      <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-sm font-medium text-gray-700">{name}</span>
+          {unit && <span className="text-xs text-gray-400">({unit})</span>}
+        </div>
+        <div className="text-sm text-gray-700">
+          {first ? (
+            <span>{first.value}{unit ? ` ${unit}` : ''}</span>
+          ) : (
+            <span className="text-gray-400">No value</span>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">

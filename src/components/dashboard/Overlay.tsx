@@ -18,7 +18,7 @@ interface Product {
   unit: string
   timepoint: string
   value: number
-  data_type?: 'discrete' | 'continuous'
+  data_type?: 'discrete' | 'continuous' | 'point'
   time_unit?: string
 }
 
@@ -30,6 +30,7 @@ interface ProcessData {
   value: number
   type?: string
   time_unit?: string
+  data_type?: 'discrete' | 'continuous' | 'point'
 }
 
 interface Variable {
@@ -74,8 +75,16 @@ interface DataPoint {
   name: string
   unit: string
   type: string
-  dataType?: 'discrete' | 'continuous'
+  dataType?: 'discrete' | 'continuous' | 'point'
   experimentPrefix: string
+}
+
+interface PointSeries {
+  name: string
+  value: number
+  unit: string
+  experimentPrefix: string
+  experimentTitle: string
 }
 
 interface OverlayProps {
@@ -283,8 +292,8 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
   useEffect(() => { setMetabolites(prev => { const n = [...prev]; n[2] = initMetabolites(datas[2]); return n }) }, [datas[2]])
 
   const processExpData = useCallback((
-    data: ExperimentDetail, selected: Record<string, boolean>, prefix: string,
-  ): DataPoint[] => {
+    data: ExperimentDetail, selected: Record<string, boolean>, prefix: string, title: string,
+  ): { plot: DataPoint[]; points: PointSeries[] } => {
     const productPoints = [
       ...data.products.map(p => ({ ...p, type: 'product' })),
       ...data.secondary_products.map(p => ({ ...p, type: 'secondary_product' })),
@@ -308,20 +317,57 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
           p.time_unit,
         ), timepoint: p.time,
         value: p.value, name: p.name, unit: p.unit, type: 'process_data', experimentPrefix: prefix,
+        dataType: p.data_type,
       }))
 
     const allPoints = [...productPoints, ...processPoints]
-    normalizeWallClockSeries(allPoints)
-    return allPoints.sort((a, b) => a.time - b.time)
+
+    // Partition by series name within this experiment.
+    const groups = new Map<string, DataPoint[]>()
+    for (const p of allPoints) {
+      if (!groups.has(p.name)) groups.set(p.name, [])
+      groups.get(p.name)!.push(p)
+    }
+
+    const plot: DataPoint[] = []
+    const points: PointSeries[] = []
+    for (const [name, rows] of groups) {
+      const allPoint = rows.every(r => r.dataType === 'point')
+      const anyPoint = rows.some(r => r.dataType === 'point')
+      if (allPoint) {
+        if (rows.length > 1) {
+          console.warn(`[Overlay] point series "${prefix}:${name}" has ${rows.length} rows; showing only the first`)
+        }
+        const first = rows[0]
+        points.push({ name, value: first.value, unit: first.unit, experimentPrefix: prefix, experimentTitle: title })
+      } else {
+        if (anyPoint) {
+          console.warn(`[Overlay] series "${prefix}:${name}" mixes 'point' and other data_types; rendering as time series`)
+        }
+        plot.push(...rows)
+      }
+    }
+
+    normalizeWallClockSeries(plot)
+    plot.sort((a, b) => a.time - b.time)
+    return { plot, points }
   }, [])
 
   const buildAllData = useCallback(() => {
     const all: DataPoint[] = []
     for (let i = 0; i < 3; i++) {
-      if (datas[i]) all.push(...processExpData(datas[i]!, metabolites[i], `Exp${i + 1}`))
+      if (datas[i]) all.push(...processExpData(datas[i]!, metabolites[i], `Exp${i + 1}`, exps[i]?.title ?? `Exp${i + 1}`).plot)
     }
     return all
-  }, [datas, metabolites, processExpData])
+  }, [datas, metabolites, exps, processExpData])
+
+  const buildAllPointSeries = useCallback((): PointSeries[] => {
+    const all: PointSeries[] = []
+    for (let i = 0; i < 3; i++) {
+      if (datas[i]) all.push(...processExpData(datas[i]!, metabolites[i], `Exp${i + 1}`, exps[i]?.title ?? `Exp${i + 1}`).points)
+    }
+    return all
+  }, [datas, metabolites, exps, processExpData])
 
   const buildColorMap = (groups: d3.InternMap<string, DataPoint[]>) => {
     const colorMap = new Map<string, string>()
@@ -409,7 +455,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
       .attr('width', tw).attr('height', th)
       .append('g').attr('transform', `translate(${margin.left},${margin.top})`)
 
-    const allData = buildAllData().filter(d => d.dataType !== 'continuous' && d.type !== 'process_data')
+    const allData = buildAllData().filter(d => d.dataType !== 'continuous' && d.dataType !== 'point' && d.type !== 'process_data')
 
     if (allData.length === 0) {
       svg.append('text').attr('x', w / 2).attr('y', h / 2)
@@ -625,6 +671,24 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
           <div className="overflow-x-auto overflow-y-hidden pb-3">
             <svg ref={svgRef} className="min-w-[500px]" />
           </div>
+          {(() => {
+            const points = buildAllPointSeries()
+            if (points.length === 0) return null
+            return (
+              <div className="mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50/50">
+                <div className="text-xs font-medium text-gray-500 mb-1.5">Single-point measurements</div>
+                <div className="flex flex-wrap gap-x-6 gap-y-1">
+                  {points.map((p, i) => (
+                    <div key={`${p.experimentPrefix}-${p.name}-${i}`} className="text-sm text-gray-700">
+                      <span className="text-gray-500">{p.experimentTitle} – </span>
+                      <span className="font-medium">{p.name}:</span>{' '}
+                      <span>{p.value}{p.unit ? ` ${p.unit}` : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 
