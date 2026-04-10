@@ -369,7 +369,7 @@ export function DataCategoryManager() {
     setCustomName(cat.name)
     setCustomUnit(cat.unit)
     setCustomOperandA(cat.formula_operand_a ?? '')
-    setCustomOperator((cat.formula_operator ?? '/') as Operator)
+    setCustomOperator(cat.formula_operator ?? '/')
     setCustomOperandB(cat.formula_operand_b ?? '')
     setCustomFormOpen(true)
     setCustomError('')
@@ -408,7 +408,7 @@ export function DataCategoryManager() {
         {TABS.map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => { setActiveTab(key); setIsAdding(false); setEditingId(null) }}
+            onClick={() => { setActiveTab(key); setIsAdding(false); setEditingId(null); resetCustomForm() }}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
               activeTab === key
                 ? 'border-b-2 border-[#eb5234] text-[#eb5234]'
@@ -781,7 +781,7 @@ export function DataCategoryManager() {
 
               {!customFormOpen && (
                 <button
-                  onClick={() => setCustomFormOpen(true)}
+                  onClick={() => { resetCustomForm(); setCustomFormOpen(true) }}
                   className="w-full border border-dashed border-gray-300 rounded-lg py-2 text-sm text-gray-500 hover:bg-gray-50 flex items-center justify-center gap-1"
                 >
                   <Plus className="h-4 w-4" /> Add Custom Category
