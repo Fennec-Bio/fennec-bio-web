@@ -98,8 +98,6 @@ const EXP_COLORS = [
   ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3', '#1b9e77', '#d95f02'],
 ]
 
-const EVENT_COLORS = ['#3b82f6', '#9333ea', '#059669']
-const ANOMALY_COLORS = ['#ef4444', '#f97316', '#eab308']
 const CHECKBOX_COLORS = ['text-blue-600', 'text-purple-600', 'text-emerald-600']
 
 function parseTimepoint(tp: string | number): number {
@@ -287,9 +285,12 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
     return defaults
   }
 
-  useEffect(() => { setMetabolites(prev => { const n = [...prev]; n[0] = initMetabolites(datas[0]); return n }) }, [datas[0]])
-  useEffect(() => { setMetabolites(prev => { const n = [...prev]; n[1] = initMetabolites(datas[1]); return n }) }, [datas[1]])
-  useEffect(() => { setMetabolites(prev => { const n = [...prev]; n[2] = initMetabolites(datas[2]); return n }) }, [datas[2]])
+  const data0 = datas[0]
+  const data1 = datas[1]
+  const data2 = datas[2]
+  useEffect(() => { setMetabolites(prev => { const n = [...prev]; n[0] = initMetabolites(data0); return n }) }, [data0])
+  useEffect(() => { setMetabolites(prev => { const n = [...prev]; n[1] = initMetabolites(data1); return n }) }, [data1])
+  useEffect(() => { setMetabolites(prev => { const n = [...prev]; n[2] = initMetabolites(data2); return n }) }, [data2])
 
   const processExpData = useCallback((
     data: ExperimentDetail, selected: Record<string, boolean>, prefix: string, title: string,
@@ -440,7 +441,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
       const label = unit ? `${key} (${unit})` : key
       g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '11px').text(label)
     })
-  }, [datas, metabolites, getGraphDimensions, buildAllData])
+  }, [datas, getGraphDimensions, buildAllData])
 
   const renderBarGraph = useCallback(() => {
     if (!svgRef.current || !datas.some(d => d)) return
@@ -503,12 +504,13 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
       const label = unit ? `${key} (${unit})` : key
       g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '11px').text(label)
     })
-  }, [datas, metabolites, getGraphDimensions, buildAllData])
+  }, [datas, getGraphDimensions, buildAllData])
 
   // Render on data/selection changes
   useEffect(() => {
     if (!svgRef.current) return
-    graphType === 'bar' ? renderBarGraph() : renderLineGraph()
+    if (graphType === 'bar') renderBarGraph()
+    else renderLineGraph()
   }, [datas, metabolites, graphType, renderLineGraph, renderBarGraph])
 
   // Debounced resize
@@ -518,7 +520,8 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
       clearTimeout(timeout)
       timeout = setTimeout(() => {
         if (svgRef.current && datas.some(d => d)) {
-          graphType === 'bar' ? renderBarGraph() : renderLineGraph()
+          if (graphType === 'bar') renderBarGraph()
+          else renderLineGraph()
         }
       }, 150)
     }
@@ -605,7 +608,7 @@ export function Overlay({ experiments, preselectedExperiments }: OverlayProps) {
 
       {/* Metabolites + graph type row */}
       <div className="flex gap-3 flex-wrap">
-        {expConfigs.map(({ metKey, idx, label }) => (
+        {expConfigs.map(({ metKey, idx }) => (
           <div key={metKey} className="relative overlay-dropdown">
             <button
               className="h-9 px-4 py-2 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all disabled:opacity-50"

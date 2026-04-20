@@ -65,7 +65,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }, [isSignedIn, getToken, activeProjectId])
+  }, [isSignedIn, getToken])
 
   useEffect(() => {
     refreshProjects()

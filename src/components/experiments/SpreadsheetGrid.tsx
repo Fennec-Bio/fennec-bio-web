@@ -71,7 +71,6 @@ interface SpreadsheetGridProps {
   readOnly?: boolean
   truncated?: boolean
   showAddRow?: boolean
-  showAddColumn?: boolean
   timeUnit?: string
   onTimeUnitChange?: (unit: string) => void
   collapseAfter?: number
@@ -90,7 +89,6 @@ export function SpreadsheetGrid({
   readOnly = false,
   truncated = false,
   showAddRow = false,
-  showAddColumn = false,
   timeUnit,
   onTimeUnitChange,
   collapseAfter,

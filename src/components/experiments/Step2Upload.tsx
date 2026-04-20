@@ -198,7 +198,7 @@ interface AccumulatedUpload {
   data: ClassifiedData
 }
 
-export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTemplates, dataCategories }: Step2UploadProps) {
+export function Step2Upload({ onClassified, onBack, onSkip, dataTemplates, dataCategories }: Step2UploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Built once per categories change; passed to the parser as the source of truth.
   const dataTypeLookup = React.useMemo(() => buildDataTypeLookup(dataCategories), [dataCategories])
@@ -316,9 +316,6 @@ export function Step2Upload({ onClassified, onBack, onSkip, projectId, dataTempl
   const totalItems = parsedData
     ? parsedData.products.length + parsedData.secondary_products.length + parsedData.process_data.length
     : 0
-
-  const accumulatedTotalItems = accumulatedUploads.reduce((sum, u) =>
-    sum + u.data.products.length + u.data.secondary_products.length + u.data.process_data.length, 0)
 
   // Build template info summary
   const templateSheets = selectedTemplate

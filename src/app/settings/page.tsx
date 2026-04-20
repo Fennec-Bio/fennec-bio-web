@@ -39,7 +39,7 @@ export default function Settings() {
   const [inviteStatus, setInviteStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null)
-  const { projects, activeProject, setActiveProjectId, refreshProjects } = useProjectContext()
+  const { projects, activeProject, setActiveProjectId } = useProjectContext()
   const { getToken } = useAuth()
   const [members, setMembers] = useState<OrgMember[]>([])
   const [removeStatus, setRemoveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -77,7 +77,7 @@ export default function Settings() {
       }
     }
     fetchMe()
-  }, [])
+  }, [getToken])
 
   useEffect(() => {
     if (!backendUser?.is_platform_staff) return
@@ -96,7 +96,7 @@ export default function Settings() {
       }
     }
     fetchOrgs()
-  }, [backendUser?.is_platform_staff])
+  }, [backendUser?.is_platform_staff, getToken])
 
   useEffect(() => {
     if (!isOrgLoaded || !organization || !isAdmin) return

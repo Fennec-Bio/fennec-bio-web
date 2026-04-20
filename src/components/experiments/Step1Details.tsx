@@ -696,6 +696,7 @@ export function Step1Details({
             <div className="flex gap-2 flex-wrap mt-2">
               {previewUrls.map((url, idx) => (
                 <div key={url} className="relative group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={url}
                     alt={`Attachment ${idx + 1}`}

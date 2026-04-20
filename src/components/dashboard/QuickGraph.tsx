@@ -177,7 +177,7 @@ function decimateData<T>(data: T[], maxPoints: number = 1000): T[] {
 // Simple in-memory cache so switching between experiments is instant on revisit
 const experimentCache = new Map<string, ExperimentDetail>()
 
-export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments, defaultExperiment, resetKey = null, prefetchedData }: QuickGraphProps) {
+export function QuickGraph({ selectedExperiment, experiments, defaultExperiment, resetKey = null, prefetchedData }: QuickGraphProps) {
   const { getToken } = useAuth()
   const [experimentData, setExperimentData] = useState<ExperimentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -191,7 +191,6 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   const [graphTypeOpen, setGraphTypeOpen] = useState(false)
   const [selectedMetabolites, setSelectedMetabolites] = useState<Record<string, boolean>>({})
   const [manualExperiment, setManualExperiment] = useState<Experiment | null>(defaultExperiment ?? null)
-  const [currentTitle, setCurrentTitle] = useState<string | null>(null)
 
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -210,7 +209,6 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   useEffect(() => {
     if (prefetchedData) return
     setExperimentData(null)
-    setCurrentTitle(null)
     setSelectedMetabolites({})
     setManualExperiment(defaultExperiment ?? null)
     prevUniqueRef.current = ''
@@ -266,7 +264,6 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       unique_names: prefetchedData.unique_names,
     }
     setExperimentData(full)
-    setCurrentTitle(title)
     setIsLoading(false)
     setIsLoadingExtra(false)
   }, [prefetchedData, activeExperiment])
@@ -282,7 +279,6 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     const cached = experimentCache.get(cacheKey)
     if (cached) {
       setExperimentData(cached)
-      setCurrentTitle(title)
       setIsLoading(false)
       setIsLoadingExtra(false)
       return
@@ -292,7 +288,6 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     if (fetchingTitleRef.current === cacheKey) return
 
     fetchingTitleRef.current = cacheKey
-    setCurrentTitle(title)
 
     const encodedTitle = encodeURIComponent(title)
     // Pass ?id= so the backend disambiguates when multiple experiments share
@@ -613,7 +608,8 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
   // Re-render graph when data/selections/type change
   useEffect(() => {
     if (!experimentData || !svgRef.current) return
-    graphType === 'bar' ? renderBarGraph() : renderLineGraph()
+    if (graphType === 'bar') renderBarGraph()
+    else renderLineGraph()
   }, [experimentData, selectedMetabolites, graphType, showEvents, showAnomalies, renderLineGraph, renderBarGraph])
 
   // Debounced resize
@@ -623,7 +619,8 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       clearTimeout(timeout)
       timeout = setTimeout(() => {
         if (experimentData && svgRef.current) {
-          graphType === 'bar' ? renderBarGraph() : renderLineGraph()
+          if (graphType === 'bar') renderBarGraph()
+          else renderLineGraph()
         }
       }, 150)
     }

@@ -68,8 +68,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     anomalies: []
   })
 
-  const [strainNames, setStrainNames] = useState<string[]>([])
-
   const [viewMode, setViewMode] = useState<'experiments' | 'sets'>('experiments')
   const [experimentSets, setExperimentSets] = useState<ExperimentSetData[]>([])
   const [expandedSets, setExpandedSets] = useState<Set<string>>(new Set())
@@ -254,24 +252,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
       }
     }
     fetchUniqueNames()
-    const fetchStrains = async () => {
-      try {
-        const token = await getToken()
-        const params = new URLSearchParams()
-        if (activeProject) params.append('project_id', activeProject.id.toString())
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/strain-lineage/?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          const names: string[] = (data.strains || []).map((s: { name: string }) => s.name)
-          setStrainNames(names.sort((a, b) => a.localeCompare(b)))
-        }
-      } catch {
-        // Non-critical
-      }
-    }
-    fetchStrains()
 
     const fetchMediaTree = async () => {
       try {
@@ -327,7 +307,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
   // changes the page itself, otherwise pagination clicks get stomped back to 1.
   useEffect(() => {
     setCurrentPage(1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [currentSortBy, currentSortOrder, activeFilters, activeProject])
 
   // Auto-select the first experiment only on initial load and when the user

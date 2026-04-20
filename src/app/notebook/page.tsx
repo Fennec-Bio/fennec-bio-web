@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import * as d3 from 'd3'
@@ -361,7 +361,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
       const label = unit ? `${name} (${unit})` : name
       g.append('text').attr('x', 16).attr('y', 9).attr('font-size', '12px').text(label)
     })
-  }, [data, selected, buildDataPoints, getGraphDimensions])
+  }, [data, buildDataPoints, getGraphDimensions])
 
   useEffect(() => { renderGraph() }, [renderGraph])
 
@@ -700,6 +700,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
                     return (
                       <div key={img.id} className="group relative overflow-hidden rounded-lg border border-gray-200 bg-white hover:shadow-md transition-shadow">
                         <a href={src} target="_blank" rel="noopener noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={src}
                             alt={img.filename}
@@ -788,6 +789,7 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
                 <div key={comment.id} className="group bg-white rounded-lg p-3 border border-gray-200">
                   <div className="flex items-start gap-2">
                     {comment.author_picture ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={comment.author_picture} alt="" className="w-7 h-7 rounded-full shrink-0" />
                     ) : (
                       <div className="w-7 h-7 rounded-full bg-gray-300 shrink-0 flex items-center justify-center text-xs font-medium text-gray-600">

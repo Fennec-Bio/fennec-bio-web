@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
-import { Plus, Pencil, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, X } from 'lucide-react'
 
 interface ColumnMapping {
   column: string

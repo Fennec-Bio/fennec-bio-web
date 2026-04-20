@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import * as d3 from 'd3'
@@ -128,7 +128,7 @@ export function VariableImpact() {
     if (selectedProduct) fetchData(selectedProduct)
   }, [selectedProduct, fetchData])
 
-  const impacts = data?.impacts ?? []
+  const impacts = useMemo(() => data?.impacts ?? [], [data?.impacts])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -191,7 +191,7 @@ export function VariableImpact() {
 
   // Render box plot
   const selectedImpact = impacts.find(i => i.variable === selectedVariable)
-  const groupedData = selectedImpact?.group_data ?? []
+  const groupedData = useMemo(() => selectedImpact?.group_data ?? [], [selectedImpact?.group_data])
 
   useEffect(() => {
     if (!boxplotRef.current || !selectedVariable || groupedData.length === 0) return

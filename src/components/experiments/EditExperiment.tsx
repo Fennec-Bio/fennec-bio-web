@@ -1392,6 +1392,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
             <div className="flex gap-2 flex-wrap mt-2">
               {noteImages.map((img) => (
                 <div key={img.id} className="relative group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={img.gcs_url.startsWith('http') ? img.gcs_url : `${apiUrl}${img.gcs_url}`}
                     alt={img.filename}

@@ -135,7 +135,7 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
 
   useEffect(() => {
     setCurrentPage(1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [currentSortBy, currentSortOrder, activeFilters, activeProject])
 
   useEffect(() => {
