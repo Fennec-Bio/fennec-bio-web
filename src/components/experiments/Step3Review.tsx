@@ -279,6 +279,11 @@ export function Step3Review({
             onExperimentNoteChange={onExperimentNoteChange}
             noteImages={noteImages}
             onNoteImagesChange={onNoteImagesChange}
+            mediaOptions={[]}
+            batchMediaId={null}
+            onBatchMediaChange={() => {}}
+            feedMediaId={null}
+            onFeedMediaChange={() => {}}
           />
         )}
 

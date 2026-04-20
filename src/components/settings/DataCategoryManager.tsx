@@ -6,23 +6,36 @@ import { useProjectContext } from '@/hooks/useProjectContext'
 import { Plus, Pencil, Trash2, X, Check, ArrowRightLeft } from 'lucide-react'
 
 type DataType = 'discrete' | 'continuous' | 'point'
+type Operator = '+' | '-' | '*' | '/'
 
 interface DataCategory {
   id: number
   project: number
-  category: 'product' | 'secondary_product' | 'process_data'
+  category: 'product' | 'secondary_product' | 'process_data' | 'custom'
   name: string
   unit: string
   data_type: DataType
+  formula_operand_a: number | null
+  formula_operand_b: number | null
+  formula_operator: Operator | null
+  is_stale: boolean
 }
 
-type CategoryTab = 'product' | 'secondary_product' | 'process_data'
+type CategoryTab = 'product' | 'secondary_product' | 'process_data' | 'custom'
 
 const TABS: { key: CategoryTab; label: string }[] = [
   { key: 'product', label: 'Products' },
   { key: 'secondary_product', label: 'Secondary Products' },
   { key: 'process_data', label: 'Process Data' },
+  { key: 'custom', label: 'Custom' },
 ]
+
+const OPERATOR_LABELS: Record<Operator, string> = {
+  '+': '+',
+  '-': '−',
+  '*': '×',
+  '/': '÷',
+}
 
 const DATA_TYPE_OPTIONS: { value: DataType; label: string }[] = [
   { value: 'discrete', label: 'Discrete' },
@@ -68,6 +81,28 @@ export function DataCategoryManager() {
   const [addDataType, setAddDataType] = useState<DataType>('discrete')
   const [addError, setAddError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
+  // Custom-tab add/edit form state
+  const [customFormOpen, setCustomFormOpen] = useState(false)
+  const [customFormEditId, setCustomFormEditId] = useState<number | null>(null)
+  const [customName, setCustomName] = useState('')
+  const [customUnit, setCustomUnit] = useState('')
+  const [customOperandA, setCustomOperandA] = useState<number | ''>('')
+  const [customOperator, setCustomOperator] = useState<Operator>('/')
+  const [customOperandB, setCustomOperandB] = useState<number | ''>('')
+  const [customError, setCustomError] = useState('')
+  const [isSavingCustom, setIsSavingCustom] = useState(false)
+
+  const resetCustomForm = () => {
+    setCustomFormOpen(false)
+    setCustomFormEditId(null)
+    setCustomName('')
+    setCustomUnit('')
+    setCustomOperandA('')
+    setCustomOperator('/')
+    setCustomOperandB('')
+    setCustomError('')
+  }
 
   // Inline edit state
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -273,6 +308,88 @@ export function DataCategoryManager() {
     }
   }
 
+  const handleCustomSave = async () => {
+    if (!activeProject) return
+    if (!customName.trim() || !customUnit.trim() || customOperandA === '' || customOperandB === '') {
+      setCustomError('All fields are required')
+      return
+    }
+    setIsSavingCustom(true)
+    setCustomError('')
+    try {
+      const token = await getToken()
+      const isEdit = customFormEditId !== null
+      const url = isEdit
+        ? `${apiUrl}/api/data-categories/custom/${customFormEditId}/`
+        : `${apiUrl}/api/data-categories/custom/`
+      const body = isEdit
+        ? {
+            name: customName.trim(),
+            unit: customUnit.trim(),
+            operand_a_id: customOperandA,
+            operator: customOperator,
+            operand_b_id: customOperandB,
+          }
+        : {
+            project_id: activeProject.id,
+            name: customName.trim(),
+            unit: customUnit.trim(),
+            operand_a_id: customOperandA,
+            operator: customOperator,
+            operand_b_id: customOperandB,
+          }
+      const res = await fetch(url, {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        const saved: DataCategory = await res.json()
+        setCategories(prev => isEdit
+          ? prev.map(c => c.id === saved.id ? saved : c)
+          : [...prev, saved]
+        )
+        resetCustomForm()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setCustomError(data.error || 'Failed to save')
+      }
+    } catch {
+      setCustomError('Failed to save')
+    } finally {
+      setIsSavingCustom(false)
+    }
+  }
+
+  const startEditCustom = (cat: DataCategory) => {
+    setCustomFormEditId(cat.id)
+    setCustomName(cat.name)
+    setCustomUnit(cat.unit)
+    setCustomOperandA(cat.formula_operand_a ?? '')
+    setCustomOperator(cat.formula_operator ?? '/')
+    setCustomOperandB(cat.formula_operand_b ?? '')
+    setCustomFormOpen(true)
+    setCustomError('')
+  }
+
+  const handleDeleteCustom = async (id: number) => {
+    try {
+      const token = await getToken()
+      const res = await fetch(`${apiUrl}/api/data-categories/custom/${id}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        setCategories(prev => prev.filter(c => c.id !== id))
+      }
+    } catch {
+      // silently fail
+    }
+  }
+
   const startEdit = (cat: DataCategory) => {
     setEditingId(cat.id)
     setEditName(cat.name)
@@ -291,7 +408,7 @@ export function DataCategoryManager() {
         {TABS.map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => { setActiveTab(key); setIsAdding(false); setEditingId(null) }}
+            onClick={() => { setActiveTab(key); setIsAdding(false); setEditingId(null); resetCustomForm() }}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
               activeTab === key
                 ? 'border-b-2 border-[#eb5234] text-[#eb5234]'
@@ -313,6 +430,8 @@ export function DataCategoryManager() {
         </div>
       ) : (
         <>
+          {activeTab !== 'custom' && (
+            <>
           {/* List */}
           {filtered.length === 0 && !isAdding && (
             <div className="text-center py-8 text-gray-500">
@@ -490,6 +609,186 @@ export function DataCategoryManager() {
               <Plus className="h-4 w-4" /> Add {TABS.find(t => t.key === activeTab)?.label.replace(/s$/, '')}
             </button>
           )}
+            </>
+          )}
+
+          {activeTab === 'custom' && (
+            <>
+              {/* Custom rows list */}
+              {filtered.length === 0 && !customFormOpen && (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="text-sm">No custom data categories defined yet.</p>
+                </div>
+              )}
+
+              {filtered.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
+                  <div className="grid grid-cols-[1fr_240px_120px_96px] gap-0 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                    <span>Name</span><span>Formula</span><span>Unit</span><span />
+                  </div>
+                  {filtered.map(cat => {
+                    const opA = categories.find(c => c.id === cat.formula_operand_a)
+                    const opB = categories.find(c => c.id === cat.formula_operand_b)
+                    const formula = opA && opB && cat.formula_operator
+                      ? `${opA.name} ${OPERATOR_LABELS[cat.formula_operator]} ${opB.name}`
+                      : '—'
+                    return (
+                      <div
+                        key={cat.id}
+                        className="grid grid-cols-[1fr_240px_120px_96px] gap-0 px-4 py-2 border-t border-gray-100 items-center"
+                      >
+                        <span className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          {cat.name}
+                          {cat.is_stale && (
+                            <span
+                              title="recomputing…"
+                              className="inline-block w-2 h-2 rounded-full bg-gray-400"
+                            />
+                          )}
+                        </span>
+                        <span className="text-sm text-gray-700 truncate">{formula}</span>
+                        <span className="text-sm text-gray-500">{cat.unit}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => startEditCustom(cat)}
+                            className="text-gray-400 hover:text-[#eb5234]"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => { setDeleteTarget(cat); setDeleteConfirmText('') }}
+                            className="text-gray-400 hover:text-red-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Custom create/edit form */}
+              {customFormOpen && (
+                <div className="border border-gray-200 rounded-lg p-4 mb-3 space-y-3">
+                  {customError && (
+                    <div className="text-red-600 bg-red-50 p-2 rounded text-sm">{customError}</div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={customName}
+                      onChange={e => setCustomName(e.target.value)}
+                      placeholder="e.g. CBDa per Olivetol"
+                      className={inputClass}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Operand A</label>
+                      <select
+                        value={customOperandA}
+                        onChange={e => setCustomOperandA(e.target.value === '' ? '' : Number(e.target.value))}
+                        className={inputClass}
+                      >
+                        <option value="">Select...</option>
+                        {(['product', 'secondary_product', 'process_data'] as const).map(group => {
+                          const items = categories.filter(c => c.category === group)
+                          if (items.length === 0) return null
+                          const groupLabel = TABS.find(t => t.key === group)?.label ?? group
+                          return (
+                            <optgroup key={group} label={groupLabel}>
+                              {items.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </optgroup>
+                          )
+                        })}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Op</label>
+                      <div className="flex gap-1">
+                        {(['+', '-', '*', '/'] as const).map(op => (
+                          <button
+                            key={op}
+                            type="button"
+                            onClick={() => setCustomOperator(op)}
+                            className={`h-9 w-9 text-sm border rounded-md ${
+                              customOperator === op
+                                ? 'border-[#eb5234] text-[#eb5234] bg-orange-50'
+                                : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {OPERATOR_LABELS[op]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Operand B</label>
+                      <select
+                        value={customOperandB}
+                        onChange={e => setCustomOperandB(e.target.value === '' ? '' : Number(e.target.value))}
+                        className={inputClass}
+                      >
+                        <option value="">Select...</option>
+                        {(['product', 'secondary_product', 'process_data'] as const).map(group => {
+                          const items = categories.filter(c => c.category === group)
+                          if (items.length === 0) return null
+                          const groupLabel = TABS.find(t => t.key === group)?.label ?? group
+                          return (
+                            <optgroup key={group} label={groupLabel}>
+                              {items.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </optgroup>
+                          )
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                    <input
+                      type="text"
+                      value={customUnit}
+                      onChange={e => setCustomUnit(e.target.value)}
+                      placeholder="e.g. ratio, %, g/g"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCustomSave}
+                      disabled={isSavingCustom}
+                      className="h-9 px-4 text-sm font-medium text-white rounded-md hover:opacity-90 disabled:opacity-50 transition-all"
+                      style={{ backgroundColor: '#eb5234' }}
+                    >
+                      {isSavingCustom ? 'Saving...' : (customFormEditId !== null ? 'Save' : 'Add')}
+                    </button>
+                    <button
+                      onClick={resetCustomForm}
+                      className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-md hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!customFormOpen && (
+                <button
+                  onClick={() => { resetCustomForm(); setCustomFormOpen(true) }}
+                  className="w-full border border-dashed border-gray-300 rounded-lg py-2 text-sm text-gray-500 hover:bg-gray-50 flex items-center justify-center gap-1"
+                >
+                  <Plus className="h-4 w-4" /> Add Custom Category
+                </button>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -545,7 +844,7 @@ export function DataCategoryManager() {
                 to which type?
               </p>
               <div className="flex flex-col gap-2">
-                {TABS.filter(t => t.key !== cat.category).map(t => (
+                {TABS.filter(t => t.key !== cat.category && t.key !== 'custom').map(t => (
                   <button
                     key={t.key}
                     onClick={() => {
@@ -593,7 +892,11 @@ export function DataCategoryManager() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={async () => {
-                  await handleDelete(deleteTarget.id)
+                  if (deleteTarget.category === 'custom') {
+                    await handleDeleteCustom(deleteTarget.id)
+                  } else {
+                    await handleDelete(deleteTarget.id)
+                  }
                   setDeleteTarget(null)
                   setDeleteConfirmText('')
                 }}

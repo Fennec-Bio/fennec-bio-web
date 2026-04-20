@@ -2,6 +2,12 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 
+interface MediaOption {
+  id: number
+  name: string
+  media_type: 'defined' | 'complex'
+}
+
 interface Step1DetailsProps {
   title: string
   onTitleChange: (title: string) => void
@@ -27,6 +33,11 @@ interface Step1DetailsProps {
   onExperimentNoteChange: (note: string) => void
   noteImages: File[]
   onNoteImagesChange: (images: File[]) => void
+  mediaOptions: MediaOption[]
+  batchMediaId: number | null
+  onBatchMediaChange: (id: number | null) => void
+  feedMediaId: number | null
+  onFeedMediaChange: (id: number | null) => void
   extractEventsWithAI?: boolean
   onExtractEventsWithAIChange?: (val: boolean) => void
   extractAnomaliesWithAI?: boolean
@@ -65,6 +76,11 @@ export function Step1Details({
   onExperimentNoteChange,
   noteImages,
   onNoteImagesChange,
+  mediaOptions,
+  batchMediaId,
+  onBatchMediaChange,
+  feedMediaId,
+  onFeedMediaChange,
   extractEventsWithAI = false,
   onExtractEventsWithAIChange,
   extractAnomaliesWithAI = false,
@@ -282,6 +298,52 @@ export function Step1Details({
             <option key={s} value={s}>{s}</option>
           ))}
           <option value="__add_new_strain__">Add New...</option>
+        </select>
+      </div>
+
+      {/* ---- Batch Media ---- */}
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Batch Media</label>
+        <select
+          value={batchMediaId ?? ''}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '__add_new_media__') {
+              window.open('/media', '_blank')
+            } else {
+              onBatchMediaChange(val === '' ? null : Number(val))
+            }
+          }}
+          className={selectClass}
+        >
+          <option value="">None</option>
+          {mediaOptions.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+          <option value="__add_new_media__">Add New...</option>
+        </select>
+      </div>
+
+      {/* ---- Feed Media ---- */}
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Feed Media</label>
+        <select
+          value={feedMediaId ?? ''}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '__add_new_media__') {
+              window.open('/media', '_blank')
+            } else {
+              onFeedMediaChange(val === '' ? null : Number(val))
+            }
+          }}
+          className={selectClass}
+        >
+          <option value="">None</option>
+          {mediaOptions.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+          <option value="__add_new_media__">Add New...</option>
         </select>
       </div>
 

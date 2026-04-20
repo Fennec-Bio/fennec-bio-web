@@ -58,6 +58,7 @@ interface ExperimentDetail {
   products: Product[]
   secondary_products: Product[]
   process_data: ProcessData[]
+  custom: Product[]
   variables: Variable[]
   events: Event[]
   anomalies: Anomaly[]
@@ -67,6 +68,7 @@ interface ExperimentDetail {
     products?: string[]
     secondary_products?: string[]
     process_data?: string[]
+    custom?: string[]
   }
 }
 
@@ -255,6 +257,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       products: prefetchedData.products || [],
       secondary_products: prefetchedData.secondary_products || [],
       process_data: prefetchedData.process_data || [],
+      custom: prefetchedData.custom || [],
       variables: prefetchedData.variables || [],
       events: prefetchedData.events || [],
       anomalies: prefetchedData.anomalies || [],
@@ -294,7 +297,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     const encodedTitle = encodeURIComponent(title)
     // Pass ?id= so the backend disambiguates when multiple experiments share
     // a title within the same org (no DB-level uniqueness on title).
-    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodedTitle}/?id=${activeExperiment.id}&fields=products,secondary_products,process_data,variables,events,anomalies,note_images,comments,unique_names&max_points=200`
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/experiment/title/${encodedTitle}/?id=${activeExperiment.id}&fields=products,secondary_products,process_data,custom,variables,events,anomalies,note_images,comments,unique_names&max_points=200`
 
     const fetchData = async () => {
       setIsLoading(true)
@@ -311,6 +314,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
           products: data.products || [],
           secondary_products: data.secondary_products || [],
           process_data: data.process_data || [],
+          custom: data.custom || [],
           variables: data.variables || [],
           events: data.events || [],
           anomalies: data.anomalies || [],
@@ -341,6 +345,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       ...(experimentData.unique_names.products || []),
       ...(experimentData.unique_names.secondary_products || []),
       ...(experimentData.unique_names.process_data || []),
+      ...(experimentData.unique_names.custom || []),
     ]
     const key = allNames.join(',')
     if (key === prevUniqueRef.current) return
@@ -351,6 +356,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
       experimentData.unique_names?.products?.forEach(n => { if (!(n in next)) next[n] = true })
       experimentData.unique_names?.secondary_products?.forEach(n => { if (!(n in next)) next[n] = false })
       experimentData.unique_names?.process_data?.forEach(n => { if (!(n in next)) next[n] = false })
+      experimentData.unique_names?.custom?.forEach(n => { if (!(n in next)) next[n] = false })
       return next
     })
   }, [experimentData])
@@ -376,6 +382,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     const productData = [
       ...experimentData.products.map(p => ({ ...p, type: 'product' })),
       ...experimentData.secondary_products.map(p => ({ ...p, type: 'secondary_product' })),
+      ...(experimentData.custom ?? []).map(p => ({ ...p, type: 'custom' })),
     ]
       .filter(p => selectedMetabolites[p.name])
       .map(p => {
@@ -554,6 +561,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
     const barData = [
       ...experimentData.products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous' && p.data_type !== 'point').map(p => ({ ...p, type: 'product' })),
       ...experimentData.secondary_products.filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous' && p.data_type !== 'point').map(p => ({ ...p, type: 'secondary_product' })),
+      ...(experimentData.custom ?? []).filter(p => selectedMetabolites[p.name] && p.data_type !== 'continuous' && p.data_type !== 'point').map(p => ({ ...p, type: 'custom' })),
     ].map(p => ({ time: normalizeToHours(parseTimepoint(p.timepoint), p.time_unit), value: p.value, name: p.name, unit: p.unit, type: p.type }))
 
     const timepoints = [...new Set(barData.map(p => p.time))].sort((a, b) => a - b)
@@ -711,6 +719,7 @@ export function QuickGraph({ selectedExperiment, onExperimentSelect, experiments
                 { label: 'Products', items: experimentData.unique_names?.products },
                 { label: 'Secondary Products', items: experimentData.unique_names?.secondary_products },
                 { label: 'Process Data', items: experimentData.unique_names?.process_data },
+                { label: 'Custom', items: experimentData.unique_names?.custom },
               ] as const).map(section => (
                 section.items && section.items.length > 0 && (
                   <div key={section.label} className="p-3 border-b border-gray-200 last:border-b-0">
