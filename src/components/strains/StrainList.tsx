@@ -71,6 +71,7 @@ export function StrainList({ onStrainSelect, selectedStrain, isMobileDrawer = fa
 
   // Reset to page 1 when filter/sort changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1)
   }, [filterText, sortOption])
 

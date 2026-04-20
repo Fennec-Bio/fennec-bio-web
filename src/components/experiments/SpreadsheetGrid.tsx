@@ -113,6 +113,7 @@ export function SpreadsheetGrid({
   useEffect(() => {
     if (prevNamesRef.current !== grid.names) {
       prevNamesRef.current = grid.names
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsCollapsed(true)
     }
   }, [grid.names])

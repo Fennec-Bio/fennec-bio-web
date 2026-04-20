@@ -887,6 +887,7 @@ function NotebookContent() {
     const title = searchParams.get('experiment')
     if (title && experiments.length > 0 && !selectedExperiment) {
       const match = experiments.find(e => e.title === title)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (match) setSelectedExperiment(match)
     }
   }, [searchParams, experiments, selectedExperiment])

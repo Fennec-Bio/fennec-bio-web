@@ -32,6 +32,7 @@ export function StrainLineageChart({ selectedStrain, strains, availableProducts,
   // Set default product when availableProducts changes
   useEffect(() => {
     const defaultProd = availableProducts.find(p => p !== 'total') || 'total'
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedProduct(defaultProd)
   }, [availableProducts])
 

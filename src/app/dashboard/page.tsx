@@ -89,6 +89,7 @@ export default function Dashboard() {
   // needs to be re-captured from the next experiments list to arrive.
   useEffect(() => {
     expectingFreshDefaultRef.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRightGraphDefault(null)
   }, [activeProject?.id])
 

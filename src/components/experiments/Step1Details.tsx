@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 
 interface Step1DetailsProps {
   title: string
@@ -75,16 +75,18 @@ export function Step1Details({
   // Ref for hidden image file input
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Object URLs for image previews — cleaned up on unmount or when images change
-  const [previewUrls, setPreviewUrls] = useState<string[]>([])
-
+  // Object URLs for image previews. Derived via useMemo so the URL set tracks
+  // noteImages directly; the matching useEffect below only handles cleanup
+  // (revoking the URLs) — no setState in effect.
+  const previewUrls = useMemo(
+    () => noteImages.map((f) => URL.createObjectURL(f)),
+    [noteImages],
+  )
   useEffect(() => {
-    const urls = noteImages.map((f) => URL.createObjectURL(f))
-    setPreviewUrls(urls)
     return () => {
-      urls.forEach((u) => URL.revokeObjectURL(u))
+      previewUrls.forEach((u) => URL.revokeObjectURL(u))
     }
-  }, [noteImages])
+  }, [previewUrls])
 
   // Track which variable name/value cells are in free-text mode
   const [varNameFree, setVarNameFree] = useState<FreeTextState>({})

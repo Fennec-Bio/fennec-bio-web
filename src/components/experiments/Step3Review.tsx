@@ -170,7 +170,7 @@ export function Step3Review({
     const valueOrZero = isNaN(numVal) ? 0 : numVal
     onDataChange({
       ...classifiedData,
-      [category]: classifiedData[category].map((item: any) => {
+      [category]: (classifiedData[category] as { column_header: string; data: unknown[] }[]).map((item) => {
         if (item.column_header !== columnHeader) return item
         const row = category === 'process_data'
           ? { time: '0', value: valueOrZero }
