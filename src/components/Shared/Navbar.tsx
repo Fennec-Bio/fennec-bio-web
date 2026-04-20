@@ -27,6 +27,7 @@ export const Navbar = ({ onMenuToggle, isMenuOpen }: NavbarProps) => {
     { href: '/experiments', label: 'Experiments' },
     { href: '/notebook', label: 'Notebook' },
     { href: '/strains', label: 'Strains' },
+    { href: '/media', label: 'Media' },
     { href: '/literature', label: 'Literature' },
     { href: '/settings', label: 'Settings' },
   ]

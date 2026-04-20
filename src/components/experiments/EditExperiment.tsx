@@ -14,6 +14,8 @@ interface Experiment {
   experiment_note?: string
   date?: string | null
   benchmark: string
+  batch_media?: number | null
+  feed_media?: number | null
   created_at: string
   updated_at: string
 }
@@ -175,6 +177,9 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [strainNames, setStrainNames] = useState<string[]>([])
   const [selectedStrain, setSelectedStrain] = useState('')
+  const [mediaOptions, setMediaOptions] = useState<{ id: number; name: string; media_type: 'defined' | 'complex' }[]>([])
+  const [editBatchMediaId, setEditBatchMediaId] = useState<number | null>(null)
+  const [editFeedMediaId, setEditFeedMediaId] = useState<number | null>(null)
 
   // Unique names for dropdowns
   const [uniqueNames, setUniqueNames] = useState<{
@@ -282,10 +287,26 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       }
     }
 
+    const fetchMediaOptions = async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch(`${apiUrl}/api/media/options/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setMediaOptions(data.media ?? [])
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+
     fetchUniqueNames()
     fetchTemplates()
     fetchStrains()
     fetchDataCategories()
+    fetchMediaOptions()
   }, [getToken, apiUrl, activeProject])
 
   useEffect(() => {
@@ -309,6 +330,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       setEventNameFree({})
       setAnomalyNameFree({})
       setSelectedStrain('')
+      setEditBatchMediaId(null)
+      setEditFeedMediaId(null)
       return
     }
     let cancelled = false
@@ -335,6 +358,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           setEditTitle(detail.experiment.title)
           setEditDate(detail.experiment.date || '')
           setEditNote(detail.experiment.experiment_note || '')
+          setEditBatchMediaId(detail.experiment.batch_media ?? null)
+          setEditFeedMediaId(detail.experiment.feed_media ?? null)
           setEditVariables(detail.variables.map(v => ({ name: v.name, value: v.value })))
           const strainVar = detail.variables.find(v => v.name.toLowerCase() === 'strain')
           setSelectedStrain(strainVar?.value || '')
@@ -671,6 +696,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           title: editTitle,
           date: editDate || null,
           experiment_note: editNote,
+          batch_media_id: editBatchMediaId,
+          feed_media_id: editFeedMediaId,
           variables: editVariables,
           events: editEvents,
           anomalies: editAnomalies,
@@ -1041,6 +1068,54 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
               <option key={s} value={s}>{s}</option>
             ))}
             <option value="__add_new_strain__">Add New...</option>
+          </select>
+        </div>
+
+        {/* Batch Media */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Batch Media</label>
+          <select
+            value={editBatchMediaId ?? ''}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '__add_new_media__') {
+                window.open('/media', '_blank')
+              } else {
+                setEditBatchMediaId(val === '' ? null : Number(val))
+                markChanged()
+              }
+            }}
+            className={inputClass}
+          >
+            <option value="">None</option>
+            {mediaOptions.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+            <option value="__add_new_media__">Add New...</option>
+          </select>
+        </div>
+
+        {/* Feed Media */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Feed Media</label>
+          <select
+            value={editFeedMediaId ?? ''}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '__add_new_media__') {
+                window.open('/media', '_blank')
+              } else {
+                setEditFeedMediaId(val === '' ? null : Number(val))
+                markChanged()
+              }
+            }}
+            className={inputClass}
+          >
+            <option value="">None</option>
+            {mediaOptions.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+            <option value="__add_new_media__">Add New...</option>
           </select>
         </div>
 

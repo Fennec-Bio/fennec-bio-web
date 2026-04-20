@@ -409,13 +409,17 @@ export function SpreadsheetGrid({
                   ? availableNamesForColumn(colIdx)
                   : null
                 return (
-                  <th key={`${name}-${colIdx}`} className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[100px]">
-                    <div className="flex items-center justify-end gap-1">
+                  <th key={`${name}-${colIdx}`} className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase border border-gray-200 min-w-[140px]">
+                    <div className="flex items-center justify-end gap-1.5">
                       {renameOptions ? (
                         <select
                           value={name}
                           onChange={e => onRenameColumn!(colIdx, e.target.value)}
-                          className="bg-transparent text-xs font-semibold text-gray-500 uppercase cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 rounded max-w-[140px]"
+                          className="appearance-none bg-white border border-gray-300 rounded-md px-2.5 py-1 pr-6 text-xs font-semibold text-gray-700 uppercase cursor-pointer shadow-xs hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors max-w-[160px] bg-no-repeat bg-right"
+                          style={{
+                            backgroundImage: "url(\"data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
+                            backgroundPosition: 'right 6px center',
+                          }}
                           title="Rename column"
                         >
                           <option value={name}>{name}</option>
@@ -430,7 +434,7 @@ export function SpreadsheetGrid({
                         <button
                           type="button"
                           onClick={() => onDeleteColumn(colIdx)}
-                          className="text-gray-400 hover:text-red-500 leading-none px-1"
+                          className="flex items-center justify-center w-6 h-6 text-base text-gray-500 hover:text-white hover:bg-red-500 border border-gray-300 hover:border-red-500 rounded-md shadow-xs transition-colors leading-none"
                           aria-label={`Delete column ${name}`}
                           title={`Delete column ${name}`}
                         >

@@ -89,6 +89,8 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     event_name?: string
     keyword?: string
     has_anomaly?: string
+    batch_media?: { id: number; name: string }
+    feed_media?: { id: number; name: string }
   }>({})
 
   // Filter dropdown variables
@@ -97,7 +99,41 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
   const [anomaliesMenu, setAnomaliesMenu] = useState(false)
   const [eventsMenu, setEventsMenu] = useState(false)
   const [keywordMenu, setKeywordMenu] = useState(false)
+  const [strainMenu, setStrainMenu] = useState(false)
   const [variableValuesMenu, setVariableValuesMenu] = useState<string | null>(null)
+
+  // Media filter dropdown state — three levels deep (slot → section → component → media)
+  type MediaSlot = 'batch' | 'feed'
+  type MediaSection = 'most_recent' | 'most_common' | 'by_carbon_source' | 'by_nitrogen_source' | 'by_complex_component' | 'all'
+  interface MediaTreeEntry { id: number; name: string }
+  interface MediaTreeGroup { name: string; media: MediaTreeEntry[] }
+  interface MediaTreeSlot {
+    most_recent: MediaTreeEntry[]
+    most_common: MediaTreeEntry[]
+    by_carbon_source: MediaTreeGroup[]
+    by_nitrogen_source: MediaTreeGroup[]
+    by_complex_component: MediaTreeGroup[]
+    all: MediaTreeEntry[]
+  }
+  const emptySlot: MediaTreeSlot = {
+    most_recent: [], most_common: [],
+    by_carbon_source: [], by_nitrogen_source: [],
+    by_complex_component: [], all: [],
+  }
+  const [mediaTree, setMediaTree] = useState<{ batch: MediaTreeSlot; feed: MediaTreeSlot }>({
+    batch: emptySlot, feed: emptySlot,
+  })
+  const [openMediaSlot, setOpenMediaSlot] = useState<MediaSlot | null>(null)
+  const [openMediaSection, setOpenMediaSection] = useState<MediaSection | null>(null)
+  const [openMediaComponent, setOpenMediaComponent] = useState<string | null>(null)
+
+  // Strain filter tree — mirrors the media menu's most_recent / most_common / all shape
+  type StrainSection = 'most_recent' | 'most_common' | 'all'
+  const [strainTree, setStrainTree] = useState<{ most_recent: string[]; most_common: string[]; all: string[] }>({
+    most_recent: [], most_common: [], all: [],
+  })
+  const [openStrainSection, setOpenStrainSection] = useState<StrainSection | null>(null)
+  const strainSectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Sort dropdown variables
   const [sortMenu, setSortMenu] = useState(false)
@@ -123,18 +159,27 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
   const anomaliesTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const eventsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const keywordTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const strainTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const productsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const secondaryProductsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const variableValuesTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const mediaSlotTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const mediaSectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const mediaComponentTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const clearAllTimeouts = () => {
     if (variablesTimeoutRef.current) clearTimeout(variablesTimeoutRef.current)
     if (anomaliesTimeoutRef.current) clearTimeout(anomaliesTimeoutRef.current)
     if (eventsTimeoutRef.current) clearTimeout(eventsTimeoutRef.current)
     if (keywordTimeoutRef.current) clearTimeout(keywordTimeoutRef.current)
+    if (strainTimeoutRef.current) clearTimeout(strainTimeoutRef.current)
     if (productsTimeoutRef.current) clearTimeout(productsTimeoutRef.current)
     if (secondaryProductsTimeoutRef.current) clearTimeout(secondaryProductsTimeoutRef.current)
     if (variableValuesTimeoutRef.current) clearTimeout(variableValuesTimeoutRef.current)
+    if (mediaSlotTimeoutRef.current) clearTimeout(mediaSlotTimeoutRef.current)
+    if (mediaSectionTimeoutRef.current) clearTimeout(mediaSectionTimeoutRef.current)
+    if (mediaComponentTimeoutRef.current) clearTimeout(mediaComponentTimeoutRef.current)
+    if (strainSectionTimeoutRef.current) clearTimeout(strainSectionTimeoutRef.current)
   }
 
   const setMenuWithDelay = (setter: (value: boolean) => void, timeoutRef: React.MutableRefObject<NodeJS.Timeout | null>, delay: number = 1000) => {
@@ -227,6 +272,48 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
       }
     }
     fetchStrains()
+
+    const fetchMediaTree = async () => {
+      try {
+        const token = await getToken()
+        const params = new URLSearchParams()
+        if (activeProject) params.append('project_id', activeProject.id.toString())
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/media/filter-tree/?${params.toString()}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        )
+        if (res.ok) {
+          const data = await res.json()
+          setMediaTree({ batch: data.batch ?? emptySlot, feed: data.feed ?? emptySlot })
+        }
+      } catch {
+        // Non-critical — media menu just stays empty
+      }
+    }
+    fetchMediaTree()
+
+    const fetchStrainTree = async () => {
+      try {
+        const token = await getToken()
+        const params = new URLSearchParams()
+        if (activeProject) params.append('project_id', activeProject.id.toString())
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/strains/filter-tree/?${params.toString()}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        )
+        if (res.ok) {
+          const data = await res.json()
+          setStrainTree({
+            most_recent: data.most_recent ?? [],
+            most_common: data.most_common ?? [],
+            all: data.all ?? [],
+          })
+        }
+      } catch {
+        // Non-critical — strain menu just stays empty
+      }
+    }
+    fetchStrainTree()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProject, refreshKey])
 
@@ -274,9 +361,13 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
         setAnomaliesMenu(false)
         setEventsMenu(false)
         setKeywordMenu(false)
+        setStrainMenu(false)
         setVariableValuesMenu(null)
         setProductsMenu(false)
         setSecondaryProductsMenu(false)
+        setOpenMediaSlot(null)
+        setOpenMediaSection(null)
+        setOpenMediaComponent(null)
         setActiveSortItem(null)
       }
     }
@@ -329,13 +420,31 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     setAnomaliesMenu(false)
     setEventsMenu(false)
     setKeywordMenu(false)
+    setStrainMenu(false)
     setVariableValuesMenu(null)
     setProductsMenu(false)
     setSecondaryProductsMenu(false)
+    setOpenMediaSlot(null)
+    setOpenMediaSection(null)
+    setOpenMediaComponent(null)
     setActiveSortItem(null)
     setCurrentSortBy(null)
     setCurrentSortOrder(null)
     fetchExperimentsWithPage(1, {})
+  }
+
+  const applyMediaFilter = (slot: MediaSlot, entry: MediaTreeEntry) => {
+    clearAllTimeouts()
+    const newFilters = { ...activeFilters }
+    if (slot === 'batch') newFilters.batch_media = { id: entry.id, name: entry.name }
+    else newFilters.feed_media = { id: entry.id, name: entry.name }
+    setActiveFilters(newFilters)
+    setCurrentPage(1)
+    setFilterMenu(false)
+    setOpenMediaSlot(null)
+    setOpenMediaSection(null)
+    setOpenMediaComponent(null)
+    fetchExperimentsWithPage(1, newFilters, currentSortBy || undefined, currentSortOrder || undefined)
   }
 
   const applySort = (sortBy: string, sortOrder: string) => {
@@ -369,6 +478,8 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
       if (filters.has_anomaly) params.append('has_anomaly', filters.has_anomaly)
       if (filters.event_name) params.append('event_name', filters.event_name)
       if (filters.keyword) params.append('keyword', filters.keyword)
+      if (filters.batch_media) params.append('batch_media_id', filters.batch_media.id.toString())
+      if (filters.feed_media) params.append('feed_media_id', filters.feed_media.id.toString())
       if (sortBy) params.append('sort_by', sortBy)
       if (sortOrder) params.append('sort_order', sortOrder)
 
@@ -421,6 +532,8 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
       if (activeFilters.has_anomaly) params.append('has_anomaly', activeFilters.has_anomaly)
       if (activeFilters.event_name) params.append('event_name', activeFilters.event_name)
       if (activeFilters.keyword) params.append('keyword', activeFilters.keyword)
+      if (activeFilters.batch_media) params.append('batch_media_id', activeFilters.batch_media.id.toString())
+      if (activeFilters.feed_media) params.append('feed_media_id', activeFilters.feed_media.id.toString())
       if (currentSortBy) params.append('sort_by', currentSortBy)
       if (currentSortOrder) params.append('sort_order', currentSortOrder)
 
@@ -454,15 +567,126 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     }
   }
 
-  const mergedVariables = React.useMemo(() => {
-    const merged: Record<string, string[]> = { ...uniqueNames.variables }
-    const existingStrains = merged['strain'] || []
-    const allStrains = [...new Set([...existingStrains, ...strainNames])]
-    if (allStrains.length > 0) {
-      merged['strain'] = allStrains.sort((a, b) => a.localeCompare(b))
+  const renderMediaSlotMenu = (slot: MediaSlot) => {
+    const tree = mediaTree[slot]
+    const closeSectionSoon = () => setMenuWithDelay(
+      (v: boolean) => { if (!v) { setOpenMediaSection(null); setOpenMediaComponent(null) } },
+      mediaSectionTimeoutRef,
+    )
+
+    const renderMediaList = (items: MediaTreeEntry[], emptyText: string) => (
+      <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+        {items.length === 0 ? (
+          <div className="px-4 py-2 text-sm text-gray-400">{emptyText}</div>
+        ) : items.map((m) => (
+          <div key={m.id}
+            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+            onClick={() => applyMediaFilter(slot, m)}>
+            {m.name}
+          </div>
+        ))}
+      </div>
+    )
+
+    const renderGrouped = (groups: MediaTreeGroup[], section: MediaSection) => (
+      // Note: no max-height / overflow here. Setting overflow-y implicitly
+      // clips overflow-x too, which would trap the inner media sub-panel
+      // inside this panel's box instead of letting it float to the right.
+      <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+        {groups.length === 0 ? (
+          <div className="px-4 py-2 text-sm text-gray-400">None</div>
+        ) : groups.map((g) => (
+          <div key={g.name} className="relative"
+            onMouseEnter={() => {
+              clearAllTimeouts()
+              setOpenMediaComponent(section + ':' + g.name)
+            }}
+            onMouseLeave={() => setMenuWithDelay(
+              (v: boolean) => { if (!v) setOpenMediaComponent(null) },
+              mediaComponentTimeoutRef,
+            )}
+          >
+            <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{g.name}</div>
+            {openMediaComponent === section + ':' + g.name && renderMediaList(g.media, 'No media')}
+          </div>
+        ))}
+      </div>
+    )
+
+    const enterSection = (target: MediaSection) => {
+      clearAllTimeouts()
+      // Only reset the child (component) state when actually switching sections.
+      // Re-firing mouseenter on the same section (e.g. after crossing the gap
+      // between the section label and its open sub-panel) must not wipe out
+      // the currently-open component sub-panel.
+      if (openMediaSection !== target) {
+        setOpenMediaSection(target)
+        setOpenMediaComponent(null)
+      }
     }
+
+    return (
+      <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+        {/* Most recent */}
+        <div className="relative"
+          onMouseEnter={() => enterSection('most_recent')}
+          onMouseLeave={closeSectionSoon}
+        >
+          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Most recent</div>
+          {openMediaSection === 'most_recent' && renderMediaList(tree.most_recent, 'No recent media')}
+        </div>
+        {/* Most common */}
+        <div className="relative"
+          onMouseEnter={() => enterSection('most_common')}
+          onMouseLeave={closeSectionSoon}
+        >
+          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Most common</div>
+          {openMediaSection === 'most_common' && renderMediaList(tree.most_common, 'No common media')}
+        </div>
+        {/* Carbon Source */}
+        <div className="relative"
+          onMouseEnter={() => enterSection('by_carbon_source')}
+          onMouseLeave={closeSectionSoon}
+        >
+          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Carbon Source</div>
+          {openMediaSection === 'by_carbon_source' && renderGrouped(tree.by_carbon_source, 'by_carbon_source')}
+        </div>
+        {/* Nitrogen Source */}
+        <div className="relative"
+          onMouseEnter={() => enterSection('by_nitrogen_source')}
+          onMouseLeave={closeSectionSoon}
+        >
+          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Nitrogen Source</div>
+          {openMediaSection === 'by_nitrogen_source' && renderGrouped(tree.by_nitrogen_source, 'by_nitrogen_source')}
+        </div>
+        {/* Complex Component */}
+        <div className="relative"
+          onMouseEnter={() => enterSection('by_complex_component')}
+          onMouseLeave={closeSectionSoon}
+        >
+          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Complex Component</div>
+          {openMediaSection === 'by_complex_component' && renderGrouped(tree.by_complex_component, 'by_complex_component')}
+        </div>
+        {/* All */}
+        <div className="relative"
+          onMouseEnter={() => enterSection('all')}
+          onMouseLeave={closeSectionSoon}
+        >
+          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">All</div>
+          {openMediaSection === 'all' && renderMediaList(tree.all, 'No media')}
+        </div>
+      </div>
+    )
+  }
+
+  const mergedVariables = React.useMemo(() => {
+    // Strain is now a top-level Filter item — exclude it from the generic
+    // Variables sub-menu so it doesn't appear in both places.
+    const merged: Record<string, string[]> = { ...uniqueNames.variables }
+    delete merged['strain']
     return merged
-  }, [uniqueNames.variables, strainNames])
+  }, [uniqueNames.variables])
+
 
   return (
     <div className={`w-full pt-4 pb-2 px-4 overflow-visible bg-white rounded-lg shadow ${
@@ -490,14 +714,16 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
             </button>
 
             {filterMenu && (
-              <div className="absolute top-full left-0 w-auto min-w-full bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] mt-1">
+              <div className="absolute top-full left-0 w-max min-w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] mt-1">
                 {/* Variables */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setVariablesMenu(true); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false)
+                  setVariablesMenu(true); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
+                  setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
+        setOpenStrainSection(null)
                 }} onMouseLeave={() => setMenuWithDelay(setVariablesMenu, variablesTimeoutRef)}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">variables</div>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Variables</div>
                   {variablesMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
                       {Object.entries(mergedVariables)
@@ -529,10 +755,12 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Anomalies */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setAnomaliesMenu(true); setVariablesMenu(false); setEventsMenu(false); setKeywordMenu(false)
+                  setAnomaliesMenu(true); setVariablesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
+                  setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
+        setOpenStrainSection(null)
                 }} onMouseLeave={() => setMenuWithDelay(setAnomaliesMenu, anomaliesTimeoutRef)}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">anomalies</div>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Anomalies</div>
                   {anomaliesMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
                       {sortItems([...uniqueNames.anomalies]).map((anomaly, index) => (
@@ -553,10 +781,12 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Events */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setEventsMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setKeywordMenu(false)
+                  setEventsMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setKeywordMenu(false); setStrainMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
+                  setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
+        setOpenStrainSection(null)
                 }} onMouseLeave={() => setMenuWithDelay(setEventsMenu, eventsTimeoutRef)}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">events</div>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Events</div>
                   {eventsMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
                       {sortItems([...uniqueNames.events]).map((event, index) => (
@@ -570,13 +800,115 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                   )}
                 </div>
 
+                {/* Strain */}
+                <div className="relative" onMouseEnter={() => {
+                  clearAllTimeouts()
+                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false)
+                  setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
+                  setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
+                  // Idempotent: don't clear the child section when re-entering the
+                  // same Strain item (e.g. after crossing the gap to its sub-panel)
+                  if (!strainMenu) {
+                    setStrainMenu(true); setOpenStrainSection(null)
+                  }
+                }} onMouseLeave={() => setMenuWithDelay(
+                  (v: boolean) => { if (!v) { setStrainMenu(false); setOpenStrainSection(null) } },
+                  strainTimeoutRef,
+                )}>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Strain</div>
+                  {strainMenu && (() => {
+                    const enterStrainSection = (target: StrainSection) => {
+                      clearAllTimeouts()
+                      if (openStrainSection !== target) setOpenStrainSection(target)
+                    }
+                    const closeStrainSectionSoon = () => setMenuWithDelay(
+                      (v: boolean) => { if (!v) setOpenStrainSection(null) },
+                      strainSectionTimeoutRef,
+                    )
+                    const renderStrainNames = (items: string[], emptyText: string) => (
+                      <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                        {items.length === 0 ? (
+                          <div className="px-4 py-2 text-sm text-gray-400">{emptyText}</div>
+                        ) : items.map((s) => (
+                          <div key={s}
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer whitespace-nowrap"
+                            onClick={() => applyFilter('variable', 'strain', s)}>
+                            {s}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                    return (
+                      <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                        <div className="relative"
+                          onMouseEnter={() => enterStrainSection('most_recent')}
+                          onMouseLeave={closeStrainSectionSoon}
+                        >
+                          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Most recent</div>
+                          {openStrainSection === 'most_recent' && renderStrainNames(strainTree.most_recent, 'No recent strains')}
+                        </div>
+                        <div className="relative"
+                          onMouseEnter={() => enterStrainSection('most_common')}
+                          onMouseLeave={closeStrainSectionSoon}
+                        >
+                          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Most common</div>
+                          {openStrainSection === 'most_common' && renderStrainNames(strainTree.most_common, 'No common strains')}
+                        </div>
+                        <div className="relative"
+                          onMouseEnter={() => enterStrainSection('all')}
+                          onMouseLeave={closeStrainSectionSoon}
+                        >
+                          <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">All</div>
+                          {openStrainSection === 'all' && renderStrainNames(strainTree.all, 'No strains')}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {/* Batch Media */}
+                <div className="relative" onMouseEnter={() => {
+                  clearAllTimeouts()
+                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
+                  setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
+                  // Only clear child state when switching slots; re-entries (e.g. after
+                  // crossing the gap between label and open sub-panel) must preserve it.
+                  if (openMediaSlot !== 'batch') {
+                    setOpenMediaSlot('batch'); setOpenMediaSection(null); setOpenMediaComponent(null)
+                  }
+                }} onMouseLeave={() => setMenuWithDelay(
+                  (v: boolean) => { if (!v) { setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null) } },
+                  mediaSlotTimeoutRef,
+                )}>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Batch Media</div>
+                  {openMediaSlot === 'batch' && renderMediaSlotMenu('batch')}
+                </div>
+
+                {/* Feed Media */}
+                <div className="relative" onMouseEnter={() => {
+                  clearAllTimeouts()
+                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
+                  setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
+                  if (openMediaSlot !== 'feed') {
+                    setOpenMediaSlot('feed'); setOpenMediaSection(null); setOpenMediaComponent(null)
+                  }
+                }} onMouseLeave={() => setMenuWithDelay(
+                  (v: boolean) => { if (!v) { setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null) } },
+                  mediaSlotTimeoutRef,
+                )}>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Feed Media</div>
+                  {openMediaSlot === 'feed' && renderMediaSlotMenu('feed')}
+                </div>
+
                 {/* Keyword */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setKeywordMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false)
+                  setKeywordMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setStrainMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
+                  setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
+        setOpenStrainSection(null)
                 }} onMouseLeave={() => setMenuWithDelay(setKeywordMenu, keywordTimeoutRef)}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">keyword</div>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Keyword</div>
                   {keywordMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
                       <div className="p-3">
@@ -734,7 +1066,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
         </div>
 
         {/* Active filters */}
-        {(activeFilters.variables?.length || activeFilters.anomaly_name || activeFilters.has_anomaly || activeFilters.event_name || activeFilters.keyword) && (
+        {(activeFilters.variables?.length || activeFilters.anomaly_name || activeFilters.has_anomaly || activeFilters.event_name || activeFilters.keyword || activeFilters.batch_media || activeFilters.feed_media) && (
           <div className="flex flex-wrap gap-2 mt-4">
             {activeFilters.variables?.map((v, i) => (
               <span key={i} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center gap-1">
@@ -771,6 +1103,34 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
             {activeFilters.keyword && (
               <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
                 Keyword: {activeFilters.keyword}
+              </span>
+            )}
+            {activeFilters.batch_media && (
+              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full flex items-center gap-1">
+                Batch Media: {activeFilters.batch_media.name}
+                <button
+                  className="ml-1 hover:text-orange-600"
+                  onClick={() => {
+                    const newFilters = { ...activeFilters, batch_media: undefined }
+                    setActiveFilters(newFilters)
+                    setCurrentPage(1)
+                    fetchExperimentsWithPage(1, newFilters, currentSortBy || undefined, currentSortOrder || undefined)
+                  }}
+                >x</button>
+              </span>
+            )}
+            {activeFilters.feed_media && (
+              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full flex items-center gap-1">
+                Feed Media: {activeFilters.feed_media.name}
+                <button
+                  className="ml-1 hover:text-orange-600"
+                  onClick={() => {
+                    const newFilters = { ...activeFilters, feed_media: undefined }
+                    setActiveFilters(newFilters)
+                    setCurrentPage(1)
+                    fetchExperimentsWithPage(1, newFilters, currentSortBy || undefined, currentSortOrder || undefined)
+                  }}
+                >x</button>
               </span>
             )}
           </div>

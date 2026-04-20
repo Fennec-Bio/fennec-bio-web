@@ -30,6 +30,9 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
   const [selectedStrain, setSelectedStrain] = useState('')
   const [extractEventsWithAI, setExtractEventsWithAI] = useState(false)
   const [extractAnomaliesWithAI, setExtractAnomaliesWithAI] = useState(false)
+  const [mediaOptions, setMediaOptions] = useState<{ id: number; name: string; media_type: 'defined' | 'complex' }[]>([])
+  const [batchMediaId, setBatchMediaId] = useState<number | null>(null)
+  const [feedMediaId, setFeedMediaId] = useState<number | null>(null)
 
   // UI state
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
@@ -101,6 +104,22 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
       }
     }
     fetchStrains()
+
+    const fetchMediaOptions = async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch(`${apiUrl}/api/media/options/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setMediaOptions(data.media ?? [])
+        }
+      } catch {
+        // Non-critical — dropdown just stays empty
+      }
+    }
+    fetchMediaOptions()
 
     // Fetch data categories — single source of truth for data_type
     const fetchDataCategories = async () => {
@@ -215,6 +234,8 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
     setSelectedStrain('')
     setExtractEventsWithAI(false)
     setExtractAnomaliesWithAI(false)
+    setBatchMediaId(null)
+    setFeedMediaId(null)
   }
 
   const handleCreate = async () => {
@@ -243,6 +264,8 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
         description: experimentSummary,
         experiment_note: experimentNote,
         date: experimentDate,
+        batch_media_id: batchMediaId,
+        feed_media_id: feedMediaId,
         variables: filledVars,
         events: finalEvents,
         anomalies: finalAnomalies,
@@ -392,6 +415,11 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
             onExperimentNoteChange={setExperimentNote}
             noteImages={noteImages}
             onNoteImagesChange={setNoteImages}
+            mediaOptions={mediaOptions}
+            batchMediaId={batchMediaId}
+            onBatchMediaChange={setBatchMediaId}
+            feedMediaId={feedMediaId}
+            onFeedMediaChange={setFeedMediaId}
             extractEventsWithAI={extractEventsWithAI}
             onExtractEventsWithAIChange={setExtractEventsWithAI}
             extractAnomaliesWithAI={extractAnomaliesWithAI}
