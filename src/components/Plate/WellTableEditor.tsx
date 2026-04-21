@@ -96,7 +96,7 @@ export function WellTableEditor({
       for (let i = 0; i < values.length; i++) {
         const idx = fromIdx + i
         if (idx >= wellKeys.length) break
-        const v = values[i]
+        const v = values[i].trim()
         if (v === '') delete col[wellKeys[idx]]
         else col[wellKeys[idx]] = v
       }
@@ -112,7 +112,7 @@ export function WellTableEditor({
       for (let i = 0; i < values.length; i++) {
         const idx = fromIdx + i
         if (idx >= wellKeys.length) break
-        const v = values[i]
+        const v = values[i].trim()
         if (v === '') delete col[wellKeys[idx]]
         else col[wellKeys[idx]] = v
       }
@@ -217,7 +217,7 @@ export function WellTableEditor({
             + Add column
           </button>
           {addOpen && (
-            <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-2 w-64 space-y-2">
+            <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 w-64 space-y-2">
               <div className="flex gap-1 text-xs">
                 <button
                   type="button"
