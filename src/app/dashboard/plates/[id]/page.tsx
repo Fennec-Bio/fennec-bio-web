@@ -3,14 +3,17 @@
 import { use } from 'react'
 import Link from 'next/link'
 import { usePlateExperiment } from '@/hooks/usePlateExperiment'
+import { useDataCategories } from '@/hooks/useDataCategories'
 import { DashboardTabs } from '@/components/Plate/DashboardTabs'
 import { PlateManager } from '@/components/Plate/PlateManager'
+import { WellGridEditor } from '@/components/Plate/WellGridEditor'
 
 export default function PlateExperimentDetailPage({
   params,
 }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { data, loading, error, refetch } = usePlateExperiment(id)
+  const { categories } = useDataCategories(data?.project ?? null)
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -40,11 +43,15 @@ export default function PlateExperimentDetailPage({
 
             <PlateManager experimentId={data.id} plates={data.plates} onChanged={refetch}>
               {(plate) => (
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="mb-2 text-sm text-gray-500">
+                <div className="space-y-4">
+                  <div className="bg-white rounded-lg shadow p-4 text-sm text-gray-500">
                     {plate.label} ({plate.format}-well) · {plate.wells.length} well{plate.wells.length === 1 ? '' : 's'} configured
                   </div>
-                  {/* WellGridEditor and PlateBarChart added in Tasks 12 + 13 */}
+                  <WellGridEditor
+                    plate={plate}
+                    dataCategories={categories}
+                    onSaved={refetch}
+                  />
                 </div>
               )}
             </PlateManager>
