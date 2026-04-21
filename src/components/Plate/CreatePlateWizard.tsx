@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { useDataCategories } from '@/hooks/useDataCategories'
@@ -58,7 +59,14 @@ export function CreatePlateWizard({
   onCancel?: () => void
 } = {}) {
   const { getToken } = useAuth()
+  const router = useRouter()
   const { activeProject } = useProjectContext()
+
+  // When no explicit onCancel is provided, default to router.back() — matches
+  // the legacy single-page form's UX on /dashboard/plates/new. Callers that
+  // want a different cancel behavior (e.g. the /experiments picker returning
+  // to the type-chooser) pass their own onCancel.
+  const effectiveOnCancel = onCancel ?? (() => router.back())
   const projectId = activeProject?.id ?? null
   const { categories } = useDataCategories(projectId)
   const API = process.env.NEXT_PUBLIC_API_URL
@@ -165,7 +173,7 @@ export function CreatePlateWizard({
           date={date}
           onDateChange={setDate}
           onNext={() => setStep(2)}
-          onCancel={onCancel}
+          onCancel={effectiveOnCancel}
         />
       )}
 
