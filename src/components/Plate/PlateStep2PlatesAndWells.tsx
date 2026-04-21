@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { DataCategory } from '@/hooks/useDataCategories'
 import { WellTableEditor } from '@/components/Plate/WellTableEditor'
 
@@ -32,6 +32,20 @@ export function PlateStep2PlatesAndWells({
   const [newLabel, setNewLabel] = useState('')
   const [newFormat, setNewFormat] = useState<'96' | '384'>('96')
   const [addError, setAddError] = useState<string | null>(null)
+  const addPopoverRef = useRef<HTMLDivElement>(null)
+
+  // Close the "+ Add plate" popover on outside click. The listener is only
+  // registered while the popover is open.
+  useEffect(() => {
+    if (!addOpen) return
+    function onDocMouseDown(e: MouseEvent) {
+      if (addPopoverRef.current && !addPopoverRef.current.contains(e.target as Node)) {
+        setAddOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [addOpen])
 
   const selectedIdx = plates.findIndex(p => p.localKey === selectedPlateKey)
   const selected = selectedIdx >= 0 ? plates[selectedIdx] : null
@@ -73,9 +87,9 @@ export function PlateStep2PlatesAndWells({
     onPlatesChange(prev => prev.filter(p => p.localKey !== key))
   }
 
-  // Controlled bundle for WellGridEditor: updates the selected plate's slice
+  // Controlled bundle for WellTableEditor: updates the selected plate's slice
   // of state inside the plates array. All four setters accept useState-style
-  // updater functions because WellGridEditor uses the function form in places.
+  // updater functions because WellTableEditor uses the function form in places.
   function updateSelectedPlate<K extends keyof PlateDraft>(
     key: K,
     updater: React.SetStateAction<PlateDraft[K]>,
@@ -88,58 +102,58 @@ export function PlateStep2PlatesAndWells({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* Plate sidebar */}
-        <div className="md:w-56 space-y-2">
-          <div className="text-xs uppercase text-gray-500">Plates</div>
-          <ul className="space-y-1">
-            {plates.map(p => {
-              const active = p.localKey === selectedPlateKey
-              return (
-                <li key={p.localKey}>
-                  <div
-                    className={`flex items-center justify-between px-3 py-2 border rounded-md cursor-pointer ${
-                      active
-                        ? 'border-[#eb5234] bg-[#eb5234]/5 text-gray-900'
-                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    onClick={() => onSelectedPlateKeyChange(p.localKey)}
-                  >
-                    <div className="text-sm">
-                      <div className="font-medium">{p.label}</div>
-                      <div className="text-xs text-gray-500">{p.format}-well</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); removePlate(p.localKey) }}
-                      className="text-gray-400 hover:text-red-600 text-sm px-1"
-                      aria-label={`Remove ${p.label}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-
-          {!addOpen ? (
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="w-full px-3 py-2 border border-dashed border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50"
+    <div className="space-y-3">
+      {/* Horizontal plate tabs + Add plate popover */}
+      <div className="flex flex-wrap items-center gap-2">
+        {plates.map(p => {
+          const active = p.localKey === selectedPlateKey
+          return (
+            <div
+              key={p.localKey}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium cursor-pointer ${
+                active
+                  ? 'bg-[#eb5234] text-white'
+                  : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+              onClick={() => onSelectedPlateKeyChange(p.localKey)}
             >
-              + Add plate
-            </button>
-          ) : (
-            <div className="space-y-2 border border-gray-200 rounded-md p-2 bg-white">
+              <span>
+                {p.label}{' '}
+                <span className={active ? 'opacity-80' : 'text-gray-500'}>({p.format})</span>
+              </span>
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); removePlate(p.localKey) }}
+                className={`-mr-1 px-1 ${active ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-red-600'}`}
+                aria-label={`Remove ${p.label}`}
+              >
+                ×
+              </button>
+            </div>
+          )
+        })}
+
+        <div ref={addPopoverRef} className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setAddError(null)
+              setAddOpen(o => !o)
+            }}
+            className="px-3 py-1.5 border border-dashed border-gray-300 bg-white text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+          >
+            + Add plate
+          </button>
+          {addOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 w-64 space-y-2">
               <div>
                 <label htmlFor="plate-wizard-add-label" className="block text-xs font-medium text-gray-700 mb-1">Label</label>
                 <input
                   id="plate-wizard-add-label"
+                  autoFocus
                   value={newLabel}
                   onChange={e => setNewLabel(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addPlate() }}
                   className="w-full px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#eb5234]"
                 />
               </div>
@@ -176,30 +190,28 @@ export function PlateStep2PlatesAndWells({
             </div>
           )}
         </div>
-
-        {/* Wells editor */}
-        <div className="flex-1 min-w-0">
-          {selected ? (
-            <WellTableEditor
-              key={selected.localKey}
-              plateFormat={selected.format}
-              dataCategories={dataCategories}
-              variableGrids={selected.variableGrids}
-              onVariableGridsChange={v => updateSelectedPlate('variableGrids', v)}
-              measurementGrids={selected.measurementGrids}
-              onMeasurementGridsChange={v => updateSelectedPlate('measurementGrids', v)}
-              variableNames={selected.variableNames}
-              onVariableNamesChange={v => updateSelectedPlate('variableNames', v)}
-              measurementIds={selected.measurementIds}
-              onMeasurementIdsChange={v => updateSelectedPlate('measurementIds', v)}
-            />
-          ) : (
-            <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-              Add a plate to get started.
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Full-width editor / empty state */}
+      {selected ? (
+        <WellTableEditor
+          key={selected.localKey}
+          plateFormat={selected.format}
+          dataCategories={dataCategories}
+          variableGrids={selected.variableGrids}
+          onVariableGridsChange={v => updateSelectedPlate('variableGrids', v)}
+          measurementGrids={selected.measurementGrids}
+          onMeasurementGridsChange={v => updateSelectedPlate('measurementGrids', v)}
+          variableNames={selected.variableNames}
+          onVariableNamesChange={v => updateSelectedPlate('variableNames', v)}
+          measurementIds={selected.measurementIds}
+          onMeasurementIdsChange={v => updateSelectedPlate('measurementIds', v)}
+        />
+      ) : (
+        <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+          Add a plate to get started.
+        </div>
+      )}
 
       <div className="flex gap-2">
         <button
