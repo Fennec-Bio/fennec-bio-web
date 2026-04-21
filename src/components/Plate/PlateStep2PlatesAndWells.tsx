@@ -69,13 +69,15 @@ export function PlateStep2PlatesAndWells({
   }
 
   function removePlate(key: string) {
-    onPlatesChange(prev => {
-      const next = prev.filter(p => p.localKey !== key)
-      if (key === selectedPlateKey) {
-        onSelectedPlateKeyChange(next[0]?.localKey ?? '')
-      }
-      return next
-    })
+    if (key === selectedPlateKey) {
+      const idx = plates.findIndex(p => p.localKey === key)
+      const next = plates.filter(p => p.localKey !== key)
+      // Prefer the plate that shifted into this slot; fall back to first
+      // remaining; fall back to empty string when the list is now empty.
+      const nextKey = next[idx]?.localKey ?? next[0]?.localKey ?? ''
+      onSelectedPlateKeyChange(nextKey)
+    }
+    onPlatesChange(prev => prev.filter(p => p.localKey !== key))
   }
 
   // Controlled bundle for WellGridEditor: updates the selected plate's slice
