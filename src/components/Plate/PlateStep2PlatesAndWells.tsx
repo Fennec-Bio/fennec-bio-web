@@ -1,9 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plate as PlateDetail } from '@/hooks/usePlateExperiment'
 import { DataCategory } from '@/hooks/useDataCategories'
-import { WellGridEditor } from '@/components/Plate/WellGridEditor'
+import { WellTableEditor } from '@/components/Plate/WellTableEditor'
 
 export type PlateDraft = {
   localKey: string
@@ -36,12 +35,6 @@ export function PlateStep2PlatesAndWells({
 
   const selectedIdx = plates.findIndex(p => p.localKey === selectedPlateKey)
   const selected = selectedIdx >= 0 ? plates[selectedIdx] : null
-
-  // Synthetic "Plate" object to hand to WellGridEditor. It needs .format and
-  // .wells (used only for the seed effect, which we skip in controlled mode).
-  const syntheticPlate: PlateDetail | null = selected
-    ? { id: 0, label: selected.label, format: selected.format, position: 0, wells: [] }
-    : null
 
   function addPlate() {
     setAddError(null)
@@ -186,23 +179,19 @@ export function PlateStep2PlatesAndWells({
 
         {/* Wells editor */}
         <div className="flex-1 min-w-0">
-          {selected && syntheticPlate ? (
-            <WellGridEditor
+          {selected ? (
+            <WellTableEditor
               key={selected.localKey}
-              plate={syntheticPlate}
+              plateFormat={selected.format}
               dataCategories={dataCategories}
-              onSaved={() => { /* not used in wizard mode */ }}
-              hideSaveButton
-              controlled={{
-                variableGrids: selected.variableGrids,
-                onVariableGridsChange: v => updateSelectedPlate('variableGrids', v),
-                measurementGrids: selected.measurementGrids,
-                onMeasurementGridsChange: v => updateSelectedPlate('measurementGrids', v),
-                variableNames: selected.variableNames,
-                onVariableNamesChange: v => updateSelectedPlate('variableNames', v),
-                measurementIds: selected.measurementIds,
-                onMeasurementIdsChange: v => updateSelectedPlate('measurementIds', v),
-              }}
+              variableGrids={selected.variableGrids}
+              onVariableGridsChange={v => updateSelectedPlate('variableGrids', v)}
+              measurementGrids={selected.measurementGrids}
+              onMeasurementGridsChange={v => updateSelectedPlate('measurementGrids', v)}
+              variableNames={selected.variableNames}
+              onVariableNamesChange={v => updateSelectedPlate('variableNames', v)}
+              measurementIds={selected.measurementIds}
+              onMeasurementIdsChange={v => updateSelectedPlate('measurementIds', v)}
             />
           ) : (
             <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
