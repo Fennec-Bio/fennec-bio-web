@@ -7,6 +7,7 @@ import { useDataCategories } from '@/hooks/useDataCategories'
 import { DashboardTabs } from '@/components/Plate/DashboardTabs'
 import { PlateManager } from '@/components/Plate/PlateManager'
 import { WellGridEditor } from '@/components/Plate/WellGridEditor'
+import { PlateBarChart } from '@/components/Plate/PlateBarChart'
 
 export default function PlateExperimentDetailPage({
   params,
@@ -51,6 +52,10 @@ export default function PlateExperimentDetailPage({
                     plate={plate}
                     dataCategories={categories}
                     onSaved={refetch}
+                  />
+                  <PlateBarChart
+                    plate={plate}
+                    dataCategories={categories.filter(c => c.category !== 'process_data')}
                   />
                 </div>
               )}
