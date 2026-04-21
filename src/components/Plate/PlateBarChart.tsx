@@ -15,15 +15,18 @@ function conditionKey(well: Well): string {
 export function PlateBarChart({
   plate, dataCategories,
 }: { plate: Plate; dataCategories: DataCategory[] }) {
-  const [categoryId, setCategoryId] = useState<number | null>(dataCategories[0]?.id ?? null)
+  const [userCategoryId, setUserCategoryId] = useState<number | null>(null)
   const [groupReplicates, setGroupReplicates] = useState(true)
   const svgRef = useRef<SVGSVGElement | null>(null)
 
-  useEffect(() => {
-    if (categoryId === null && dataCategories.length > 0) {
-      setCategoryId(dataCategories[0].id)
+  // Fall back to the first available category when the user hasn't picked one
+  // (or their previous pick is no longer in the list).
+  const categoryId = useMemo(() => {
+    if (userCategoryId !== null && dataCategories.some(c => c.id === userCategoryId)) {
+      return userCategoryId
     }
-  }, [dataCategories, categoryId])
+    return dataCategories[0]?.id ?? null
+  }, [userCategoryId, dataCategories])
 
   const bars = useMemo(() => {
     if (!categoryId) return []
@@ -144,7 +147,7 @@ export function PlateBarChart({
         <select
           className="h-9 px-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#eb5234]"
           value={categoryId ?? ''}
-          onChange={e => setCategoryId(Number(e.target.value))}
+          onChange={e => setUserCategoryId(Number(e.target.value))}
         >
           {dataCategories.map(c => (
             <option key={c.id} value={c.id}>{c.name} ({c.unit || '—'})</option>
