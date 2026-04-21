@@ -10,25 +10,54 @@ const ROWS_384 = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P
 const COLS_96  = Array.from({ length: 12 }, (_, i) => i + 1)
 const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1)
 
+export type WellGridEditorControlled = {
+  variableGrids: Record<string, Record<string, string>>
+  onVariableGridsChange: React.Dispatch<React.SetStateAction<Record<string, Record<string, string>>>>
+  measurementGrids: Record<number, Record<string, string>>
+  onMeasurementGridsChange: React.Dispatch<React.SetStateAction<Record<number, Record<string, string>>>>
+  variableNames: string[]
+  onVariableNamesChange: React.Dispatch<React.SetStateAction<string[]>>
+  measurementIds: number[]
+  onMeasurementIdsChange: React.Dispatch<React.SetStateAction<number[]>>
+}
+
 export function WellGridEditor({
   plate, dataCategories, onSaved,
+  controlled,
+  hideSaveButton,
 }: {
   plate: Plate
   dataCategories: DataCategory[]
   onSaved: () => void
+  controlled?: WellGridEditorControlled
+  hideSaveButton?: boolean
 }) {
   const { getToken } = useAuth()
   const rows = plate.format === '96' ? ROWS_96 : ROWS_384
   const cols = plate.format === '96' ? COLS_96 : COLS_384
 
-  const [variableGrids, setVariableGrids] = useState<Record<string, Record<string, string>>>({})
-  const [measurementGrids, setMeasurementGrids] = useState<Record<number, Record<string, string>>>({})
-  const [variableNames, setVariableNames] = useState<string[]>([])
-  const [measurementIds, setMeasurementIds] = useState<number[]>([])
+  // Always call every hook. If `controlled` is provided we ignore the internal
+  // pieces and use the parent's state + setters instead.
+  const [internalVariableGrids, setInternalVariableGrids] = useState<Record<string, Record<string, string>>>({})
+  const [internalMeasurementGrids, setInternalMeasurementGrids] = useState<Record<number, Record<string, string>>>({})
+  const [internalVariableNames, setInternalVariableNames] = useState<string[]>([])
+  const [internalMeasurementIds, setInternalMeasurementIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  const variableGrids = controlled?.variableGrids ?? internalVariableGrids
+  const setVariableGrids = controlled?.onVariableGridsChange ?? setInternalVariableGrids
+  const measurementGrids = controlled?.measurementGrids ?? internalMeasurementGrids
+  const setMeasurementGrids = controlled?.onMeasurementGridsChange ?? setInternalMeasurementGrids
+  const variableNames = controlled?.variableNames ?? internalVariableNames
+  const setVariableNames = controlled?.onVariableNamesChange ?? setInternalVariableNames
+  const measurementIds = controlled?.measurementIds ?? internalMeasurementIds
+  const setMeasurementIds = controlled?.onMeasurementIdsChange ?? setInternalMeasurementIds
+
+  // Only seed from plate.wells in uncontrolled mode. In controlled mode the
+  // parent is responsible for initializing state.
   useEffect(() => {
+    if (controlled) return
     const varNames = new Set<string>()
     const measIds = new Set<number>()
     const vars: Record<string, Record<string, string>> = {}
@@ -46,11 +75,11 @@ export function WellGridEditor({
         meas[dp.data_category][k] = String(dp.value)
       })
     })
-    setVariableGrids(vars)
-    setMeasurementGrids(meas)
-    setVariableNames([...varNames])
-    setMeasurementIds([...measIds])
-  }, [plate])
+    setInternalVariableGrids(vars)
+    setInternalMeasurementGrids(meas)
+    setInternalVariableNames([...varNames])
+    setInternalMeasurementIds([...measIds])
+  }, [plate, controlled])
 
   const allowedCategories = useMemo(
     () => dataCategories.filter(c => c.category !== 'process_data'),
@@ -149,14 +178,18 @@ export function WellGridEditor({
         onAdd={id => setMeasurementIds(s => [...s, id])}
       />
 
-      {saveError && <div className="rounded bg-red-50 p-2 text-sm text-red-600">{saveError}</div>}
-      <button
-        onClick={save}
-        disabled={saving}
-        className="px-4 py-2 bg-[#eb5234] text-white rounded-md text-sm font-medium hover:bg-[#d4492f] disabled:opacity-50"
-      >
-        {saving ? 'Saving…' : 'Save plate'}
-      </button>
+      {!hideSaveButton && (
+        <>
+          {saveError && <div className="rounded bg-red-50 p-2 text-sm text-red-600">{saveError}</div>}
+          <button
+            onClick={save}
+            disabled={saving}
+            className="px-4 py-2 bg-[#eb5234] text-white rounded-md text-sm font-medium hover:bg-[#d4492f] disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save plate'}
+          </button>
+        </>
+      )}
     </div>
   )
 }
