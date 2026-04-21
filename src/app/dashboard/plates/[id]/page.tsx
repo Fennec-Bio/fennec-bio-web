@@ -9,6 +9,7 @@ import { PlateManager } from '@/components/Plate/PlateManager'
 import { WellGridEditor } from '@/components/Plate/WellGridEditor'
 import { PlateBarChart } from '@/components/Plate/PlateBarChart'
 import { WellDetailPanel } from '@/components/Plate/WellDetailPanel'
+import { PlateNotesPanel } from '@/components/Plate/PlateNotesPanel'
 
 function PlateWorkArea({
   plate, categories, onRefetch, projectId,
@@ -114,6 +115,10 @@ export default function PlateExperimentDetailPage({
                 />
               )}
             </PlateManager>
+
+            <div className="mt-6">
+              <PlateNotesPanel experiment={data} onSaved={refetch} />
+            </div>
           </>
         )}
       </div>
