@@ -184,6 +184,7 @@ export function CreatePlateWizard({
           selectedPlateKey={selectedPlateKey}
           onSelectedPlateKeyChange={setSelectedPlateKey}
           dataCategories={categories}
+          projectId={projectId}
           onBack={() => setStep(1)}
           onNext={() => setStep(3)}
         />

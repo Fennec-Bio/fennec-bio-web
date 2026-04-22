@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { DataCategory } from '@/hooks/useDataCategories'
 import { WellTableEditor } from '@/components/Plate/WellTableEditor'
+import { PlateTemplate, usePlateTemplates } from '@/hooks/usePlateTemplates'
 
 export type PlateDraft = {
   localKey: string
@@ -18,6 +19,7 @@ export function PlateStep2PlatesAndWells({
   plates, onPlatesChange,
   selectedPlateKey, onSelectedPlateKeyChange,
   dataCategories,
+  projectId,
   onBack, onNext,
 }: {
   plates: PlateDraft[]
@@ -25,6 +27,7 @@ export function PlateStep2PlatesAndWells({
   selectedPlateKey: string
   onSelectedPlateKeyChange: (key: string) => void
   dataCategories: DataCategory[]
+  projectId: number | null
   onBack: () => void
   onNext: () => void
 }) {
@@ -32,6 +35,7 @@ export function PlateStep2PlatesAndWells({
   const [newLabel, setNewLabel] = useState('')
   const [newFormat, setNewFormat] = useState<'96' | '384'>('96')
   const [addError, setAddError] = useState<string | null>(null)
+  const { templates: plateTemplates } = usePlateTemplates(projectId)
   const addPopoverRef = useRef<HTMLDivElement>(null)
 
   // Close the "+ Add plate" popover on outside click. The listener is only
@@ -99,6 +103,58 @@ export function PlateStep2PlatesAndWells({
         ? { ...p, [key]: typeof updater === 'function' ? (updater as (v: PlateDraft[K]) => PlateDraft[K])(p[key]) : updater }
         : p,
     ))
+  }
+
+  // Replaces the selected plate's column configuration with the template's.
+  // Grid cell values for columns that aren't in the new template are dropped.
+  // If the template's default_format differs from the current plate's format,
+  // the format is updated and any well keys outside the new format's bounds
+  // are removed from every grid.
+  function applyTemplateToSelected(t: PlateTemplate) {
+    const cfg = t.plate_config
+    const newVarNames = [...cfg.variable_names]
+    const newMeasIds = [...cfg.measurement_data_category_ids]
+    const newFormat = cfg.default_format
+
+    const rows96 = new Set(['A','B','C','D','E','F','G','H'])
+    function keyInBounds(wk: string): boolean {
+      const row = wk.charAt(0)
+      const col = parseInt(wk.slice(1), 10)
+      if (newFormat === '96') {
+        return rows96.has(row) && col >= 1 && col <= 12
+      }
+      return row >= 'A' && row <= 'P' && col >= 1 && col <= 24
+    }
+
+    function pruneWellKeys(grid: Record<string, string>): Record<string, string> {
+      const next: Record<string, string> = {}
+      for (const k of Object.keys(grid)) {
+        if (keyInBounds(k)) next[k] = grid[k]
+      }
+      return next
+    }
+
+    onPlatesChange(prev => prev.map(p => {
+      if (p.localKey !== selectedPlateKey) return p
+      const nextVariableGrids: Record<string, Record<string, string>> = {}
+      for (const name of newVarNames) {
+        const existing = p.variableGrids[name]
+        if (existing) nextVariableGrids[name] = pruneWellKeys(existing)
+      }
+      const nextMeasurementGrids: Record<number, Record<string, string>> = {}
+      for (const id of newMeasIds) {
+        const existing = p.measurementGrids[id]
+        if (existing) nextMeasurementGrids[id] = pruneWellKeys(existing)
+      }
+      return {
+        ...p,
+        format: newFormat,
+        variableNames: newVarNames,
+        measurementIds: newMeasIds,
+        variableGrids: nextVariableGrids,
+        measurementGrids: nextMeasurementGrids,
+      }
+    }))
   }
 
   return (
@@ -206,6 +262,8 @@ export function PlateStep2PlatesAndWells({
           onVariableNamesChange={v => updateSelectedPlate('variableNames', v)}
           measurementIds={selected.measurementIds}
           onMeasurementIdsChange={v => updateSelectedPlate('measurementIds', v)}
+          plateTemplates={plateTemplates}
+          onApplyTemplate={applyTemplateToSelected}
         />
       ) : (
         <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
