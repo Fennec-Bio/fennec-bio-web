@@ -112,6 +112,20 @@ export function PlateTemplateEditor() {
 
   async function save() {
     if (!projectId || !name.trim()) return
+    // Symmetric collision check: variable names and measurement column names
+    // share the same column namespace in the wizard's table, so duplicates
+    // would produce confusing two-of-a-kind columns. addVariable() covers the
+    // variable-add path; this covers the measurement-toggle path.
+    const measNames = new Set(
+      measurementIds
+        .map(id => allowedCats.find(c => c.id === id)?.name)
+        .filter((n): n is string => !!n),
+    )
+    const collision = variableNames.find(v => measNames.has(v))
+    if (collision) {
+      setError(`Variable "${collision}" collides with a selected measurement name.`)
+      return
+    }
     setError(null)
     const payload = {
       name: name.trim(),
@@ -290,7 +304,7 @@ export function PlateTemplateEditor() {
           type="button"
           onClick={startCreate}
           disabled={!projectId}
-          className="h-9 px-4 py-2 bg-[#eb5234] text-white rounded-md text-sm font-medium hover:bg-[#d4462c] transition-all flex items-center gap-1 disabled:opacity-50"
+          className="h-9 px-4 py-2 bg-[#eb5234] text-white rounded-md text-sm font-medium hover:bg-[#d4492f] transition-all flex items-center gap-1 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" /> New Plate Template
         </button>
@@ -328,7 +342,7 @@ export function PlateTemplateEditor() {
                   <button
                     type="button"
                     onClick={() => startEdit(t)}
-                    className="text-[#eb5234] hover:text-[#d4462c] text-sm flex items-center gap-1"
+                    className="text-[#eb5234] hover:text-[#d4492f] text-sm flex items-center gap-1"
                   >
                     <Pencil className="h-3.5 w-3.5" /> Edit
                   </button>
