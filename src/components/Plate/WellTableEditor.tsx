@@ -40,6 +40,7 @@ export type WellTableEditorProps = {
   onMeasurementIdsChange: React.Dispatch<React.SetStateAction<number[]>>
   plateTemplates?: PlateTemplate[]
   onApplyTemplate?: (t: PlateTemplate) => void
+  strainSuggestions?: string[]
 }
 
 export function WellTableEditor({
@@ -49,6 +50,7 @@ export function WellTableEditor({
   variableNames, onVariableNamesChange,
   measurementIds, onMeasurementIdsChange,
   plateTemplates, onApplyTemplate,
+  strainSuggestions,
 }: WellTableEditorProps) {
   const wellKeys = buildWellKeys(plateFormat)
   const allowedCategories = dataCategories.filter(c => c.category !== 'process_data')
@@ -396,10 +398,12 @@ export function WellTableEditor({
                 <td className="px-2 py-1 text-gray-500 font-medium">{wk}</td>
                 {variableNames.map(name => (
                   <td key={`cv-${name}-${wk}`} className="p-0">
-                    <input
-                      className="w-full px-2 py-1 text-xs focus:outline-none focus:bg-[#eb5234]/5"
+                    <VariableCellInput
+                      wellKey={wk}
+                      name={name}
                       value={variableGrids[name]?.[wk] ?? ''}
-                      onChange={e => setVariableCell(name, wk, e.target.value)}
+                      suggestions={strainSuggestions}
+                      onChange={next => setVariableCell(name, wk, next)}
                       onPaste={e => handleVariablePaste(e, name, wellIdx)}
                     />
                   </td>
@@ -419,6 +423,77 @@ export function WellTableEditor({
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+function VariableCellInput({
+  wellKey, name, value, suggestions, onChange, onPaste,
+}: {
+  wellKey: string
+  name: string
+  value: string
+  suggestions?: string[]
+  onChange: (next: string) => void
+  onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => void
+}) {
+  const typeaheadEnabled = Boolean(
+    suggestions && suggestions.length > 0 && name.toLowerCase() === 'strain'
+  )
+  const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocMouseDown(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [open])
+
+  if (!typeaheadEnabled) {
+    return (
+      <input
+        className="w-full px-2 py-1 text-xs focus:outline-none focus:bg-[#eb5234]/5"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onPaste={onPaste}
+      />
+    )
+  }
+
+  const q = value.trim().toLowerCase()
+  const filtered = (suggestions ?? []).filter(s => s.toLowerCase().includes(q))
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <input
+        className="w-full px-2 py-1 text-xs focus:outline-none focus:bg-[#eb5234]/5"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onChange={e => { onChange(e.target.value); setOpen(true) }}
+        onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}
+        onPaste={onPaste}
+        data-well-key={wellKey}
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] w-64 max-h-48 overflow-y-auto">
+          {filtered.map(s => (
+            <li key={s}>
+              <button
+                type="button"
+                onClick={() => { onChange(s); setOpen(false) }}
+                className="w-full text-left px-2 py-1 text-xs hover:bg-gray-100"
+              >
+                {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
