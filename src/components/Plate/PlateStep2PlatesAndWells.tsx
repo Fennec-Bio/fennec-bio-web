@@ -20,6 +20,7 @@ export function PlateStep2PlatesAndWells({
   selectedPlateKey, onSelectedPlateKeyChange,
   dataCategories,
   projectId,
+  strainSuggestions,
   onBack, onNext,
 }: {
   plates: PlateDraft[]
@@ -28,6 +29,7 @@ export function PlateStep2PlatesAndWells({
   onSelectedPlateKeyChange: (key: string) => void
   dataCategories: DataCategory[]
   projectId: number | null
+  strainSuggestions: string[]
   onBack: () => void
   onNext: () => void
 }) {
@@ -264,6 +266,7 @@ export function PlateStep2PlatesAndWells({
           onMeasurementIdsChange={v => updateSelectedPlate('measurementIds', v)}
           plateTemplates={plateTemplates}
           onApplyTemplate={applyTemplateToSelected}
+          strainSuggestions={strainSuggestions}
         />
       ) : (
         <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">

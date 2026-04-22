@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { useDataCategories } from '@/hooks/useDataCategories'
+import { useProjectStrains } from '@/hooks/useProjectStrains'
 import { PlateStepIndicator } from '@/components/Plate/PlateStepIndicator'
 import { PlateStep1Details } from '@/components/Plate/PlateStep1Details'
 import { PlateStep2PlatesAndWells, PlateDraft } from '@/components/Plate/PlateStep2PlatesAndWells'
@@ -69,6 +70,7 @@ export function CreatePlateWizard({
   const effectiveOnCancel = onCancel ?? (() => router.back())
   const projectId = activeProject?.id ?? null
   const { categories } = useDataCategories(projectId)
+  const { names: strainSuggestions } = useProjectStrains(projectId)
   const API = process.env.NEXT_PUBLIC_API_URL
 
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -185,6 +187,7 @@ export function CreatePlateWizard({
           onSelectedPlateKeyChange={setSelectedPlateKey}
           dataCategories={categories}
           projectId={projectId}
+          strainSuggestions={strainSuggestions}
           onBack={() => setStep(1)}
           onNext={() => setStep(3)}
         />
