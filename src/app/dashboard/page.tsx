@@ -9,7 +9,6 @@ import { QuickView } from '@/components/dashboard/QuickView'
 import { Overlay } from '@/components/dashboard/Overlay'
 import { VariableImpact } from '@/components/dashboard/VariableImpact'
 import { AIRecommendations } from '@/components/AIRecommendations'
-import { DashboardTabs } from '@/components/Plate/DashboardTabs'
 
 interface Experiment {
   id: number
@@ -182,7 +181,6 @@ export default function Dashboard() {
       )}
 
       <div className="max-w-[1920px] mx-auto px-3 py-3 md:px-4 md:py-4 lg:px-6">
-        <DashboardTabs />
         <div className="flex flex-row gap-3 md:gap-5 lg:gap-6">
           {/* Desktop sidebar */}
           <div className="hidden md:block w-[364px] min-w-[364px] max-w-[416px] flex-shrink-0 relative z-50">

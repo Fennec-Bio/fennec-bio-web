@@ -1,9 +1,12 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
+import { DashboardTabs, DashboardSection } from '@/components/Plate/DashboardTabs'
+import { usePlateExperiments } from '@/hooks/usePlateExperiment'
 
 interface Experiment {
   id: number
@@ -68,7 +71,10 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     anomalies: []
   })
 
+  const [section, setSection] = useState<DashboardSection>('reactor')
   const [viewMode, setViewMode] = useState<'experiments' | 'sets'>('experiments')
+  const { data: plateData, loading: platesLoading, error: platesError } =
+    usePlateExperiments({ projectId: activeProject?.id ?? null })
   const [experimentSets, setExperimentSets] = useState<ExperimentSetData[]>([])
   const [expandedSets, setExpandedSets] = useState<Set<string>>(new Set())
   const [setsLoading, setSetsLoading] = useState(false)
@@ -673,18 +679,23 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
       isMobileDrawer ? 'h-full border-0 shadow-none' : ''
     }`}>
       <div className="pb-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-left text-xl md:text-2xl font-bold">
-            {viewMode === 'experiments' ? 'Experiment List' : 'Experiment Sets'}
-          </h2>
-          <button
-            onClick={() => setViewMode(viewMode === 'experiments' ? 'sets' : 'experiments')}
-            className="h-8 px-3 border border-gray-200 rounded-md text-xs font-medium shadow-xs hover:bg-gray-100 transition-all"
-          >
-            {viewMode === 'experiments' ? 'View Sets' : 'View List'}
-          </button>
+        <h2 className="text-left text-xl md:text-2xl font-bold">
+          {section === 'plates'
+            ? 'Plate Experiments'
+            : viewMode === 'experiments' ? 'Experiment List' : 'Experiment Sets'}
+        </h2>
+        <div className="flex items-center gap-2 mt-2">
+          <DashboardTabs value={section} onChange={setSection} />
+          {section === 'reactor' && (
+            <button
+              onClick={() => setViewMode(viewMode === 'experiments' ? 'sets' : 'experiments')}
+              className="h-8 px-3 border border-gray-200 rounded-md text-xs font-medium shadow-xs hover:bg-gray-100 transition-all"
+            >
+              {viewMode === 'experiments' ? 'View Sets' : 'View List'}
+            </button>
+          )}
         </div>
-        {viewMode === 'experiments' && <><div className="flex gap-2 mt-4 relative" ref={menuRef}>
+        {section === 'reactor' && viewMode === 'experiments' && <><div className="flex gap-2 mt-4 relative" ref={menuRef}>
           <div className="flex-1 relative">
             <button
               className="w-full h-9 px-4 py-2 border border-gray-200 rounded-md text-sm font-medium shadow-xs hover:bg-gray-100 transition-all"
@@ -1128,7 +1139,38 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
         </>}
       </div>
 
-      {viewMode === 'experiments' ? (
+      {section === 'plates' ? (
+        <div className="px-0 pb-4 overflow-y-auto flex-1">
+          {platesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">Loading plate experiments...</div>
+            </div>
+          ) : platesError ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-red-600">{platesError}</div>
+            </div>
+          ) : !plateData || plateData.results.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">No plate experiments in this project</div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {plateData.results.map((pe) => (
+                <Link
+                  key={pe.id}
+                  href={`/dashboard/plates/${pe.id}`}
+                  className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <h4 className="font-medium">{pe.title}</h4>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {pe.plate_count} plate{pe.plate_count === 1 ? '' : 's'} · {pe.date ?? '—'}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : viewMode === 'experiments' ? (
         <div className="px-0 pb-4 overflow-y-auto flex-1">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
