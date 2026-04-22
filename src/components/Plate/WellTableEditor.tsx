@@ -193,7 +193,12 @@ export function WellTableEditor({
   }
 
   function removeVariable(name: string) {
-    onVariableNamesChange(prev => prev.filter(n => n !== name))
+    const n = name.toLowerCase()
+    if (n === 'strain' || n === 'media') {
+      window.alert('The Strain and Media variables cannot be removed.')
+      return
+    }
+    onVariableNamesChange(prev => prev.filter(nm => nm !== name))
     onVariableGridsChange(prev => {
       const next = { ...prev }
       delete next[name]

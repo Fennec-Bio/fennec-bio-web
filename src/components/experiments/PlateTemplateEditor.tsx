@@ -213,6 +213,46 @@ export function PlateTemplateEditor() {
             </select>
           </div>
           <div>
+            <div className="block text-sm font-medium text-gray-700 mb-1">Preview</div>
+            <div className="text-xs text-gray-500 mb-2">First 2 wells of a {format}-well plate</div>
+            <div className="bg-white border border-gray-200 rounded-lg overflow-auto">
+              <table className="border-collapse text-xs w-full">
+                <thead>
+                  <tr>
+                    <th className="px-2 py-2 text-left text-gray-500 font-medium border-b border-gray-200 w-16">Well</th>
+                    {variableNames.map(name => (
+                      <th key={`pv-v-${name}`} className="px-2 py-2 text-left text-gray-500 font-medium border-b border-gray-200">
+                        {name}
+                      </th>
+                    ))}
+                    {measurementIds.map(id => {
+                      const cat = allowedCats.find(c => c.id === id)
+                      if (!cat) return null
+                      return (
+                        <th key={`pv-m-${id}`} className="px-2 py-2 text-left text-gray-500 font-medium border-b border-gray-200">
+                          {cat.name}{cat.unit ? ` (${cat.unit})` : ''}
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {['A1', 'A2'].map(wk => (
+                    <tr key={`pv-row-${wk}`} className="border-t border-gray-100">
+                      <td className="px-2 py-1 text-gray-700 font-medium">{wk}</td>
+                      {variableNames.map(name => (
+                        <td key={`pv-cv-${name}-${wk}`} className="px-2 py-1 text-gray-400">—</td>
+                      ))}
+                      {measurementIds.map(id => (
+                        <td key={`pv-cm-${id}-${wk}`} className="px-2 py-1 text-gray-400">—</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
             <div className="block text-sm font-medium text-gray-700 mb-1">Variables</div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
               {variableNames.length === 0 && (
@@ -223,7 +263,13 @@ export function PlateTemplateEditor() {
                   {v}
                   <button
                     type="button"
-                    onClick={() => setVariableNames(prev => prev.filter(x => x !== v))}
+                    onClick={() => {
+                      if (v.toLowerCase() === 'strain' || v.toLowerCase() === 'media') {
+                        window.alert('The Strain and Media variables cannot be removed.')
+                        return
+                      }
+                      setVariableNames(prev => prev.filter(x => x !== v))
+                    }}
                     className="text-gray-400 hover:text-red-600"
                     aria-label={`Remove variable ${v}`}
                   >×</button>
