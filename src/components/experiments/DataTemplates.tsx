@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { PlateTemplateEditor } from '@/components/experiments/PlateTemplateEditor'
 
 interface ColumnMapping {
   column: string
@@ -87,13 +88,14 @@ export function DataTemplates() {
   const [activeSheetIdx, setActiveSheetIdx] = useState(0)
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [templateType, setTemplateType] = useState<'fermentation' | 'plate' | null>(null)
 
   const fetchTemplates = useCallback(async () => {
     if (!activeProject) return
     setIsLoading(true)
     try {
       const token = await getToken()
-      const res = await fetch(`${apiUrl}/api/data-templates/?project_id=${activeProject.id}`, {
+      const res = await fetch(`${apiUrl}/api/data-templates/?project_id=${activeProject.id}&type=fermentation`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -526,9 +528,60 @@ export function DataTemplates() {
     )
   }
 
-  // List view
+  // Template-type picker branches. Run AFTER the fermentation edit-mode
+  // branch above (so flipping type during a fermentation edit doesn't strand
+  // the form) but BEFORE the fermentation list view below.
+  if (templateType === null) {
+    return (
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Data Templates</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setTemplateType('fermentation')}
+            className="text-left p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:shadow-md transition-shadow"
+          >
+            <div className="font-semibold text-gray-900 mb-1">Fermentation Template</div>
+            <div className="text-sm text-gray-500">Spreadsheet column mapping for uploaded bioreactor data (sheet names, timepoints, product/process columns).</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTemplateType('plate')}
+            className="text-left p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:shadow-md transition-shadow"
+          >
+            <div className="font-semibold text-gray-900 mb-1">Plate Template</div>
+            <div className="text-sm text-gray-500">Pre-configured variable and measurement columns for the plate create wizard.</div>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (templateType === 'plate') {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setTemplateType(null)}
+          className="mb-3 text-sm text-gray-500 hover:text-gray-900"
+        >
+          ← Change type
+        </button>
+        <PlateTemplateEditor />
+      </div>
+    )
+  }
+
+  // Fermentation branch: the existing list view with a change-type link prepended.
   return (
     <div>
+      <button
+        type="button"
+        onClick={() => setTemplateType(null)}
+        className="mb-3 text-sm text-gray-500 hover:text-gray-900"
+      >
+        ← Change type
+      </button>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">Data Templates</h3>
         <button

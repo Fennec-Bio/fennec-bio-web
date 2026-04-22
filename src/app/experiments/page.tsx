@@ -7,6 +7,7 @@ import { CreateExperiment } from '@/components/experiments/CreateExperiment'
 import { EditExperiment } from '@/components/experiments/EditExperiment'
 import { ManageExperimentSets } from '@/components/experiments/ManageExperimentSets'
 import { DataTemplates } from '@/components/experiments/DataTemplates'
+import { CreatePlateExperiment } from '@/components/Plate/CreatePlateExperiment'
 
 interface Experiment {
   id: number
@@ -26,6 +27,7 @@ export default function ExperimentsPage() {
   const [isSetsOpen, setIsSetsOpen] = useState(true)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(true)
   const [listRefreshKey, setListRefreshKey] = useState(0)
+  const [newType, setNewType] = useState<'fermentation' | 'plate' | null>(null)
 
   const handleExperimentSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
@@ -78,7 +80,11 @@ export default function ExperimentsPage() {
           <div className="flex-1 min-w-0 flex flex-col gap-3 md:gap-5">
             <div className="bg-white rounded-lg shadow">
               <button
-                onClick={() => setIsCreateOpen(!isCreateOpen)}
+                onClick={() => {
+                  const nextOpen = !isCreateOpen
+                  setIsCreateOpen(nextOpen)
+                  if (!nextOpen) setNewType(null)
+                }}
                 className="w-full px-4 py-3 flex items-center justify-between text-left text-xl md:text-2xl font-bold text-gray-900 hover:bg-gray-50 rounded-t-lg"
               >
                 <span>Create Experiment</span>
@@ -86,7 +92,55 @@ export default function ExperimentsPage() {
               </button>
               {isCreateOpen && (
                 <div className="p-3 md:p-4 lg:p-6">
-                  <CreateExperiment onCreated={() => setListRefreshKey(k => k + 1)} />
+                  {newType === null && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setNewType('fermentation')}
+                        className="text-left p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:shadow-md transition-shadow"
+                      >
+                        <div className="font-semibold text-gray-900 mb-1">Fermentation Experiment</div>
+                        <div className="text-sm text-gray-500">Bioreactor run with time-series products, secondary products, and process data.</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewType('plate')}
+                        className="text-left p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:shadow-md transition-shadow"
+                      >
+                        <div className="font-semibold text-gray-900 mb-1">Plate Experiment</div>
+                        <div className="text-sm text-gray-500">96- or 384-well screen with per-well conditions and endpoint measurements.</div>
+                      </button>
+                    </div>
+                  )}
+
+                  {newType === 'fermentation' && (
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setNewType(null)}
+                        className="text-sm text-gray-500 hover:text-gray-900"
+                      >
+                        ← Change type
+                      </button>
+                      <CreateExperiment onCreated={() => setListRefreshKey(k => k + 1)} />
+                    </div>
+                  )}
+
+                  {newType === 'plate' && (
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setNewType(null)}
+                        className="text-sm text-gray-500 hover:text-gray-900"
+                      >
+                        ← Change type
+                      </button>
+                      <CreatePlateExperiment
+                        onCreated={() => setListRefreshKey(k => k + 1)}
+                        onCancel={() => setNewType(null)}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
