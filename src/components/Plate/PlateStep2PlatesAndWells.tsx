@@ -69,7 +69,7 @@ export function PlateStep2PlatesAndWells({
       format: newFormat,
       variableGrids: {},
       measurementGrids: {},
-      variableNames: [],
+      variableNames: ['Strain', 'Media'],
       measurementIds: [],
     }
     onPlatesChange(prev => [...prev, draft])

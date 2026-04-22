@@ -21,8 +21,8 @@ export function WellDetailPanel({
     )
   }
 
-  const strain = well.variables.find(v => v.name === 'strain')?.value
-  const colony = well.variables.find(v => v.name === 'colony')?.value
+  const strain = well.variables.find(v => v.name.toLowerCase() === 'strain')?.value
+  const colony = well.variables.find(v => v.name.toLowerCase() === 'colony')?.value
   const canPromote = Boolean(strain && colony && projectId)
 
   return (

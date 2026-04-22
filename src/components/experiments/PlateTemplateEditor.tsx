@@ -67,7 +67,7 @@ export function PlateTemplateEditor() {
     setEditingId(null)
     setName('')
     setFormat('96')
-    setVariableNames([])
+    setVariableNames(['Strain', 'Media'])
     setMeasurementIds([])
     setNewVar('')
     setError(null)

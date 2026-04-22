@@ -17,7 +17,7 @@ function freshSeedPlates(): PlateDraft[] {
     format: '96',
     variableGrids: {},
     measurementGrids: {},
-    variableNames: [],
+    variableNames: ['Strain', 'Media'],
     measurementIds: [],
   }]
 }

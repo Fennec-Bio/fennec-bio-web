@@ -53,7 +53,7 @@ export function PlateBarChart({
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key)!.push(value)
       if (!labels.has(key)) {
-        const strain = well.variables.find(v => v.name === 'strain')?.value
+        const strain = well.variables.find(v => v.name.toLowerCase() === 'strain')?.value
         labels.set(key, strain ?? `${well.row}${well.column}`)
       }
     })
