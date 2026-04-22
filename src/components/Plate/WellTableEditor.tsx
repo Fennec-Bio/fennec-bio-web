@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { DataCategory } from '@/hooks/useDataCategories'
+import type { PlateTemplate } from '@/hooks/usePlateTemplates'
 
 const ROWS_96 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const ROWS_384 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P']
@@ -37,6 +38,8 @@ export type WellTableEditorProps = {
   onVariableNamesChange: React.Dispatch<React.SetStateAction<string[]>>
   measurementIds: number[]
   onMeasurementIdsChange: React.Dispatch<React.SetStateAction<number[]>>
+  plateTemplates?: PlateTemplate[]
+  onApplyTemplate?: (t: PlateTemplate) => void
 }
 
 export function WellTableEditor({
@@ -45,6 +48,7 @@ export function WellTableEditor({
   measurementGrids, onMeasurementGridsChange,
   variableNames, onVariableNamesChange,
   measurementIds, onMeasurementIdsChange,
+  plateTemplates, onApplyTemplate,
 }: WellTableEditorProps) {
   const wellKeys = buildWellKeys(plateFormat)
   const allowedCategories = dataCategories.filter(c => c.category !== 'process_data')
@@ -66,6 +70,20 @@ export function WellTableEditor({
     document.addEventListener('mousedown', onDocMouseDown)
     return () => document.removeEventListener('mousedown', onDocMouseDown)
   }, [addOpen])
+
+  const [loadOpen, setLoadOpen] = useState(false)
+  const loadPopoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!loadOpen) return
+    function onDocMouseDown(e: MouseEvent) {
+      if (loadPopoverRef.current && !loadPopoverRef.current.contains(e.target as Node)) {
+        setLoadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [loadOpen])
 
   function setVariableCell(name: string, wellKey: string, value: string) {
     onVariableGridsChange(prev => {
@@ -203,6 +221,47 @@ export function WellTableEditor({
           {wellKeys.length} wells · {variableNames.length} variable{variableNames.length === 1 ? '' : 's'} · {measurementIds.length} measurement{measurementIds.length === 1 ? '' : 's'}
           {hasNoColumns && <span className="ml-2 text-gray-400">— click &ldquo;+ Add column&rdquo; to start</span>}
         </div>
+        {plateTemplates && onApplyTemplate && plateTemplates.length > 0 && (
+          <div ref={loadPopoverRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setLoadOpen(o => !o)}
+              className="px-3 py-1.5 border border-gray-200 bg-white text-gray-700 rounded-md text-xs font-medium hover:bg-gray-50"
+            >
+              Load template
+            </button>
+            {loadOpen && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 w-64 space-y-2">
+                <div className="text-xs uppercase text-gray-500 px-1">Plate templates</div>
+                <ul className="max-h-60 overflow-y-auto space-y-0.5">
+                  {plateTemplates.map(t => (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => { onApplyTemplate(t); setLoadOpen(false) }}
+                        className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-100"
+                      >
+                        <div className="font-medium text-gray-900">{t.name}</div>
+                        <div className="text-gray-500">
+                          {t.plate_config.default_format}-well · {t.plate_config.variable_names.length} var{t.plate_config.variable_names.length !== 1 ? 's' : ''} · {t.plate_config.measurement_data_category_ids.length} meas
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setLoadOpen(false)}
+                    className="px-3 py-1 border border-gray-200 bg-white text-gray-700 rounded-md text-xs font-medium hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <div ref={popoverRef} className="relative">
           <button
             type="button"
