@@ -25,6 +25,7 @@ interface ApiResponse {
   products: string[]
   impacts: ImpactEntry[]
   rebuild_status: 'running' | 'completed' | 'failed' | null
+  rebuild_error?: string
 }
 
 export function VariableImpact() {
@@ -37,6 +38,7 @@ export function VariableImpact() {
   const [isLoading, setIsLoading] = useState(false)
   const [productOpen, setProductOpen] = useState(false)
   const [isRebuilding, setIsRebuilding] = useState(false)
+  const [rebuildError, setRebuildError] = useState<string | null>(null)
 
   const heatmapRef = useRef<SVGSVGElement>(null)
   const boxplotRef = useRef<SVGSVGElement>(null)
@@ -83,13 +85,19 @@ export function VariableImpact() {
   useEffect(() => {
     if (isRebuilding && data?.rebuild_status === 'completed') {
       setIsRebuilding(false)
+      setRebuildError(null)
       // Re-fetch without product filter to reload product list
       fetchData()
     }
-  }, [isRebuilding, data?.rebuild_status, fetchData])
+    if (isRebuilding && data?.rebuild_status === 'failed') {
+      setIsRebuilding(false)
+      setRebuildError(data.rebuild_error || 'Rebuild failed. Please try again.')
+    }
+  }, [isRebuilding, data?.rebuild_status, data?.rebuild_error, fetchData])
 
   const handleRebuild = async () => {
     setIsRebuilding(true)
+    setRebuildError(null)
     try {
       const token = await getToken()
       const res = await fetch(
@@ -103,6 +111,7 @@ export function VariableImpact() {
         const err = await res.json()
         if (res.status === 409) {
           // Already running, just start polling
+          fetchData(selectedProduct || undefined)
           return
         }
         throw new Error(err.error || 'Failed to trigger rebuild')
@@ -111,6 +120,7 @@ export function VariableImpact() {
       fetchData(selectedProduct || undefined)
     } catch (err) {
       console.error('Rebuild failed:', err)
+      setRebuildError(err instanceof Error ? err.message : 'Failed to trigger rebuild')
       setIsRebuilding(false)
     }
   }
@@ -324,6 +334,12 @@ export function VariableImpact() {
               )}
             </button>
           </div>
+
+          {rebuildError && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {rebuildError}
+            </div>
+          )}
 
           {isLoading && (
             <div className="flex items-center justify-center h-48">
