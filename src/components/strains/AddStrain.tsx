@@ -34,6 +34,10 @@ export function AddStrain({ onStrainAdded, availableStrains, lineageData = [] }:
 
   const [name, setName] = useState('')
   const [parent, setParent] = useState('')
+  const [species, setSpecies] = useState('')
+  const [isolate, setIsolate] = useState('')
+  const [description, setDescription] = useState('')
+  const [notes, setNotes] = useState('')
   const [modifications, setModifications] = useState<Modification[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -82,6 +86,10 @@ export function AddStrain({ onStrainAdded, availableStrains, lineageData = [] }:
       const payload: Record<string, unknown> = {
         strain_name: name.trim(),
         parent_strain: parent || null,
+        species: species.trim() || null,
+        isolate: isolate.trim() || null,
+        description: description.trim(),
+        notes: notes.trim(),
         modifications: modifications
           .filter(m => m.gene_name.trim())
           .map(m => ({ type: m.modification_type, gene_name: m.gene_name.trim() })),
@@ -104,6 +112,10 @@ export function AddStrain({ onStrainAdded, availableStrains, lineageData = [] }:
       setSuccessMessage(`Strain "${name.trim()}" created successfully`)
       setName('')
       setParent('')
+      setSpecies('')
+      setIsolate('')
+      setDescription('')
+      setNotes('')
       setModifications([])
       onStrainAdded()
     } catch (err) {
@@ -159,6 +171,58 @@ export function AddStrain({ onStrainAdded, availableStrains, lineageData = [] }:
               <option key={s.name} value={s.name}>{s.name}</option>
             ))}
           </select>
+        </div>
+
+        {/* Metadata */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Species
+            </label>
+            <input
+              type="text"
+              value={species}
+              onChange={e => setSpecies(e.target.value)}
+              placeholder="e.g. S. cerevisiae"
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Isolate
+            </label>
+            <input
+              type="text"
+              value={isolate}
+              onChange={e => setIsolate(e.target.value)}
+              placeholder="e.g. colony A1"
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
+          <textarea
+            rows={3}
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Notes
+          </label>
+          <textarea
+            rows={3}
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         {/* Modifications */}

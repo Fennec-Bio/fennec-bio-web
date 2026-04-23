@@ -13,6 +13,10 @@ interface StrainLineageData {
     modification_type: string
     gene_name: string
   }[]
+  description?: string
+  species?: string | null
+  notes?: string
+  isolate?: string | null
   lineage_id: number | null
 }
 
@@ -39,6 +43,10 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
   const { getToken } = useAuth()
 
   const [parent, setParent] = useState('')
+  const [species, setSpecies] = useState('')
+  const [isolate, setIsolate] = useState('')
+  const [description, setDescription] = useState('')
+  const [notes, setNotes] = useState('')
   const [modifications, setModifications] = useState<Modification[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -48,6 +56,10 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
   useEffect(() => {
     if (strainData) {
       setParent(strainData.parent || '')
+      setSpecies(strainData.species || '')
+      setIsolate(strainData.isolate || '')
+      setDescription(strainData.description || '')
+      setNotes(strainData.notes || '')
       setModifications(
         strainData.modifications.map(m => ({
           id: m.id,
@@ -58,6 +70,10 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
       )
     } else {
       setParent('')
+      setSpecies('')
+      setIsolate('')
+      setDescription('')
+      setNotes('')
       setModifications([])
     }
     setSuccessMessage('')
@@ -86,6 +102,10 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
       const token = await getToken()
       const payload: Record<string, unknown> = {
         parent_strain: parent || null,
+        species: species.trim() || null,
+        isolate: isolate.trim() || null,
+        description: description.trim(),
+        notes: notes.trim(),
         modifications: modifications
           .filter(m => m.gene_name.trim())
           .map(m => ({
@@ -177,6 +197,56 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
                 <option key={s.name} value={s.name}>{s.name}</option>
               ))}
           </select>
+        </div>
+
+        {/* Metadata */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Species
+            </label>
+            <input
+              type="text"
+              value={species}
+              onChange={e => setSpecies(e.target.value)}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Isolate
+            </label>
+            <input
+              type="text"
+              value={isolate}
+              onChange={e => setIsolate(e.target.value)}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
+          <textarea
+            rows={3}
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Notes
+          </label>
+          <textarea
+            rows={3}
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         {/* Modifications */}

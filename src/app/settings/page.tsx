@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useOrganization, useAuth, useUser, useClerk } from '@clerk/nextjs'
+import { useOrganization, useAuth, useUser } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { DataCategoryManager } from '@/components/settings/DataCategoryManager'
@@ -12,12 +12,6 @@ interface BackendUser {
   last_name: string
   email: string
   is_platform_staff: boolean
-}
-
-interface OrgOption {
-  id: number
-  clerk_org_id: string
-  name: string
 }
 
 interface OrgMember {
@@ -33,7 +27,6 @@ type InviteRole = 'org:member' | 'org:admin'
 export default function Settings() {
   const { organization, isLoaded: isOrgLoaded, membership } = useOrganization()
   const { user: clerkUser } = useUser()
-  const { setActive } = useClerk()
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<InviteRole>('org:member')
   const [inviteStatus, setInviteStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -45,9 +38,6 @@ export default function Settings() {
   const [removeStatus, setRemoveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isRemoving, setIsRemoving] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; identifier: string } | null>(null)
-  const [allOrgs, setAllOrgs] = useState<OrgOption[]>([])
-  const [switchError, setSwitchError] = useState('')
-  const [isSwitching, setIsSwitching] = useState<string | null>(null)
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true)
   const router = useRouter()
 
@@ -78,25 +68,6 @@ export default function Settings() {
     }
     fetchMe()
   }, [getToken])
-
-  useEffect(() => {
-    if (!backendUser?.is_platform_staff) return
-    const fetchOrgs = async () => {
-      try {
-        const token = await getToken()
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setAllOrgs(data.organizations || [])
-        }
-      } catch {
-        // silently fail
-      }
-    }
-    fetchOrgs()
-  }, [backendUser?.is_platform_staff, getToken])
 
   useEffect(() => {
     if (!isOrgLoaded || !organization || !isAdmin) return
@@ -146,18 +117,6 @@ export default function Settings() {
       setRemoveStatus({ type: 'error', message: 'Failed to connect to server' })
     } finally {
       setIsRemoving(null)
-    }
-  }
-
-  const handleSwitchOrg = async (clerkOrgId: string) => {
-    setIsSwitching(clerkOrgId)
-    setSwitchError('')
-    try {
-      await setActive({ organization: clerkOrgId })
-      window.location.reload()
-    } catch {
-      setSwitchError('You must be added as a member of this organization in Clerk first.')
-      setIsSwitching(null)
     }
   }
 
@@ -256,31 +215,6 @@ export default function Settings() {
             className="w-full border-white rounded-md px-3 py-2 bg-gray-50 text-gray-600 cursor-not-allowed"
           />
         </div>
-        {backendUser?.is_platform_staff && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Switch Organization</label>
-            {switchError && (
-              <p className="text-sm p-2 rounded text-red-600 bg-red-50 mb-2">{switchError}</p>
-            )}
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {allOrgs.map((org) => (
-                <button
-                  key={org.id}
-                  onClick={() => handleSwitchOrg(org.clerk_org_id)}
-                  disabled={isSwitching !== null}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                    organization?.id === org.clerk_org_id
-                      ? 'bg-blue-100 border border-blue-300 font-medium'
-                      : 'bg-gray-50 hover:bg-gray-100'
-                  } ${isSwitching !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {org.name}
-                  {isSwitching === org.clerk_org_id && ' (switching...)'}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Current Project</label>
           <div className="flex gap-2">

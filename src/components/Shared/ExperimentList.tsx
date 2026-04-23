@@ -104,6 +104,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
   const [eventsMenu, setEventsMenu] = useState(false)
   const [keywordMenu, setKeywordMenu] = useState(false)
   const [strainMenu, setStrainMenu] = useState(false)
+  const [mediaMenu, setMediaMenu] = useState(false)
   const [variableValuesMenu, setVariableValuesMenu] = useState<string | null>(null)
 
   // Media filter dropdown state — three levels deep (slot → section → component → media)
@@ -167,6 +168,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
   const productsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const secondaryProductsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const variableValuesTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const mediaMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const mediaSlotTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const mediaSectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const mediaComponentTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -180,6 +182,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     if (productsTimeoutRef.current) clearTimeout(productsTimeoutRef.current)
     if (secondaryProductsTimeoutRef.current) clearTimeout(secondaryProductsTimeoutRef.current)
     if (variableValuesTimeoutRef.current) clearTimeout(variableValuesTimeoutRef.current)
+    if (mediaMenuTimeoutRef.current) clearTimeout(mediaMenuTimeoutRef.current)
     if (mediaSlotTimeoutRef.current) clearTimeout(mediaSlotTimeoutRef.current)
     if (mediaSectionTimeoutRef.current) clearTimeout(mediaSectionTimeoutRef.current)
     if (mediaComponentTimeoutRef.current) clearTimeout(mediaComponentTimeoutRef.current)
@@ -348,6 +351,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
         setEventsMenu(false)
         setKeywordMenu(false)
         setStrainMenu(false)
+        setMediaMenu(false)
         setVariableValuesMenu(null)
         setProductsMenu(false)
         setSecondaryProductsMenu(false)
@@ -407,6 +411,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     setEventsMenu(false)
     setKeywordMenu(false)
     setStrainMenu(false)
+    setMediaMenu(false)
     setVariableValuesMenu(null)
     setProductsMenu(false)
     setSecondaryProductsMenu(false)
@@ -427,6 +432,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     setActiveFilters(newFilters)
     setCurrentPage(1)
     setFilterMenu(false)
+    setMediaMenu(false)
     setOpenMediaSlot(null)
     setOpenMediaSection(null)
     setOpenMediaComponent(null)
@@ -665,13 +671,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     )
   }
 
-  const mergedVariables = React.useMemo(() => {
-    // Strain is now a top-level Filter item — exclude it from the generic
-    // Variables sub-menu so it doesn't appear in both places.
-    const merged: Record<string, string[]> = { ...uniqueNames.variables }
-    delete merged['strain']
-    return merged
-  }, [uniqueNames.variables])
 
 
   return (
@@ -709,7 +708,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Variables */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setVariablesMenu(true); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
+                  setVariablesMenu(true); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
         setOpenStrainSection(null)
@@ -717,7 +716,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Variables</div>
                   {variablesMenu && (
                     <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
-                      {Object.entries(mergedVariables)
+                      {Object.entries(uniqueNames.variables)
                         .sort(([a], [b]) => sortItems([a, b])[0] === a ? -1 : 1)
                         .map(([variableName, variableValues], index) => (
                           <div className="relative" onMouseEnter={() => {
@@ -746,7 +745,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Anomalies */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setAnomaliesMenu(true); setVariablesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
+                  setAnomaliesMenu(true); setVariablesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
         setOpenStrainSection(null)
@@ -772,7 +771,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Events */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setEventsMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setKeywordMenu(false); setStrainMenu(false)
+                  setEventsMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setKeywordMenu(false); setStrainMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
         setOpenStrainSection(null)
@@ -794,7 +793,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Strain */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false)
+                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
                   // Idempotent: don't clear the child section when re-entering the
@@ -857,44 +856,58 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                   })()}
                 </div>
 
-                {/* Batch Media */}
+                {/* Media (Batch / Feed sub-items) */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
                   setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
-                  // Only clear child state when switching slots; re-entries (e.g. after
-                  // crossing the gap between label and open sub-panel) must preserve it.
-                  if (openMediaSlot !== 'batch') {
-                    setOpenMediaSlot('batch'); setOpenMediaSection(null); setOpenMediaComponent(null)
+                  setOpenStrainSection(null)
+                  // Idempotent: re-entering Media shouldn't wipe out an open slot panel.
+                  if (!mediaMenu) {
+                    setMediaMenu(true); setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
                   }
                 }} onMouseLeave={() => setMenuWithDelay(
-                  (v: boolean) => { if (!v) { setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null) } },
-                  mediaSlotTimeoutRef,
+                  (v: boolean) => { if (!v) { setMediaMenu(false); setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null) } },
+                  mediaMenuTimeoutRef,
                 )}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Batch Media</div>
-                  {openMediaSlot === 'batch' && renderMediaSlotMenu('batch')}
-                </div>
+                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Media</div>
+                  {mediaMenu && (
+                    <div className="absolute left-full top-0 w-auto min-w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                      {/* Batch */}
+                      <div className="relative" onMouseEnter={() => {
+                        clearAllTimeouts()
+                        if (openMediaSlot !== 'batch') {
+                          setOpenMediaSlot('batch'); setOpenMediaSection(null); setOpenMediaComponent(null)
+                        }
+                      }} onMouseLeave={() => setMenuWithDelay(
+                        (v: boolean) => { if (!v) { setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null) } },
+                        mediaSlotTimeoutRef,
+                      )}>
+                        <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Batch</div>
+                        {openMediaSlot === 'batch' && renderMediaSlotMenu('batch')}
+                      </div>
 
-                {/* Feed Media */}
-                <div className="relative" onMouseEnter={() => {
-                  clearAllTimeouts()
-                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
-                  setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
-                  if (openMediaSlot !== 'feed') {
-                    setOpenMediaSlot('feed'); setOpenMediaSection(null); setOpenMediaComponent(null)
-                  }
-                }} onMouseLeave={() => setMenuWithDelay(
-                  (v: boolean) => { if (!v) { setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null) } },
-                  mediaSlotTimeoutRef,
-                )}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Feed Media</div>
-                  {openMediaSlot === 'feed' && renderMediaSlotMenu('feed')}
+                      {/* Feed */}
+                      <div className="relative" onMouseEnter={() => {
+                        clearAllTimeouts()
+                        if (openMediaSlot !== 'feed') {
+                          setOpenMediaSlot('feed'); setOpenMediaSection(null); setOpenMediaComponent(null)
+                        }
+                      }} onMouseLeave={() => setMenuWithDelay(
+                        (v: boolean) => { if (!v) { setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null) } },
+                        mediaSlotTimeoutRef,
+                      )}>
+                        <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Feed</div>
+                        {openMediaSlot === 'feed' && renderMediaSlotMenu('feed')}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Keyword */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setKeywordMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setStrainMenu(false)
+                  setKeywordMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setStrainMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
         setOpenStrainSection(null)
