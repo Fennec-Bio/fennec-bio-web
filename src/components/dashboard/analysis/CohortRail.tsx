@@ -16,6 +16,31 @@ interface Candidate {
   strain_name: string | null
 }
 
+interface ExperimentSetRow {
+  id: string
+  name: string
+  experiment_ids: number[]
+}
+
+async function fetchExperimentSets(token: string | null): Promise<ExperimentSetRow[]> {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/experiment-sets/`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  )
+  if (!res.ok) return []
+  const body = await res.json()
+  const raw: Array<{
+    id: string
+    name: string
+    experiments?: Array<{ id: number }>
+  }> = Array.isArray(body) ? body : (body.results ?? body.experiment_sets ?? [])
+  return raw.map(r => ({
+    id: r.id,
+    name: r.name,
+    experiment_ids: (r.experiments ?? []).map(e => e.id),
+  }))
+}
+
 function MultiSelectDropdown({
   label,
   options,
@@ -74,6 +99,24 @@ export function CohortRail() {
   const [unique, setUnique] = useState<UniqueNamesResponse | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const [setPickerOpen, setSetPickerOpen] = useState(false)
+  const [sets, setSets] = useState<ExperimentSetRow[] | null>(null)
+  const [loadedSetName, setLoadedSetName] = useState<string | null>(null)
+
+  const openSetPicker = async () => {
+    setSetPickerOpen(true)
+    if (sets === null) {
+      const token = await getToken()
+      const fetched = await fetchExperimentSets(token)
+      setSets(fetched)
+    }
+  }
+
+  const loadFromSet = (s: ExperimentSetRow) => {
+    setState({ ids: s.experiment_ids })
+    setLoadedSetName(s.name)
+    setSetPickerOpen(false)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -161,6 +204,39 @@ export function CohortRail() {
         selected={state.feedMediaIds}
         onChange={ids => setState({ feedMediaIds: ids })}
       />
+
+      <div className="mt-3 relative">
+        <button
+          onClick={openSetPicker}
+          className="h-9 w-full px-3 py-2 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all text-left"
+        >
+          Load from set…
+        </button>
+        {loadedSetName && (
+          <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 rounded bg-orange-50 text-[#eb5234] text-xs">
+            via {loadedSetName}
+            <button onClick={() => setLoadedSetName(null)} className="text-[#eb5234]">×</button>
+          </div>
+        )}
+        {setPickerOpen && (
+          <div className="absolute z-[9999] mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+            {sets === null && <div className="px-3 py-2 text-sm text-gray-400">Loading…</div>}
+            {sets?.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">No sets</div>}
+            {sets?.map(s => (
+              <div
+                key={s.id}
+                onClick={() => loadFromSet(s)}
+                className="px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+              >
+                <div className="font-medium">{s.name}</div>
+                <div className="text-xs text-gray-400">
+                  {s.experiment_ids.length} experiments
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="mt-3 flex items-center justify-between">
         <h3 className="text-xs uppercase text-gray-400">
