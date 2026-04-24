@@ -29,7 +29,7 @@ export const THEMES: Array<{
     { slug: 'main-effects',     label: 'Main effects',      availableInP1: true  },
     { slug: 'response-surface', label: 'Response surface',  availableInP1: false },
     { slug: 'pareto',           label: 'Pareto',            availableInP1: true  },
-    { slug: 'regression',       label: 'Regression',        availableInP1: false },
+    { slug: 'regression',       label: 'Regression',        availableInP1: true  },
   ]},
   { id: 'metabolic', label: 'Metabolic eng.', analyses: [
     { slug: 'strain-lineage', label: 'Strain lineage',       availableInP1: false },

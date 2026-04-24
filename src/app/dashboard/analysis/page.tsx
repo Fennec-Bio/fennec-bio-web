@@ -7,6 +7,7 @@ import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParame
 import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { Pareto } from '@/components/dashboard/analysis/Pareto'
+import { Regression } from '@/components/dashboard/analysis/Regression'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
@@ -58,6 +59,9 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'pareto' && (
                 <Pareto ids={state.ids} outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'regression' && (
+                <Regression ids={state.ids} outcome={state.outcome} product={state.product} />
               )}
             </>
           )}
