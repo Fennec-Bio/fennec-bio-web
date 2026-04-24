@@ -5,6 +5,7 @@ import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
 import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
 import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
+import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
@@ -50,6 +51,9 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'anova-heatmap' && (
                 <AnovaHeatmap ids={state.ids} outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'main-effects' && (
+                <MainEffects ids={state.ids} outcome={state.outcome} product={state.product} />
               )}
             </>
           )}

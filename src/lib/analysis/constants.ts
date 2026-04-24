@@ -26,7 +26,7 @@ export const THEMES: Array<{
   ]},
   { id: 'doe', label: 'Variable impact & DoE', analyses: [
     { slug: 'anova-heatmap',    label: 'ANOVA heatmap',     availableInP1: true  },
-    { slug: 'main-effects',     label: 'Main effects',      availableInP1: false },
+    { slug: 'main-effects',     label: 'Main effects',      availableInP1: true  },
     { slug: 'response-surface', label: 'Response surface',  availableInP1: false },
     { slug: 'pareto',           label: 'Pareto',            availableInP1: false },
     { slug: 'regression',       label: 'Regression',        availableInP1: false },
