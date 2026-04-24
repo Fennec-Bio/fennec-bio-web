@@ -39,7 +39,7 @@ export const THEMES: Array<{
   ]},
   { id: 'pattern', label: 'Pattern finding', analyses: [
     { slug: 'pca',         label: 'PCA biplot',         availableInP1: false },
-    { slug: 'cohort-diff', label: 'Best-vs-worst diff', availableInP1: false },
+    { slug: 'cohort-diff', label: 'Best-vs-worst diff', availableInP1: true  },
   ]},
 ]
 

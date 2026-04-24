@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react'
 import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
+import { BestVsWorstDiff } from '@/components/dashboard/analysis/BestVsWorstDiff'
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
 import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
 import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
@@ -70,6 +71,9 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'strain-lineage' && (
                 <StrainLineage payload={payload} product={state.product} outcome={state.outcome} />
+              )}
+              {state.analysis === 'cohort-diff' && (
+                <BestVsWorstDiff payload={payload} product={state.product} outcome={state.outcome} />
               )}
             </>
           )}
