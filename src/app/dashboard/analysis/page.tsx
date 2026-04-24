@@ -8,6 +8,7 @@ import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { Pareto } from '@/components/dashboard/analysis/Pareto'
 import { Regression } from '@/components/dashboard/analysis/Regression'
+import { StrainLineage } from '@/components/dashboard/analysis/StrainLineage'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { YieldSummary } from '@/components/dashboard/analysis/YieldSummary'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
@@ -66,6 +67,9 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'yield-summary' && (
                 <YieldSummary payload={payload} product={state.product} />
+              )}
+              {state.analysis === 'strain-lineage' && (
+                <StrainLineage payload={payload} product={state.product} outcome={state.outcome} />
               )}
             </>
           )}

@@ -32,7 +32,7 @@ export const THEMES: Array<{
     { slug: 'regression',       label: 'Regression',        availableInP1: true  },
   ]},
   { id: 'metabolic', label: 'Metabolic eng.', analyses: [
-    { slug: 'strain-lineage', label: 'Strain lineage',       availableInP1: false },
+    { slug: 'strain-lineage', label: 'Strain lineage',       availableInP1: true  },
     { slug: 'carbon-balance', label: 'Carbon balance',       availableInP1: false },
     { slug: 'yield-summary',  label: 'Yield summary',        availableInP1: true  },
     { slug: 'media-scan',     label: 'Media component scan', availableInP1: false },
