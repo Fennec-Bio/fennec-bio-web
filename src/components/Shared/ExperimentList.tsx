@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
@@ -54,6 +55,19 @@ interface ExperimentListProps {
 export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExperimentSetSelect, isMobileDrawer = false, refreshKey }: ExperimentListProps) => {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
+  const router = useRouter()
+
+  // Multi-select state for cohort-analysis launch. Independent of the
+  // single-select onExperimentSelect handler (which drives detail view).
+  const [analysisSelection, setAnalysisSelection] = useState<Set<number>>(new Set())
+  const toggleAnalysisSelection = useCallback((id: number) => {
+    setAnalysisSelection(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const [uniqueNames, setUniqueNames] = useState<{
     products: string[]
@@ -1136,18 +1150,60 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
               <div className="text-gray-500">No experiments available here</div>
             </div>
           ) : (
-            <div className="space-y-2">
-              {experiments.map((experiment) => (
-                <div
-                  key={experiment.id}
-                  className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => onExperimentSelect?.(experiment)}
-                >
-                  <h4 className="font-medium">{experiment.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-1">{experiment.description}</p>
+            <>
+              {analysisSelection.size > 0 && (
+                <div className="mb-2 flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                  <span className="text-sm text-gray-700">
+                    {analysisSelection.size} selected
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="h-8 px-3 border border-gray-200 rounded-md text-xs font-medium bg-white shadow-xs hover:bg-gray-100 transition-all"
+                      onClick={() => setAnalysisSelection(new Set())}
+                    >
+                      Clear
+                    </button>
+                    <button
+                      className="h-8 px-3 border border-gray-200 rounded-md text-xs font-medium bg-white shadow-xs hover:bg-gray-100 transition-all"
+                      onClick={() => {
+                        const ids = Array.from(analysisSelection).join(',')
+                        router.push(`/dashboard/analysis?ids=${ids}`)
+                      }}
+                    >
+                      Analyze selection →
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+              <div className="space-y-2">
+                {experiments.map((experiment) => {
+                  const isChecked = analysisSelection.has(experiment.id)
+                  return (
+                    <div
+                      key={experiment.id}
+                      className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => onExperimentSelect?.(experiment)}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Add ${experiment.title} to analysis cohort`}
+                        className="mt-1 h-4 w-4 cursor-pointer"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          toggleAnalysisSelection(experiment.id)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-medium">{experiment.title}</h4>
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-1">{experiment.description}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
 
           {/* Pagination */}
