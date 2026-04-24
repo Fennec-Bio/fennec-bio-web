@@ -1,5 +1,6 @@
 'use client'
 
+import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
 import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
 import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
@@ -39,7 +40,7 @@ export default function AnalysisPage() {
                 <DerivedParameters payload={payload} product={state.product} />
               )}
               {state.analysis === 'anova-heatmap' && (
-                <div className="text-sm text-gray-400">ANOVA heatmap — Task 24</div>
+                <AnovaHeatmap ids={state.ids} outcome={state.outcome} product={state.product} />
               )}
             </>
           )}
