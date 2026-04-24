@@ -6,6 +6,7 @@ import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
 import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
 import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
+import { Pareto } from '@/components/dashboard/analysis/Pareto'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
@@ -54,6 +55,9 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'main-effects' && (
                 <MainEffects ids={state.ids} outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'pareto' && (
+                <Pareto ids={state.ids} outcome={state.outcome} product={state.product} />
               )}
             </>
           )}
