@@ -31,6 +31,21 @@ function serializeIds(ids: number[]): string | null {
   return ids.length ? ids.join(',') : null
 }
 
+function parseVariableFilters(raw: string | null): Array<{ name: string; values: string[] }> {
+  if (!raw) return []
+  return raw.split(';').filter(Boolean).map(group => {
+    const [name, valuesRaw] = group.split(':')
+    return { name, values: valuesRaw ? valuesRaw.split(',').filter(Boolean) : [] }
+  })
+}
+
+function serializeVariableFilters(filters: Array<{ name: string; values: string[] }>): string | null {
+  if (!filters.length) return null
+  return filters
+    .map(f => `${f.name}:${f.values.join(',')}`)
+    .join(';')
+}
+
 export function useAnalysisState(): [AnalysisState, (partial: Partial<AnalysisState>) => void] {
   const params = useSearchParams()
   const router = useRouter()
@@ -41,7 +56,7 @@ export function useAnalysisState(): [AnalysisState, (partial: Partial<AnalysisSt
     parentStrainIds: parseIds(params?.get('parent_strains') ?? null),
     batchMediaIds:   parseIds(params?.get('batch_media') ?? null),
     feedMediaIds:    parseIds(params?.get('feed_media') ?? null),
-    variableFilters: [], // populated in Task 17 when variable_filters round-trip is added
+    variableFilters: parseVariableFilters(params?.get('variable_filters') ?? null),
     ids:             parseIds(params?.get('ids') ?? null),
     outcome:         (params?.get('outcome') as OutcomeMetric) || 'final_titer',
     product:         params?.get('product') ?? null,
@@ -60,6 +75,7 @@ export function useAnalysisState(): [AnalysisState, (partial: Partial<AnalysisSt
     maybeSet('batch_media',    serializeIds(merged.batchMediaIds))
     maybeSet('feed_media',     serializeIds(merged.feedMediaIds))
     maybeSet('ids',            serializeIds(merged.ids))
+    maybeSet('variable_filters', serializeVariableFilters(merged.variableFilters))
     maybeSet('outcome',        merged.outcome === 'final_titer' ? null : merged.outcome)
     maybeSet('product',        merged.product)
     maybeSet('theme',          merged.theme === DEFAULT_THEME ? null : merged.theme)
