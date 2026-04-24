@@ -1,4 +1,13 @@
-import type { CohortPayload, AnovaResult, OutcomeMetric } from './types'
+import type {
+  AnovaResult,
+  CohortPayload,
+  MainEffectsResult,
+  OutcomeMetric,
+  ParetoResult,
+  RegressionModelType,
+  RegressionPrediction,
+  RegressionResult,
+} from './types'
 
 export interface UniqueNamesResponse {
   products: string[]
@@ -101,4 +110,99 @@ export async function fetchAnova(
   )
   if (!res.ok) throw new Error(`anova fetch failed: ${res.status}`)
   return res.json()
+}
+
+async function postAnalysis<T>(
+  token: string | null,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/analysis/${path}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  )
+  if (!res.ok) {
+    let message = `${path} failed: ${res.status}`
+    try {
+      const parsed = (await res.json()) as { message?: string }
+      if (parsed?.message) message = parsed.message
+    } catch {
+      // non-JSON body — keep the status-based message
+    }
+    throw new Error(message)
+  }
+  return res.json() as Promise<T>
+}
+
+export async function fetchMainEffects(
+  token: string | null,
+  experimentIds: number[],
+  outcome: OutcomeMetric,
+  product: string | null,
+  factors?: string[],
+): Promise<MainEffectsResult> {
+  return postAnalysis<MainEffectsResult>(token, 'main-effects/', {
+    experiment_ids: experimentIds,
+    outcome,
+    product,
+    ...(factors ? { factors } : {}),
+  })
+}
+
+export async function fetchPareto(
+  token: string | null,
+  experimentIds: number[],
+  outcome: OutcomeMetric,
+  product: string | null,
+  factors?: string[],
+): Promise<ParetoResult> {
+  return postAnalysis<ParetoResult>(token, 'pareto/', {
+    experiment_ids: experimentIds,
+    outcome,
+    product,
+    ...(factors ? { factors } : {}),
+  })
+}
+
+export async function fetchRegression(
+  token: string | null,
+  experimentIds: number[],
+  outcome: OutcomeMetric,
+  product: string | null,
+  variables: string[],
+  modelType: RegressionModelType,
+): Promise<RegressionResult> {
+  return postAnalysis<RegressionResult>(token, 'regression/', {
+    experiment_ids: experimentIds,
+    outcome,
+    product,
+    variables,
+    model_type: modelType,
+  })
+}
+
+export async function predictRegression(
+  token: string | null,
+  experimentIds: number[],
+  outcome: OutcomeMetric,
+  product: string | null,
+  variables: string[],
+  modelType: RegressionModelType,
+  at: Record<string, number>,
+): Promise<RegressionPrediction> {
+  return postAnalysis<RegressionPrediction>(token, 'regression/predict/', {
+    experiment_ids: experimentIds,
+    outcome,
+    product,
+    variables,
+    model_type: modelType,
+    at,
+  })
 }

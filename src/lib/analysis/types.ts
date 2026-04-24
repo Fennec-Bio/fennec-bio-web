@@ -72,3 +72,87 @@ export interface AnovaResult {
   impacts: AnovaImpact[]
   n: number
 }
+
+export interface MainEffectLevel {
+  level: string
+  mean: number
+  stderr: number
+  n: number
+}
+
+export interface MainEffectFactor {
+  factor: string
+  levels: MainEffectLevel[]
+}
+
+export interface InteractionCell {
+  level_a: string
+  level_b: string
+  mean: number
+  stderr: number
+  n: number
+}
+
+export interface InteractionEntry {
+  factor_a: string
+  factor_b: string
+  grid: InteractionCell[]
+}
+
+export interface MainEffectsResult {
+  main_effects: MainEffectFactor[]
+  interactions: InteractionEntry[]
+}
+
+export interface ParetoEffect {
+  name: string
+  coefficient: number
+  stderr: number
+  standardized: number
+  significant: boolean
+}
+
+export interface ParetoResult {
+  effects: ParetoEffect[]
+  cutoff: number
+  n: number
+}
+
+export type RegressionModelType = 'linear' | 'polynomial_2'
+
+export interface RegressionCoefficient {
+  name: string
+  coef: number
+  stderr: number
+  t: number
+  ci_low: number
+  ci_high: number
+  p: number
+}
+
+export interface RegressionResidual {
+  predicted: number
+  observed: number
+  residual: number
+}
+
+export interface RegressionResult {
+  coefficients: RegressionCoefficient[]
+  r_squared: number
+  adjusted_r_squared: number
+  residuals: RegressionResidual[]
+  fitted: number[]
+  model_type: RegressionModelType
+  feature_names: string[]
+  n: number
+  dof: number
+}
+
+export interface RegressionPrediction {
+  prediction: number
+  model_type: RegressionModelType
+  fit: {
+    r_squared: number
+    adjusted_r_squared: number
+  }
+}
