@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
+import { useCohortPayload } from '@/hooks/useCohortPayload'
 import {
   fetchCandidateExperiments,
   fetchUniqueNames,
   type UniqueNamesResponse,
 } from '@/lib/analysis/api'
+import { OutcomePicker } from './OutcomePicker'
 
 interface Candidate {
   id: number
@@ -164,6 +166,9 @@ export function CohortRail() {
     overscan: 8,
   })
 
+  const { payload } = useCohortPayload(state.ids)
+  const availableProducts = payload?.products ?? []
+
   const selectedSet = useMemo(() => new Set(state.ids), [state.ids])
   const toggle = (id: number) => {
     const next = selectedSet.has(id)
@@ -285,7 +290,7 @@ export function CohortRail() {
           </div>
         )}
       </div>
-      {/* Load-from-set popover (Task 19), outcome picker (Task 20). */}
+      <OutcomePicker availableProducts={availableProducts} />
     </div>
   )
 }
