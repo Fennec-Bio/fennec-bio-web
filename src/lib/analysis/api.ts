@@ -36,6 +36,7 @@ export interface ExperimentListParams {
   parentStrainIds?: number[]
   batchMediaIds?: number[]
   feedMediaIds?: number[]
+  variableFilters?: Array<{ name: string; values: string[] }>
   page?: number
   pageSize?: number
   projectId?: number | null
@@ -55,6 +56,9 @@ export async function fetchCandidateExperiments(
   if (params.parentStrainIds?.length)  qs.set('parent_strain__in', params.parentStrainIds.join(','))
   if (params.batchMediaIds?.length)    qs.set('batch_media__in',   params.batchMediaIds.join(','))
   if (params.feedMediaIds?.length)     qs.set('feed_media__in',    params.feedMediaIds.join(','))
+  for (const f of params.variableFilters ?? []) {
+    if (f.values.length) qs.set(`variable_${f.name}`, f.values.join(','))
+  }
   if (params.page)                     qs.set('page',              String(params.page))
   if (params.projectId)                qs.set('project_id',        String(params.projectId))
   const res = await fetch(

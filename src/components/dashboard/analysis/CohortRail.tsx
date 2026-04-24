@@ -11,6 +11,7 @@ import {
   type UniqueNamesResponse,
 } from '@/lib/analysis/api'
 import { OutcomePicker } from './OutcomePicker'
+import { VariableFilter } from './VariableFilter'
 
 interface Candidate {
   id: number
@@ -129,6 +130,15 @@ export function CohortRail() {
     return () => { cancelled = true }
   }, [getToken])
 
+  const variableFiltersKey = useMemo(
+    () => state.variableFilters
+      .filter(f => f.values.length)
+      .map(f => `${f.name}=${[...f.values].sort().join(',')}`)
+      .sort()
+      .join(';'),
+    [state.variableFilters],
+  )
+
   useEffect(() => {
     let cancelled = false
     setLoadingCandidates(true)
@@ -140,6 +150,7 @@ export function CohortRail() {
           parentStrainIds: state.parentStrainIds,
           batchMediaIds: state.batchMediaIds,
           feedMediaIds: state.feedMediaIds,
+          variableFilters: state.variableFilters,
         })
         if (!cancelled) {
           setCandidates(body.experiments.map(e => ({
@@ -156,7 +167,8 @@ export function CohortRail() {
       }
     }, 300)
     return () => { cancelled = true; clearTimeout(h) }
-  }, [getToken, state.strainIds, state.parentStrainIds, state.batchMediaIds, state.feedMediaIds])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getToken, state.strainIds, state.parentStrainIds, state.batchMediaIds, state.feedMediaIds, variableFiltersKey])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
@@ -208,6 +220,11 @@ export function CohortRail() {
         options={unique.feed_media_list}
         selected={state.feedMediaIds}
         onChange={ids => setState({ feedMediaIds: ids })}
+      />
+      <VariableFilter
+        variablesCatalog={unique.variables}
+        filters={state.variableFilters}
+        onChange={next => setState({ variableFilters: next })}
       />
 
       <div className="mt-3 relative">
