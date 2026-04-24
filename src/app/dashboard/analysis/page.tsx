@@ -9,6 +9,7 @@ import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { Pareto } from '@/components/dashboard/analysis/Pareto'
 import { Regression } from '@/components/dashboard/analysis/Regression'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
+import { YieldSummary } from '@/components/dashboard/analysis/YieldSummary'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
 
@@ -62,6 +63,9 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'regression' && (
                 <Regression ids={state.ids} outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'yield-summary' && (
+                <YieldSummary payload={payload} product={state.product} />
               )}
             </>
           )}

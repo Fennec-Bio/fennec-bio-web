@@ -34,7 +34,7 @@ export const THEMES: Array<{
   { id: 'metabolic', label: 'Metabolic eng.', analyses: [
     { slug: 'strain-lineage', label: 'Strain lineage',       availableInP1: false },
     { slug: 'carbon-balance', label: 'Carbon balance',       availableInP1: false },
-    { slug: 'yield-summary',  label: 'Yield summary',        availableInP1: false },
+    { slug: 'yield-summary',  label: 'Yield summary',        availableInP1: true  },
     { slug: 'media-scan',     label: 'Media component scan', availableInP1: false },
   ]},
   { id: 'pattern', label: 'Pattern finding', analyses: [
