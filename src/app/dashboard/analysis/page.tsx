@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
 import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
@@ -9,6 +10,14 @@ import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
 
 export default function AnalysisPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading…</div>}>
+      <AnalysisPageInner />
+    </Suspense>
+  )
+}
+
+function AnalysisPageInner() {
   const [state] = useAnalysisState()
   const { payload, loading, error } = useCohortPayload(state.ids)
 
