@@ -1,6 +1,7 @@
 'use client'
 
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
+import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
 import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
@@ -35,7 +36,7 @@ export default function AnalysisPage() {
             <>
               {state.analysis === 'kinetic-overlay' && <KineticOverlay payload={payload} />}
               {state.analysis === 'derived-parameters' && (
-                <div className="text-sm text-gray-400">Derived parameters — Task 23</div>
+                <DerivedParameters payload={payload} product={state.product} />
               )}
               {state.analysis === 'anova-heatmap' && (
                 <div className="text-sm text-gray-400">ANOVA heatmap — Task 24</div>
