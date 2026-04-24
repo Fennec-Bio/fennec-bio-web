@@ -100,8 +100,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
   // Filter dropdown variables
   const [filterMenu, setFilterMenu] = useState(false)
   const [variablesMenu, setVariablesMenu] = useState(false)
-  const [anomaliesMenu, setAnomaliesMenu] = useState(false)
-  const [eventsMenu, setEventsMenu] = useState(false)
   const [keywordMenu, setKeywordMenu] = useState(false)
   const [strainMenu, setStrainMenu] = useState(false)
   const [mediaMenu, setMediaMenu] = useState(false)
@@ -161,8 +159,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
 
   // Timeout refs for delayed menu closing
   const variablesTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const anomaliesTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const eventsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const keywordTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const strainTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const productsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -175,8 +171,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
 
   const clearAllTimeouts = () => {
     if (variablesTimeoutRef.current) clearTimeout(variablesTimeoutRef.current)
-    if (anomaliesTimeoutRef.current) clearTimeout(anomaliesTimeoutRef.current)
-    if (eventsTimeoutRef.current) clearTimeout(eventsTimeoutRef.current)
     if (keywordTimeoutRef.current) clearTimeout(keywordTimeoutRef.current)
     if (strainTimeoutRef.current) clearTimeout(strainTimeoutRef.current)
     if (productsTimeoutRef.current) clearTimeout(productsTimeoutRef.current)
@@ -347,8 +341,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
         setFilterMenu(false)
         setSortMenu(false)
         setVariablesMenu(false)
-        setAnomaliesMenu(false)
-        setEventsMenu(false)
         setKeywordMenu(false)
         setStrainMenu(false)
         setMediaMenu(false)
@@ -407,8 +399,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     setFilterMenu(false)
     setSortMenu(false)
     setVariablesMenu(false)
-    setAnomaliesMenu(false)
-    setEventsMenu(false)
     setKeywordMenu(false)
     setStrainMenu(false)
     setMediaMenu(false)
@@ -708,7 +698,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Variables */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setVariablesMenu(true); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false); setMediaMenu(false)
+                  setVariablesMenu(true); setKeywordMenu(false); setStrainMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
         setOpenStrainSection(null)
@@ -745,7 +735,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Strain */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setMediaMenu(false)
+                  setVariablesMenu(false); setKeywordMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
                   // Idempotent: don't clear the child section when re-entering the
@@ -811,7 +801,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Media (Batch / Feed sub-items) */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false)
+                  setVariablesMenu(false); setKeywordMenu(false); setStrainMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenStrainSection(null)
                   // Idempotent: re-entering Media shouldn't wipe out an open slot panel.
@@ -859,7 +849,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 {/* Keyword */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
-                  setKeywordMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setStrainMenu(false); setMediaMenu(false)
+                  setKeywordMenu(true); setVariablesMenu(false); setStrainMenu(false); setMediaMenu(false)
                   setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
                   setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
         setOpenStrainSection(null)
@@ -901,7 +891,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
                   setProductsMenu(true); setSecondaryProductsMenu(false); setActiveSortItem(null)
-                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false)
+                  setVariablesMenu(false); setKeywordMenu(false)
                 }} onMouseLeave={() => setMenuWithDelay(setProductsMenu, productsTimeoutRef)}>
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Products</div>
                   {productsMenu && (
@@ -944,7 +934,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
                   setSecondaryProductsMenu(true); setProductsMenu(false); setActiveSortItem(null)
-                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false)
+                  setVariablesMenu(false); setKeywordMenu(false)
                 }} onMouseLeave={() => setMenuWithDelay(setSecondaryProductsMenu, secondaryProductsTimeoutRef)}>
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Secondary Products</div>
                   {secondaryProductsMenu && (
@@ -987,7 +977,7 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()
                   setProductsMenu(false); setSecondaryProductsMenu(false)
-                  setVariablesMenu(false); setAnomaliesMenu(false); setEventsMenu(false); setKeywordMenu(false)
+                  setVariablesMenu(false); setKeywordMenu(false)
                   setActiveSortItem('dated')
                 }} onMouseLeave={() => {
                   if (productsTimeoutRef.current) clearTimeout(productsTimeoutRef.current)
