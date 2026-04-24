@@ -8,6 +8,7 @@ interface StrainLineageData {
   parent: string | null
   experiment_count: number
   max_titers: Record<string, number>
+  max_titer_experiments?: Record<string, string>
   modifications: {
     id: number
     modification_type: string
@@ -85,11 +86,6 @@ export function StrainStats({ strainName, lineageData, onSelectStrain }: StrainS
     )
   }
 
-  const bestTiter = strain.max_titers.total || 0
-  const topProduct = Object.entries(strain.max_titers)
-    .filter(([k]) => k !== 'total')
-    .sort((a, b) => b[1] - a[1])[0]
-
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="px-4 py-3 border-b border-gray-200">
@@ -98,14 +94,7 @@ export function StrainStats({ strainName, lineageData, onSelectStrain }: StrainS
 
       <div className="p-4 space-y-6">
         {/* Performance overview cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm text-gray-500">Best Titer (Total)</div>
-            <div className="text-2xl font-bold text-blue-600 mt-1">{bestTiter.toFixed(1)}</div>
-            {topProduct && (
-              <div className="text-xs text-gray-400 mt-1">Top: {topProduct[0]} ({topProduct[1].toFixed(1)})</div>
-            )}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="text-sm text-gray-500">Experiments</div>
             <div className="text-2xl font-bold text-gray-900 mt-1">{strain.experiment_count}</div>
@@ -125,19 +114,37 @@ export function StrainStats({ strainName, lineageData, onSelectStrain }: StrainS
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Max Titer</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Experiment</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Max Value</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {Object.entries(strain.max_titers)
                     .filter(([k]) => k !== 'total')
                     .sort((a, b) => b[1] - a[1])
-                    .map(([name, value]) => (
-                      <tr key={name}>
-                        <td className="px-4 py-2 text-sm">{name}</td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">{value.toFixed(1)}</td>
-                      </tr>
-                    ))}
+                    .map(([name, value]) => {
+                      const expTitle = strain.max_titer_experiments?.[name]
+                      return (
+                        <tr key={name}>
+                          <td className="px-4 py-2 text-sm">{name}</td>
+                          <td className="px-4 py-2 text-sm">
+                            {expTitle ? (
+                              <a
+                                href={`/notebook?experiment=${encodeURIComponent(expTitle)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {expTitle}
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-right font-mono">{value.toFixed(1)}</td>
+                        </tr>
+                      )
+                    })}
                 </tbody>
               </table>
             </div>

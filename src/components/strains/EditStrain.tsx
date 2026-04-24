@@ -36,30 +36,34 @@ interface EditStrainProps {
   strainName: string
   strainData: StrainLineageData | null
   onStrainUpdated: () => void
+  onStrainDeleted?: () => void
   availableStrains: StrainOption[]
 }
 
-export function EditStrain({ strainName, strainData, onStrainUpdated, availableStrains }: EditStrainProps) {
+export function EditStrain({ strainName, strainData, onStrainUpdated, onStrainDeleted, availableStrains }: EditStrainProps) {
   const { getToken } = useAuth()
 
   const [parent, setParent] = useState('')
   const [species, setSpecies] = useState('')
   const [isolate, setIsolate] = useState('')
   const [description, setDescription] = useState('')
-  const [notes, setNotes] = useState('')
   const [modifications, setModifications] = useState<Modification[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const experimentCount = strainData?.experiment_count ?? 0
 
   // Populate form from strainData
   useEffect(() => {
     if (strainData) {
       setParent(strainData.parent || '')
-      setSpecies(strainData.species || '')
+      // A strain with a parent inherits its species — don't surface a stale value
+      // that's hidden from the UI but would get submitted on save.
+      setSpecies(strainData.parent ? '' : (strainData.species || ''))
       setIsolate(strainData.isolate || '')
       setDescription(strainData.description || '')
-      setNotes(strainData.notes || '')
       setModifications(
         strainData.modifications.map(m => ({
           id: m.id,
@@ -73,12 +77,16 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
       setSpecies('')
       setIsolate('')
       setDescription('')
-      setNotes('')
       setModifications([])
     }
     setSuccessMessage('')
     setErrorMessage('')
   }, [strainData, strainName])
+
+  const handleParentChange = (parentName: string) => {
+    setParent(parentName)
+    if (parentName) setSpecies('')
+  }
 
   const addModification = () => {
     setModifications(prev => [...prev, { id: null, modification_type: 'insertion', gene_name: '', isNew: true }])
@@ -105,7 +113,6 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
         species: species.trim() || null,
         isolate: isolate.trim() || null,
         description: description.trim(),
-        notes: notes.trim(),
         modifications: modifications
           .filter(m => m.gene_name.trim())
           .map(m => ({
@@ -137,6 +144,31 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
       setErrorMessage(err instanceof Error ? err.message : 'Failed to update strain')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setErrorMessage('')
+    setIsDeleting(true)
+    try {
+      const token = await getToken()
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/strain-lineage/${encodeURIComponent(strainName)}/`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+      if (!response.ok && response.status !== 204) {
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error || data?.detail || 'Failed to delete strain')
+      }
+      setShowDeleteConfirm(false)
+      onStrainDeleted?.()
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to delete strain')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -187,7 +219,7 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
           </label>
           <select
             value={parent}
-            onChange={e => setParent(e.target.value)}
+            onChange={e => handleParentChange(e.target.value)}
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">None (root strain)</option>
@@ -200,18 +232,20 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
         </div>
 
         {/* Metadata */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Species
-            </label>
-            <input
-              type="text"
-              value={species}
-              onChange={e => setSpecies(e.target.value)}
-              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+        <div className={`grid grid-cols-1 ${parent ? '' : 'md:grid-cols-2'} gap-3`}>
+          {!parent && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Species
+              </label>
+              <input
+                type="text"
+                value={species}
+                onChange={e => setSpecies(e.target.value)}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Isolate
@@ -233,18 +267,6 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
             rows={3}
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Notes
-          </label>
-          <textarea
-            rows={3}
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -302,16 +324,63 @@ export function EditStrain({ strainName, strainData, onStrainUpdated, availableS
           </button>
         </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full h-10 px-4 rounded-md text-sm font-medium text-white shadow-xs transition-all disabled:opacity-50 disabled:pointer-events-none"
-          style={{ backgroundColor: '#eb5234' }}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Changes'}
-        </button>
+        {/* Submit + Delete */}
+        <div className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={isSubmitting || isDeleting}
+            className="flex-1 h-10 px-4 rounded-md text-sm font-medium text-white shadow-xs transition-all disabled:opacity-50 disabled:pointer-events-none"
+            style={{ backgroundColor: '#eb5234' }}
+          >
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isSubmitting || isDeleting}
+            className="h-10 px-3 border border-red-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+          >
+            Delete
+          </button>
+        </div>
       </form>
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => { if (!isDeleting) setShowDeleteConfirm(false) }}
+          />
+          <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Strain</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete <span className="font-medium">{strainName}</span>?
+              {' '}Deleting this strain will delete all data associated with it
+              {experimentCount > 0 && <> (including {experimentCount} experiment{experimentCount === 1 ? '' : 's'})</>}
+              . This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md hover:bg-gray-50 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-all disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

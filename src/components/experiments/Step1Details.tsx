@@ -108,10 +108,6 @@ export function Step1Details({
   const [varNameFree, setVarNameFree] = useState<FreeTextState>({})
   const [varValueFree, setVarValueFree] = useState<FreeTextState>({})
 
-  // Track which event/anomaly name cells are in free-text mode
-  const [eventNameFree, setEventNameFree] = useState<FreeTextState>({})
-  const [anomalyNameFree, setAnomalyNameFree] = useState<FreeTextState>({})
-
   /* ---- Variable helpers ---- */
 
   const addVariable = () => {
@@ -176,11 +172,6 @@ export function Step1Details({
 
   const removeEvent = (idx: number) => {
     onEventsChange(events.filter((_, i) => i !== idx))
-    setEventNameFree((prev) => {
-      const next = { ...prev }
-      delete next[idx]
-      return next
-    })
   }
 
   const updateEvent = (
@@ -191,16 +182,6 @@ export function Step1Details({
     onEventsChange(events.map((e, i) => (i === idx ? { ...e, [field]: val } : e)))
   }
 
-  const handleEventNameSelect = (idx: number, val: string) => {
-    if (val === '__add_new__') {
-      setEventNameFree((prev) => ({ ...prev, [idx]: true }))
-      updateEvent(idx, 'name', '')
-    } else {
-      setEventNameFree((prev) => ({ ...prev, [idx]: false }))
-      updateEvent(idx, 'name', val)
-    }
-  }
-
   /* ---- Anomaly helpers ---- */
 
   const addAnomaly = () => {
@@ -209,11 +190,6 @@ export function Step1Details({
 
   const removeAnomaly = (idx: number) => {
     onAnomaliesChange(anomalies.filter((_, i) => i !== idx))
-    setAnomalyNameFree((prev) => {
-      const next = { ...prev }
-      delete next[idx]
-      return next
-    })
   }
 
   const updateAnomaly = (
@@ -222,16 +198,6 @@ export function Step1Details({
     val: string
   ) => {
     onAnomaliesChange(anomalies.map((a, i) => (i === idx ? { ...a, [field]: val } : a)))
-  }
-
-  const handleAnomalyNameSelect = (idx: number, val: string) => {
-    if (val === '__add_new__') {
-      setAnomalyNameFree((prev) => ({ ...prev, [idx]: true }))
-      updateAnomaly(idx, 'name', '')
-    } else {
-      setAnomalyNameFree((prev) => ({ ...prev, [idx]: false }))
-      updateAnomaly(idx, 'name', val)
-    }
   }
 
   const varNameKeys = Object.keys(uniqueNames.variables).filter(
@@ -481,64 +447,42 @@ export function Step1Details({
             Events will be automatically extracted from your lab notes using AI.
           </div>
         ) : (
-          events.map((event, idx) => {
-            const isNameFree = !!eventNameFree[idx]
-
-            return (
-              <div key={idx} className="flex items-center gap-2 mb-1.5">
-                {/* Name */}
-                <div className="flex-1">
-                  {isNameFree ? (
-                    <input
-                      type="text"
-                      value={event.name}
-                      onChange={(e) => updateEvent(idx, 'name', e.target.value)}
-                      placeholder="Event name"
-                      className={inputClass}
-                      autoFocus
-                    />
-                  ) : (
-                    <select
-                      value={event.name}
-                      onChange={(e) => handleEventNameSelect(idx, e.target.value)}
-                      className={selectClass}
-                    >
-                      <option value="">Select event…</option>
-                      {uniqueNames.events.map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                      {event.name && !uniqueNames.events.includes(event.name) && (
-                        <option key={`custom-${event.name}`} value={event.name}>{event.name}</option>
-                      )}
-                      <option value="__add_new__">Add new…</option>
-                    </select>
-                  )}
-                </div>
-
-                {/* Timepoint */}
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={event.timepoint}
-                    onChange={(e) => updateEvent(idx, 'timepoint', e.target.value)}
-                    placeholder="Timepoint (h)"
-                    className={inputClass}
-                  />
-                </div>
-
-                {/* Remove */}
-                <button
-                  type="button"
-                  onClick={() => removeEvent(idx)}
-                  className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
-                  style={{ width: 28, height: 28 }}
-                  aria-label="Remove event"
-                >
-                  ×
-                </button>
+          events.map((event, idx) => (
+            <div key={idx} className="flex items-center gap-2 mb-1.5">
+              {/* Name */}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={event.name}
+                  onChange={(e) => updateEvent(idx, 'name', e.target.value)}
+                  placeholder="Event name"
+                  className={inputClass}
+                />
               </div>
-            )
-          })
+
+              {/* Timepoint */}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={event.timepoint}
+                  onChange={(e) => updateEvent(idx, 'timepoint', e.target.value)}
+                  placeholder="Timepoint (h)"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Remove */}
+              <button
+                type="button"
+                onClick={() => removeEvent(idx)}
+                className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
+                style={{ width: 28, height: 28 }}
+                aria-label="Remove event"
+              >
+                ×
+              </button>
+            </div>
+          ))
         )}
       </div>
 
@@ -579,75 +523,53 @@ export function Step1Details({
             Anomalies will be automatically extracted from your lab notes using AI.
           </div>
         ) : (
-          anomalies.map((anomaly, idx) => {
-            const isNameFree = !!anomalyNameFree[idx]
-
-            return (
-              <div key={idx} className="flex items-center gap-2 mb-1.5">
-                {/* Name */}
-                <div className="flex-1">
-                  {isNameFree ? (
-                    <input
-                      type="text"
-                      value={anomaly.name}
-                      onChange={(e) => updateAnomaly(idx, 'name', e.target.value)}
-                      placeholder="Anomaly name"
-                      className={inputClass}
-                      autoFocus
-                    />
-                  ) : (
-                    <select
-                      value={anomaly.name}
-                      onChange={(e) => handleAnomalyNameSelect(idx, e.target.value)}
-                      className={selectClass}
-                    >
-                      <option value="">Select anomaly…</option>
-                      {uniqueNames.anomalies.map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                      {anomaly.name && !uniqueNames.anomalies.includes(anomaly.name) && (
-                        <option key={`custom-${anomaly.name}`} value={anomaly.name}>{anomaly.name}</option>
-                      )}
-                      <option value="__add_new__">Add new…</option>
-                    </select>
-                  )}
-                </div>
-
-                {/* Timepoint */}
-                <div className="w-28">
-                  <input
-                    type="text"
-                    value={anomaly.timepoint}
-                    onChange={(e) => updateAnomaly(idx, 'timepoint', e.target.value)}
-                    placeholder="Timepoint (h)"
-                    className={inputClass}
-                  />
-                </div>
-
-                {/* Description */}
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={anomaly.description}
-                    onChange={(e) => updateAnomaly(idx, 'description', e.target.value)}
-                    placeholder="Description"
-                    className={inputClass}
-                  />
-                </div>
-
-                {/* Remove */}
-                <button
-                  type="button"
-                  onClick={() => removeAnomaly(idx)}
-                  className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
-                  style={{ width: 28, height: 28 }}
-                  aria-label="Remove anomaly"
-                >
-                  ×
-                </button>
+          anomalies.map((anomaly, idx) => (
+            <div key={idx} className="flex items-center gap-2 mb-1.5">
+              {/* Name */}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={anomaly.name}
+                  onChange={(e) => updateAnomaly(idx, 'name', e.target.value)}
+                  placeholder="Anomaly name"
+                  className={inputClass}
+                />
               </div>
-            )
-          })
+
+              {/* Timepoint */}
+              <div className="w-28">
+                <input
+                  type="text"
+                  value={anomaly.timepoint}
+                  onChange={(e) => updateAnomaly(idx, 'timepoint', e.target.value)}
+                  placeholder="Timepoint (h)"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Description */}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={anomaly.description}
+                  onChange={(e) => updateAnomaly(idx, 'description', e.target.value)}
+                  placeholder="Description"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Remove */}
+              <button
+                type="button"
+                onClick={() => removeAnomaly(idx)}
+                className="text-gray-400 hover:text-gray-600 flex items-center justify-center flex-shrink-0"
+                style={{ width: 28, height: 28 }}
+                aria-label="Remove anomaly"
+              >
+                ×
+              </button>
+            </div>
+          ))
         )}
       </div>
 

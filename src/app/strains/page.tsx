@@ -139,6 +139,11 @@ export default function StrainsPage() {
     setRefreshKey(prev => prev + 1)
   }, [])
 
+  const handleStrainDeleted = useCallback(() => {
+    setSelectedStrain(null)
+    setRefreshKey(prev => prev + 1)
+  }, [])
+
   const handleStrainSelect = useCallback((name: string) => {
     setSelectedStrain(prev => prev === name ? null : name)
     setIsMobileMenuOpen(false)
@@ -222,6 +227,7 @@ export default function StrainsPage() {
                     strainName={selectedStrain}
                     strainData={selectedStrainData}
                     onStrainUpdated={handleStrainChanged}
+                    onStrainDeleted={handleStrainDeleted}
                     availableStrains={mergedStrainsList}
                   />
                 ) : (

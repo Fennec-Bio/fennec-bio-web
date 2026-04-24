@@ -742,54 +742,6 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
                   )}
                 </div>
 
-                {/* Anomalies */}
-                <div className="relative" onMouseEnter={() => {
-                  clearAllTimeouts()
-                  setAnomaliesMenu(true); setVariablesMenu(false); setEventsMenu(false); setKeywordMenu(false); setStrainMenu(false); setMediaMenu(false)
-                  setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
-                  setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
-        setOpenStrainSection(null)
-                }} onMouseLeave={() => setMenuWithDelay(setAnomaliesMenu, anomaliesTimeoutRef)}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Anomalies</div>
-                  {anomaliesMenu && (
-                    <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
-                      {sortItems([...uniqueNames.anomalies]).map((anomaly, index) => (
-                        <div key={index}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
-                          onClick={() => applyFilter('anomaly', anomaly)}>
-                          Remove Anomalies
-                        </div>
-                      ))}
-                      <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
-                        onClick={() => applyFilter('anomaly', 'anomalies_only')}>
-                        Anomalies Only
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Events */}
-                <div className="relative" onMouseEnter={() => {
-                  clearAllTimeouts()
-                  setEventsMenu(true); setVariablesMenu(false); setAnomaliesMenu(false); setKeywordMenu(false); setStrainMenu(false); setMediaMenu(false)
-                  setProductsMenu(false); setSecondaryProductsMenu(false); setActiveSortItem(null)
-                  setOpenMediaSlot(null); setOpenMediaSection(null); setOpenMediaComponent(null)
-        setOpenStrainSection(null)
-                }} onMouseLeave={() => setMenuWithDelay(setEventsMenu, eventsTimeoutRef)}>
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Events</div>
-                  {eventsMenu && (
-                    <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
-                      {sortItems([...uniqueNames.events]).map((event, index) => (
-                        <div key={index}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
-                          onClick={() => applyFilter('event', event)}>
-                          {event}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
                 {/* Strain */}
                 <div className="relative" onMouseEnter={() => {
                   clearAllTimeouts()

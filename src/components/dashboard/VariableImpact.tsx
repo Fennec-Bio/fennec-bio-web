@@ -287,6 +287,9 @@ export function VariableImpact() {
             tooltip.style('top', event.pageY - 10 + 'px').style('left', event.pageX + 10 + 'px')
           })
           .on('mouseout', () => tooltip.style('visibility', 'hidden'))
+          .on('click', () => {
+            window.open(`/notebook?experiment=${encodeURIComponent(exp.title)}`, '_blank', 'noopener,noreferrer')
+          })
       })
     })
 
