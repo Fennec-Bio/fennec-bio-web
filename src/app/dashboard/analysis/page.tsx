@@ -1,6 +1,7 @@
 'use client'
 
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
+import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
@@ -31,12 +32,15 @@ export default function AnalysisPage() {
             </div>
           )}
           {payload && (
-            <div className="text-sm text-gray-700">
-              Analysis body renders here (Tasks 22–24).
-              Active analysis: <code>{state.analysis}</code>.
-              Cohort size: {payload.experiments.length}.
-              Products: {payload.products.join(', ') || '—'}.
-            </div>
+            <>
+              {state.analysis === 'kinetic-overlay' && <KineticOverlay payload={payload} />}
+              {state.analysis === 'derived-parameters' && (
+                <div className="text-sm text-gray-400">Derived parameters — Task 23</div>
+              )}
+              {state.analysis === 'anova-heatmap' && (
+                <div className="text-sm text-gray-400">ANOVA heatmap — Task 24</div>
+              )}
+            </>
           )}
         </div>
       </main>
