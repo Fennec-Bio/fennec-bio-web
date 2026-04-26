@@ -7,7 +7,6 @@ import { useProjectContext } from '@/hooks/useProjectContext'
 interface Media {
   id: number
   name: string
-  media_type: 'defined' | 'complex'
   project: number | null
   created_at: string
   updated_at: string
@@ -44,7 +43,6 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
   const [hasError, setHasError] = useState(false)
 
   const [activeFilters, setActiveFilters] = useState<{
-    media_type?: 'defined' | 'complex'
     keyword?: string
   }>({})
 
@@ -53,21 +51,18 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
 
   // Dropdown state
   const [filterMenu, setFilterMenu] = useState(false)
-  const [typeMenu, setTypeMenu] = useState(false)
   const [keywordMenu, setKeywordMenu] = useState(false)
   const [sortMenu, setSortMenu] = useState(false)
   const [nameSortMenu, setNameSortMenu] = useState(false)
   const [dateSortMenu, setDateSortMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const typeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const keywordTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const nameSortTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const dateSortTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isFetchingRef = useRef(false)
 
   const clearAllTimeouts = () => {
-    if (typeTimeoutRef.current) clearTimeout(typeTimeoutRef.current)
     if (keywordTimeoutRef.current) clearTimeout(keywordTimeoutRef.current)
     if (nameSortTimeoutRef.current) clearTimeout(nameSortTimeoutRef.current)
     if (dateSortTimeoutRef.current) clearTimeout(dateSortTimeoutRef.current)
@@ -96,7 +91,6 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
       const params = new URLSearchParams()
       params.append('page', page.toString())
       if (activeProject) params.append('project_id', activeProject.id.toString())
-      if (filters.media_type) params.append('media_type', filters.media_type)
       if (filters.keyword) params.append('keyword', filters.keyword)
       if (sortBy) params.append('sort_by', sortBy)
       if (sortOrder) params.append('sort_order', sortOrder)
@@ -148,7 +142,6 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
         clearAllTimeouts()
         setFilterMenu(false)
         setSortMenu(false)
-        setTypeMenu(false)
         setKeywordMenu(false)
         setNameSortMenu(false)
         setDateSortMenu(false)
@@ -157,12 +150,6 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
     document.addEventListener('mousedown', handleClickOutside)
     return () => { document.removeEventListener('mousedown', handleClickOutside) }
   }, [])
-
-  const applyTypeFilter = (mediaType: 'defined' | 'complex') => {
-    clearAllTimeouts()
-    setActiveFilters({ ...activeFilters, media_type: mediaType })
-    setFilterMenu(false)
-  }
 
   const applyKeyword = (keyword: string) => {
     if (!keyword) return
@@ -187,13 +174,12 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
     setCurrentSortOrder(null)
     setFilterMenu(false)
     setSortMenu(false)
-    setTypeMenu(false)
     setKeywordMenu(false)
     setNameSortMenu(false)
     setDateSortMenu(false)
   }
 
-  const hasActiveFilters = !!(activeFilters.media_type || activeFilters.keyword)
+  const hasActiveFilters = !!activeFilters.keyword
 
   return (
     <div className={`w-full pt-4 pb-2 px-4 overflow-visible bg-white rounded-lg shadow ${
@@ -215,29 +201,9 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
 
             {filterMenu && (
               <div className="absolute top-full left-0 w-auto min-w-full bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] mt-1">
-                {/* Type */}
-                <div className="relative"
-                  onMouseEnter={() => { clearAllTimeouts(); setTypeMenu(true); setKeywordMenu(false) }}
-                  onMouseLeave={() => setMenuWithDelay(setTypeMenu, typeTimeoutRef)}
-                >
-                  <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">type</div>
-                  {typeMenu && (
-                    <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
-                      <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
-                        onClick={() => applyTypeFilter('defined')}>
-                        Defined
-                      </div>
-                      <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
-                        onClick={() => applyTypeFilter('complex')}>
-                        Complex
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* Keyword */}
                 <div className="relative"
-                  onMouseEnter={() => { clearAllTimeouts(); setKeywordMenu(true); setTypeMenu(false) }}
+                  onMouseEnter={() => { clearAllTimeouts(); setKeywordMenu(true) }}
                   onMouseLeave={() => setMenuWithDelay(setKeywordMenu, keywordTimeoutRef)}
                 >
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">keyword</div>
@@ -319,15 +285,6 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
         {/* Active filter pills */}
         {hasActiveFilters && (
           <div className="flex flex-wrap gap-2 mt-4">
-            {activeFilters.media_type && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center gap-1">
-                Type: {activeFilters.media_type}
-                <button
-                  className="ml-1 hover:text-blue-600"
-                  onClick={() => setActiveFilters({ ...activeFilters, media_type: undefined })}
-                >x</button>
-              </span>
-            )}
             {activeFilters.keyword && (
               <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full flex items-center gap-1">
                 Keyword: {activeFilters.keyword}
@@ -371,7 +328,6 @@ export const MediaList = ({ onMediaSelect, isMobileDrawer = false, refreshKey }:
                 onClick={() => onMediaSelect?.(m)}
               >
                 <h4 className="font-medium">{m.name}</h4>
-                <p className="text-sm text-gray-600 mt-1 line-clamp-1 capitalize">{m.media_type}</p>
               </div>
             ))}
           </div>
