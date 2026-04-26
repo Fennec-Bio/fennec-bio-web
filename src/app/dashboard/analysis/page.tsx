@@ -3,12 +3,16 @@
 import { Suspense } from 'react'
 import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
 import { BestVsWorstDiff } from '@/components/dashboard/analysis/BestVsWorstDiff'
+import { CarbonBalance } from '@/components/dashboard/analysis/CarbonBalance'
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
 import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
 import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
+import { MediaScan } from '@/components/dashboard/analysis/MediaScan'
 import { Pareto } from '@/components/dashboard/analysis/Pareto'
+import { PCABiplot } from '@/components/dashboard/analysis/PCABiplot'
 import { Regression } from '@/components/dashboard/analysis/Regression'
+import { ResponseSurface } from '@/components/dashboard/analysis/ResponseSurface'
 import { StrainLineage } from '@/components/dashboard/analysis/StrainLineage'
 import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { YieldSummary } from '@/components/dashboard/analysis/YieldSummary'
@@ -65,6 +69,20 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'regression' && (
                 <Regression ids={state.ids} outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'response-surface' && (
+                <ResponseSurface payload={payload} ids={state.ids}
+                                 outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'carbon-balance' && (
+                <CarbonBalance payload={payload} />
+              )}
+              {state.analysis === 'media-scan' && (
+                <MediaScan payload={payload} outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'pca' && (
+                <PCABiplot payload={payload} ids={state.ids}
+                           outcome={state.outcome} product={state.product} />
               )}
               {state.analysis === 'yield-summary' && (
                 <YieldSummary payload={payload} product={state.product} />

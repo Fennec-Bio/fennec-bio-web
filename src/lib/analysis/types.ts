@@ -11,6 +11,22 @@ export type AnalysisSlug =
 
 export type ThemeId = 'kinetics' | 'doe' | 'metabolic' | 'pattern'
 
+export interface MediaComponent {
+  name: string
+  concentration: number | null
+  molecular_weight: number | null
+}
+
+export interface MediaInPayload {
+  id: number
+  name: string
+  type: string
+  carbon_sources: MediaComponent[]
+  nitrogen_sources: MediaComponent[]
+  complex_components: MediaComponent[]
+  additional_components: MediaComponent[]
+}
+
 export interface TimeSeriesEntry {
   category: 'product' | 'secondary_product' | 'process_data'
   name: string
@@ -31,8 +47,8 @@ export interface ExperimentInPayload {
     parent_strain: { id: number; name: string } | null
     modifications: Array<{ modification_type: string; gene_name: string }>
   } | null
-  batch_media: { id: number; name: string; type: string } | null
-  feed_media: { id: number; name: string; type: string } | null
+  batch_media: MediaInPayload | null
+  feed_media: MediaInPayload | null
   variables: Array<{ name: string; value: string }>
   outcomes: {
     final_titer: Record<string, number | null>
@@ -155,4 +171,25 @@ export interface RegressionPrediction {
     r_squared: number
     adjusted_r_squared: number
   }
+}
+
+export interface ResponseSurfaceResult {
+  beta: number[]
+  r_squared: number
+  x_range: [number, number]
+  y_range: [number, number]
+  x_grid: number[]
+  y_grid: number[]
+  z_grid: number[][]
+  observed_points: Array<{ x: number; y: number; z: number }>
+  optimum: { x: number; y: number; predicted_outcome: number } | null
+}
+
+export interface PcaScore { experiment_id: number; pc1: number; pc2: number }
+export interface PcaLoading { variable: string; pc1: number; pc2: number }
+
+export interface PcaResult {
+  scores: PcaScore[]
+  loadings: PcaLoading[]
+  explained_variance: [number, number]
 }

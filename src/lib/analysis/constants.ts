@@ -27,18 +27,18 @@ export const THEMES: Array<{
   { id: 'doe', label: 'Variable impact & DoE', analyses: [
     { slug: 'anova-heatmap',    label: 'ANOVA heatmap',     availableInP1: true  },
     { slug: 'main-effects',     label: 'Main effects',      availableInP1: true  },
-    { slug: 'response-surface', label: 'Response surface',  availableInP1: false },
+    { slug: 'response-surface', label: 'Response surface',  availableInP1: true  },
     { slug: 'pareto',           label: 'Pareto',            availableInP1: true  },
     { slug: 'regression',       label: 'Regression',        availableInP1: true  },
   ]},
   { id: 'metabolic', label: 'Metabolic eng.', analyses: [
     { slug: 'strain-lineage', label: 'Strain lineage',       availableInP1: true  },
-    { slug: 'carbon-balance', label: 'Carbon balance',       availableInP1: false },
+    { slug: 'carbon-balance', label: 'Carbon balance',       availableInP1: true  },
     { slug: 'yield-summary',  label: 'Yield summary',        availableInP1: true  },
-    { slug: 'media-scan',     label: 'Media component scan', availableInP1: false },
+    { slug: 'media-scan',     label: 'Media component scan', availableInP1: true  },
   ]},
   { id: 'pattern', label: 'Pattern finding', analyses: [
-    { slug: 'pca',         label: 'PCA biplot',         availableInP1: false },
+    { slug: 'pca',         label: 'PCA biplot',         availableInP1: true  },
     { slug: 'cohort-diff', label: 'Best-vs-worst diff', availableInP1: true  },
   ]},
 ]

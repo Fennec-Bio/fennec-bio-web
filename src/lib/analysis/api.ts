@@ -4,9 +4,11 @@ import type {
   MainEffectsResult,
   OutcomeMetric,
   ParetoResult,
+  PcaResult,
   RegressionModelType,
   RegressionPrediction,
   RegressionResult,
+  ResponseSurfaceResult,
 } from './types'
 
 export interface UniqueNamesResponse {
@@ -95,27 +97,6 @@ export async function fetchCohortPayload(
   return res.json()
 }
 
-export async function fetchAnova(
-  token: string | null,
-  experimentIds: number[],
-  outcome: OutcomeMetric,
-  product: string | null,
-): Promise<AnovaResult> {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/analysis/anova/`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ experiment_ids: experimentIds, outcome, product }),
-    },
-  )
-  if (!res.ok) throw new Error(`anova fetch failed: ${res.status}`)
-  return res.json()
-}
-
 async function postAnalysis<T>(
   token: string | null,
   path: string,
@@ -143,6 +124,19 @@ async function postAnalysis<T>(
     throw new Error(message)
   }
   return res.json() as Promise<T>
+}
+
+export async function fetchAnova(
+  token: string | null,
+  experimentIds: number[],
+  outcome: OutcomeMetric,
+  product: string | null,
+): Promise<AnovaResult> {
+  return postAnalysis<AnovaResult>(token, 'anova/', {
+    experiment_ids: experimentIds,
+    outcome,
+    product,
+  })
 }
 
 export async function fetchMainEffects(
@@ -209,4 +203,30 @@ export async function predictRegression(
     model_type: modelType,
     at,
   })
+}
+
+export async function fetchResponseSurface(
+  token: string | null,
+  req: {
+    experiment_ids: number[]
+    outcome: OutcomeMetric
+    product: string | null
+    var_x: string
+    var_y: string
+  },
+): Promise<ResponseSurfaceResult> {
+  return postAnalysis<ResponseSurfaceResult>(token, 'response-surface/', req)
+}
+
+export async function fetchPCA(
+  token: string | null,
+  req: {
+    experiment_ids: number[]
+    variables: string[]
+    include_outcome?: boolean
+    outcome?: OutcomeMetric
+    product?: string | null
+  },
+): Promise<PcaResult> {
+  return postAnalysis<PcaResult>(token, 'pca/', req)
 }
