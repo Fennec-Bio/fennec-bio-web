@@ -7,7 +7,7 @@ export type AnalysisSlug =
   | 'anova-heatmap' | 'main-effects' | 'response-surface'
   | 'pareto' | 'regression'
   | 'strain-lineage' | 'carbon-balance' | 'yield-summary' | 'media-scan'
-  | 'pca' | 'cohort-diff'
+  | 'pca' | 'cohort-diff' | 'percentile-overlay'
 
 export type ThemeId = 'kinetics' | 'doe' | 'metabolic' | 'pattern'
 
