@@ -158,6 +158,7 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
         excludedFromRanking: 0,
         rankingMode: 'none' as 'none' | 'percentile' | 'experiment-fallback' | 'all-tied',
         unit: '',
+        colorUnit: '',
       }
     }
 
@@ -184,6 +185,7 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
         excludedFromRanking: 0,
         rankingMode: 'none' as const,
         unit: commonUnit(payload, plotCategory, plotName),
+        colorUnit: '',
       }
     }
 
@@ -210,6 +212,7 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
         excludedFromRanking: excluded,
         rankingMode: 'experiment-fallback' as const,
         unit: commonUnit(payload, plotCategory, plotName),
+        colorUnit: commonUnit(payload, colorCategory, colorName),
       }
     }
 
@@ -236,6 +239,7 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
       excludedFromRanking: excluded,
       rankingMode: allTied ? 'all-tied' as const : 'percentile' as const,
       unit: commonUnit(payload, plotCategory, plotName),
+      colorUnit: commonUnit(payload, colorCategory, colorName),
     }
   }, [payload, plotCategory, plotName, colorCategory, colorName, reduction])
 
@@ -387,6 +391,7 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
               reduction={reduction}
               min={computed.scalarStats.min}
               max={computed.scalarStats.max}
+              unit={computed.colorUnit}
             />
           )}
           {computed.rankingMode === 'experiment-fallback' && colorName && (
@@ -416,11 +421,19 @@ function formatScalar(n: number): string {
   return n.toFixed(2)
 }
 
-function PercentileLegend({ metricName, reduction, min, max }: {
+const REDUCTION_LABELS: Record<ReductionKind, string> = {
+  final: 'final value',
+  max: 'max value',
+  mean: 'mean',
+  auc: 'area under curve',
+}
+
+function PercentileLegend({ metricName, reduction, min, max, unit }: {
   metricName: string
   reduction: ReductionKind
   min: number
   max: number
+  unit: string
 }) {
   const ref = useRef<SVGSVGElement | null>(null)
   useEffect(() => {
@@ -447,7 +460,7 @@ function PercentileLegend({ metricName, reduction, min, max }: {
       <svg ref={ref} className="w-full block rounded" style={{ height: 28 }} />
       <div className="flex justify-between mt-1 text-[11px] text-gray-600">
         <span>{formatScalar(min)}</span>
-        <span className="text-gray-500">{metricName} ({reduction})</span>
+        <span className="text-gray-500">{metricName} ({REDUCTION_LABELS[reduction]}){unit ? ` — ${unit}` : ''}</span>
         <span>{formatScalar(max)}</span>
       </div>
     </div>
