@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import type { CohortPayload, TimeSeriesEntry } from '@/lib/analysis/types'
 
 export type MetricCategory = 'product' | 'secondary_product' | 'process_data'
@@ -105,12 +106,100 @@ export function percentileRanks(values: number[]): number[] {
   return ranks.map(r => r / (n - 1))
 }
 
+type ColorByCategory = MetricCategory | 'none'
+
 export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
+  const [plotCategory, setPlotCategory] = useState<MetricCategory>('product')
+  const [plotName, setPlotName] = useState<string | null>(null)
+  const [colorCategory, setColorCategory] = useState<ColorByCategory>('none')
+  const [colorName, setColorName] = useState<string | null>(null)
+  const [reduction, setReduction] = useState<ReductionKind>('final')
+
+  const plotNames = useMemo(
+    () => listMetricNames(payload, plotCategory),
+    [payload, plotCategory],
+  )
+  const colorNames = useMemo(
+    () => colorCategory === 'none' ? [] : listMetricNames(payload, colorCategory),
+    [payload, colorCategory],
+  )
+
+  // Auto-pick a sensible default name when the category changes or when the
+  // current name disappears from the available list.
+  if (plotName === null && plotNames.length > 0) {
+    setPlotName(plotNames[0])
+  } else if (plotName !== null && !plotNames.includes(plotName)) {
+    setPlotName(plotNames[0] ?? null)
+  }
+  if (colorCategory !== 'none' && colorName === null && colorNames.length > 0) {
+    setColorName(colorNames[0])
+  } else if (colorCategory !== 'none' && colorName !== null && !colorNames.includes(colorName)) {
+    setColorName(colorNames[0] ?? null)
+  } else if (colorCategory === 'none' && colorName !== null) {
+    setColorName(null)
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-md p-4">
-      <h3 className="text-sm font-medium text-gray-900 mb-2">Percentile overlay</h3>
+      <div className="flex flex-wrap gap-3 items-center mb-3 text-sm">
+        <span className="text-gray-500">Plot:</span>
+        <select
+          className="h-8 px-2 border border-gray-200 rounded-md text-sm"
+          value={plotCategory}
+          onChange={e => setPlotCategory(e.target.value as MetricCategory)}
+        >
+          <option value="product">product</option>
+          <option value="secondary_product">secondary product</option>
+          <option value="process_data">process data</option>
+        </select>
+        <select
+          className="h-8 px-2 border border-gray-200 rounded-md text-sm"
+          value={plotName ?? ''}
+          onChange={e => setPlotName(e.target.value || null)}
+          disabled={plotNames.length === 0}
+        >
+          {plotNames.length === 0 && <option value="">— none available —</option>}
+          {plotNames.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+
+        <span className="ml-6 text-gray-500">Color by:</span>
+        <select
+          className="h-8 px-2 border border-gray-200 rounded-md text-sm"
+          value={colorCategory}
+          onChange={e => setColorCategory(e.target.value as ColorByCategory)}
+        >
+          <option value="none">(none)</option>
+          <option value="product">product</option>
+          <option value="secondary_product">secondary product</option>
+          <option value="process_data">process data</option>
+        </select>
+        {colorCategory !== 'none' && (
+          <>
+            <select
+              className="h-8 px-2 border border-gray-200 rounded-md text-sm"
+              value={colorName ?? ''}
+              onChange={e => setColorName(e.target.value || null)}
+              disabled={colorNames.length === 0}
+            >
+              {colorNames.length === 0 && <option value="">— none available —</option>}
+              {colorNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <select
+              className="h-8 px-2 border border-gray-200 rounded-md text-sm"
+              value={reduction}
+              onChange={e => setReduction(e.target.value as ReductionKind)}
+            >
+              <option value="final">final value</option>
+              <option value="max">max value</option>
+              <option value="mean">mean</option>
+              <option value="auc">area under curve</option>
+            </select>
+          </>
+        )}
+      </div>
+
       <div className="text-sm text-gray-500">
-        {payload.experiments.length} experiment(s) in cohort. Controls coming next.
+        Plot: {plotCategory} / {plotName ?? '—'} · Color: {colorCategory === 'none' ? 'none' : `${colorCategory} / ${colorName ?? '—'} (${reduction})`}
       </div>
     </div>
   )
