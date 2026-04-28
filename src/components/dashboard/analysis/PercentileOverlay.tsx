@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import * as d3 from 'd3'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CohortPayload, TimeSeriesEntry } from '@/lib/analysis/types'
 
 export type MetricCategory = 'product' | 'secondary_product' | 'process_data'
@@ -108,12 +109,23 @@ export function percentileRanks(values: number[]): number[] {
 
 type ColorByCategory = MetricCategory | 'none'
 
+interface PlottedRun {
+  expId: number
+  expTitle: string
+  series: TimeSeriesEntry
+  scalar: number | null   // null = run is missing the second metric
+  percentile: number | null
+  color: string
+}
+
 export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
   const [plotCategory, setPlotCategory] = useState<MetricCategory>('product')
   const [plotName, setPlotName] = useState<string | null>(null)
   const [colorCategory, setColorCategory] = useState<ColorByCategory>('none')
   const [colorName, setColorName] = useState<string | null>(null)
   const [reduction, setReduction] = useState<ReductionKind>('final')
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
 
   const plotNames = useMemo(
     () => listMetricNames(payload, plotCategory),
@@ -124,8 +136,7 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
     [payload, colorCategory],
   )
 
-  // Auto-pick a sensible default name when the category changes or when the
-  // current name disappears from the available list.
+  // Auto-pick / repair the selected name when the available list changes.
   if (plotName === null && plotNames.length > 0) {
     setPlotName(plotNames[0])
   } else if (plotName !== null && !plotNames.includes(plotName)) {
@@ -138,6 +149,166 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
   } else if (colorCategory === 'none' && colorName !== null) {
     setColorName(null)
   }
+
+  const computed = useMemo(() => {
+    if (!plotName) {
+      return {
+        runs: [] as PlottedRun[],
+        scalarStats: null as null | { min: number; max: number; n: number },
+        excludedFromRanking: 0,
+        rankingMode: 'none' as 'none' | 'percentile' | 'experiment-fallback' | 'all-tied',
+        unit: '',
+      }
+    }
+
+    const expColor = d3.scaleOrdinal(d3.schemeTableau10)
+
+    // Stage 1: pick out the runs that have the plot metric.
+    const stage1 = payload.experiments
+      .map(e => {
+        const series = findSeries(e, plotCategory, plotName)
+        return series ? { expId: e.id, expTitle: e.title, series } : null
+      })
+      .filter((r): r is { expId: number; expTitle: string; series: TimeSeriesEntry } => r !== null)
+
+    if (colorCategory === 'none' || !colorName) {
+      const runs: PlottedRun[] = stage1.map(r => ({
+        ...r,
+        scalar: null,
+        percentile: null,
+        color: expColor(String(r.expId)),
+      }))
+      return {
+        runs,
+        scalarStats: null,
+        excludedFromRanking: 0,
+        rankingMode: 'none' as const,
+        unit: commonUnit(payload, plotCategory, plotName),
+      }
+    }
+
+    // Stage 2: compute the second-metric scalar for each stage-1 run.
+    const withScalars = stage1.map(r => {
+      const exp = payload.experiments.find(e => e.id === r.expId)!
+      const colorSeries = findSeries(exp, colorCategory, colorName)
+      const scalar = colorSeries ? reduceSeries(colorSeries, reduction) : null
+      return { ...r, scalar }
+    })
+
+    const ranked = withScalars.filter(r => r.scalar !== null) as Array<typeof withScalars[number] & { scalar: number }>
+    const excluded = withScalars.length - ranked.length
+
+    if (ranked.length < 2) {
+      const runs: PlottedRun[] = withScalars.map(r => ({
+        ...r,
+        percentile: null,
+        color: r.scalar === null ? '#d1d5db' : expColor(String(r.expId)),
+      }))
+      return {
+        runs,
+        scalarStats: null,
+        excludedFromRanking: excluded,
+        rankingMode: 'experiment-fallback' as const,
+        unit: commonUnit(payload, plotCategory, plotName),
+      }
+    }
+
+    const allTied = ranked.every(r => r.scalar === ranked[0].scalar)
+    const rankedScalars = ranked.map(r => r.scalar)
+    const ranks = percentileRanks(rankedScalars)
+    const min = Math.min(...rankedScalars)
+    const max = Math.max(...rankedScalars)
+
+    const rankByExpId = new Map<number, number>()
+    ranked.forEach((r, i) => rankByExpId.set(r.expId, ranks[i]))
+
+    const runs: PlottedRun[] = withScalars.map(r => {
+      if (r.scalar === null) {
+        return { ...r, percentile: null, color: '#d1d5db' }
+      }
+      const p = rankByExpId.get(r.expId) ?? 0.5
+      return { ...r, percentile: p, color: d3.interpolateRdYlGn(p) }
+    })
+
+    return {
+      runs,
+      scalarStats: { min, max, n: ranked.length },
+      excludedFromRanking: excluded,
+      rankingMode: allTied ? 'all-tied' as const : 'percentile' as const,
+      unit: commonUnit(payload, plotCategory, plotName),
+    }
+  }, [payload, plotCategory, plotName, colorCategory, colorName, reduction])
+
+  useEffect(() => {
+    if (!svgRef.current) return
+    const svg = d3.select(svgRef.current)
+    svg.selectAll('*').remove()
+
+    if (!plotName || computed.runs.length === 0) return
+
+    const width = svgRef.current.clientWidth
+    const height = 420
+    const margin = { top: 20, right: 30, bottom: 40, left: 60 }
+    const innerW = width - margin.left - margin.right
+    const innerH = height - margin.top - margin.bottom
+
+    const allTimes = computed.runs.flatMap(r => r.series.timepoints_h)
+    const allVals = computed.runs.flatMap(r => r.series.values).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+    if (allVals.length === 0) return
+
+    const x = d3.scaleLinear().domain([0, d3.max(allTimes) ?? 1]).nice().range([0, innerW])
+    const y = d3.scaleLinear().domain([0, d3.max(allVals) ?? 1]).nice().range([innerH, 0])
+
+    svg.attr('viewBox', `0 0 ${width} ${height}`)
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`)
+
+    g.append('g').attr('transform', `translate(0,${innerH})`).call(d3.axisBottom(x))
+    g.append('g').call(d3.axisLeft(y))
+    g.append('text').attr('x', innerW / 2).attr('y', innerH + 34).attr('text-anchor', 'middle')
+      .attr('fill', '#666').attr('font-size', 12).text('time (h)')
+    g.append('text').attr('transform', 'rotate(-90)').attr('x', -innerH / 2).attr('y', -45)
+      .attr('text-anchor', 'middle').attr('fill', '#666').attr('font-size', 12)
+      .text(`${plotName}${computed.unit ? ` (${computed.unit})` : ''}`)
+
+    const line = d3.line<{ t: number; v: number | null }>()
+      .defined(d => d.v !== null && Number.isFinite(d.v as number))
+      .x(d => x(d.t))
+      .y(d => y(d.v as number))
+
+    for (const r of computed.runs) {
+      const pts = r.series.timepoints_h.map((t, i) => ({ t, v: r.series.values[i] ?? null }))
+      const key = `${r.expId}`
+      const isMissing = r.scalar === null && computed.rankingMode !== 'none'
+      const baseOpacity = isMissing ? 0.5 : 1
+      const finalOpacity = hoveredKey && hoveredKey !== key ? 0.25 : baseOpacity
+      g.append('path')
+        .datum(pts)
+        .attr('fill', 'none')
+        .attr('stroke', r.color)
+        .attr('stroke-width', hoveredKey === key ? 3 : 1.5)
+        .attr('opacity', finalOpacity)
+        .attr('d', line)
+        .style('cursor', 'pointer')
+        .on('mouseenter', () => setHoveredKey(key))
+        .on('mouseleave', () => setHoveredKey(null))
+        .append('title')
+        .text(() => {
+          const parts = [r.expTitle]
+          if (r.scalar !== null && colorName) {
+            parts.push(`${colorName} (${reduction}): ${formatScalar(r.scalar)}`)
+          }
+          if (r.percentile !== null) {
+            parts.push(`percentile: ${(r.percentile * 100).toFixed(0)}%`)
+          } else if (computed.rankingMode === 'percentile' || computed.rankingMode === 'all-tied') {
+            parts.push(`percentile: — (missing ${colorName})`)
+          }
+          return parts.join('\n')
+        })
+    }
+  }, [computed, plotName, colorName, reduction, hoveredKey])
+
+  const noPlotMetricChosen = !plotName
+  const noPlotData = !!plotName && computed.runs.length === 0
 
   return (
     <div className="bg-white border border-gray-200 rounded-md p-4">
@@ -198,8 +369,86 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
         )}
       </div>
 
-      <div className="text-sm text-gray-500">
-        Plot: {plotCategory} / {plotName ?? '—'} · Color: {colorCategory === 'none' ? 'none' : `${colorCategory} / ${colorName ?? '—'} (${reduction})`}
+      {noPlotMetricChosen && (
+        <div className="text-sm text-gray-500">Pick a metric to plot.</div>
+      )}
+      {noPlotData && (
+        <div className="text-sm text-gray-500">
+          No selected runs have data for {plotName}.
+        </div>
+      )}
+      {!noPlotMetricChosen && !noPlotData && (
+        <>
+          <svg ref={svgRef} className="w-full" style={{ height: 420 }} />
+
+          {computed.rankingMode === 'percentile' && computed.scalarStats && colorName && (
+            <PercentileLegend
+              metricName={colorName}
+              reduction={reduction}
+              min={computed.scalarStats.min}
+              max={computed.scalarStats.max}
+            />
+          )}
+          {computed.rankingMode === 'experiment-fallback' && colorName && (
+            <div className="mt-2 text-xs text-amber-700">
+              Not enough runs with {colorName} data to rank — coloring by experiment instead.
+            </div>
+          )}
+          {computed.rankingMode === 'all-tied' && colorName && (
+            <div className="mt-2 text-xs text-amber-700">
+              All runs tied on {colorName} — no percentile spread.
+            </div>
+          )}
+          {computed.excludedFromRanking > 0 && (computed.rankingMode === 'percentile' || computed.rankingMode === 'all-tied') && (
+            <div className="mt-1 text-xs text-gray-500">
+              {computed.excludedFromRanking} selected run(s) excluded from ranking (missing {colorName}).
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function formatScalar(n: number): string {
+  if (!Number.isFinite(n)) return String(n)
+  if (Math.abs(n) >= 1000 || (n !== 0 && Math.abs(n) < 0.01)) return n.toExponential(2)
+  return n.toFixed(2)
+}
+
+function PercentileLegend({ metricName, reduction, min, max }: {
+  metricName: string
+  reduction: ReductionKind
+  min: number
+  max: number
+}) {
+  const ref = useRef<SVGSVGElement | null>(null)
+  useEffect(() => {
+    if (!ref.current) return
+    const svg = d3.select(ref.current)
+    svg.selectAll('*').remove()
+    const W = ref.current.clientWidth
+    const H = 28
+    const stops = 32
+    const stepW = W / stops
+    for (let i = 0; i < stops; i++) {
+      svg.append('rect')
+        .attr('x', i * stepW)
+        .attr('y', 0)
+        .attr('width', stepW + 0.5)
+        .attr('height', H)
+        .attr('fill', d3.interpolateRdYlGn(i / (stops - 1)))
+    }
+    svg.attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%').attr('height', H)
+  }, [])
+
+  return (
+    <div className="mt-3">
+      <svg ref={ref} className="w-full block rounded" style={{ height: 28 }} />
+      <div className="flex justify-between mt-1 text-[11px] text-gray-600">
+        <span>{formatScalar(min)}</span>
+        <span className="text-gray-500">{metricName} ({reduction})</span>
+        <span>{formatScalar(max)}</span>
       </div>
     </div>
   )
