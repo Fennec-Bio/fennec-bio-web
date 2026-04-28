@@ -381,7 +381,7 @@ export function PercentileOverlay({ payload }: { payload: CohortPayload }) {
         <>
           <svg ref={svgRef} className="w-full" style={{ height: 420 }} />
 
-          {computed.rankingMode === 'percentile' && computed.scalarStats && colorName && (
+          {(computed.rankingMode === 'percentile' || computed.rankingMode === 'all-tied') && computed.scalarStats && colorName && (
             <PercentileLegend
               metricName={colorName}
               reduction={reduction}
