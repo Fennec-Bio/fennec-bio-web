@@ -33,8 +33,11 @@ export function reduceSeries(series: TimeSeriesEntry, kind: ReductionKind): numb
     for (const p of finitePairs) s += p.v
     return s / finitePairs.length
   }
-  // AUC: re-walk the original arrays so a null at index i breaks the segment.
-  // Using `finitePairs` here would silently bridge gaps, which the spec forbids.
+  // AUC: re-walk the original arrays so any non-finite point (null / NaN /
+  // Infinity) at index i breaks the segment. Using `finitePairs` here would
+  // silently bridge gaps, which the spec forbids. (The TimeSeriesEntry.values
+  // type is `number[]` but the runtime payload may contain nulls — see the
+  // `as number | null` cast in KineticOverlay.tsx.)
   let area = 0
   for (let i = 1; i < n; i++) {
     const v0 = vs[i - 1], v1 = vs[i]
