@@ -11,6 +11,7 @@ import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { MediaScan } from '@/components/dashboard/analysis/MediaScan'
 import { Pareto } from '@/components/dashboard/analysis/Pareto'
 import { PCABiplot } from '@/components/dashboard/analysis/PCABiplot'
+import { PercentileOverlay } from '@/components/dashboard/analysis/PercentileOverlay'
 import { Regression } from '@/components/dashboard/analysis/Regression'
 import { ResponseSurface } from '@/components/dashboard/analysis/ResponseSurface'
 import { StrainLineage } from '@/components/dashboard/analysis/StrainLineage'
@@ -83,6 +84,9 @@ function AnalysisPageInner() {
               {state.analysis === 'pca' && (
                 <PCABiplot payload={payload} ids={state.ids}
                            outcome={state.outcome} product={state.product} />
+              )}
+              {state.analysis === 'percentile-overlay' && (
+                <PercentileOverlay payload={payload} />
               )}
               {state.analysis === 'yield-summary' && (
                 <YieldSummary payload={payload} product={state.product} />
