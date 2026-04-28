@@ -38,8 +38,9 @@ export const THEMES: Array<{
     { slug: 'media-scan',     label: 'Media component scan', availableInP1: true  },
   ]},
   { id: 'pattern', label: 'Pattern finding', analyses: [
-    { slug: 'pca',         label: 'PCA biplot',         availableInP1: true  },
-    { slug: 'cohort-diff', label: 'Best-vs-worst diff', availableInP1: true  },
+    { slug: 'percentile-overlay', label: 'Percentile overlay',  availableInP1: true },
+    { slug: 'pca',                label: 'PCA biplot',          availableInP1: true },
+    { slug: 'cohort-diff',        label: 'Best-vs-worst diff',  availableInP1: true },
   ]},
 ]
 
