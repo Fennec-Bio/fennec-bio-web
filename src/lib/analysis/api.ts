@@ -42,13 +42,20 @@ export interface ExperimentListParams {
   page?: number
   pageSize?: number
   projectId?: number | null
+  includeVariables?: boolean
 }
 
 export async function fetchCandidateExperiments(
   token: string | null,
   params: ExperimentListParams,
 ): Promise<{
-  experiments: Array<{ id: number; title: string; description: string }>
+  experiments: Array<{
+    id: number
+    title: string
+    description: string
+    strain?: string | null
+    variables?: Array<{ name: string; value: string }>
+  }>
   total: number
   page: number
   totalPages: number
@@ -62,7 +69,9 @@ export async function fetchCandidateExperiments(
     if (f.values.length) qs.set(`variable_${f.name}`, f.values.join(','))
   }
   if (params.page)                     qs.set('page',              String(params.page))
+  if (params.pageSize)                 qs.set('page_size',         String(params.pageSize))
   if (params.projectId)                qs.set('project_id',        String(params.projectId))
+  if (params.includeVariables)         qs.set('include',           'variables')
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/api/experimentList/?${qs.toString()}`,
     { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
