@@ -5,19 +5,13 @@ import { useAuth } from '@clerk/nextjs'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
+import { useCandidateExperiments } from '@/hooks/useCandidateExperiments'
 import {
-  fetchCandidateExperiments,
   fetchUniqueNames,
   type UniqueNamesResponse,
 } from '@/lib/analysis/api'
 import { OutcomePicker } from './OutcomePicker'
 import { VariableFilter } from './VariableFilter'
-
-interface Candidate {
-  id: number
-  title: string
-  strain_name: string | null
-}
 
 interface ExperimentSetRow {
   id: string
@@ -100,8 +94,13 @@ export function CohortRail() {
   const { getToken } = useAuth()
   const [state, setState] = useAnalysisState()
   const [unique, setUnique] = useState<UniqueNamesResponse | null>(null)
-  const [candidates, setCandidates] = useState<Candidate[]>([])
-  const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const { candidates, loading: loadingCandidates } = useCandidateExperiments({
+    strainIds:       state.strainIds,
+    parentStrainIds: state.parentStrainIds,
+    batchMediaIds:   state.batchMediaIds,
+    feedMediaIds:    state.feedMediaIds,
+    variableFilters: state.variableFilters,
+  })
   const [setPickerOpen, setSetPickerOpen] = useState(false)
   const [sets, setSets] = useState<ExperimentSetRow[] | null>(null)
   const [loadedSetName, setLoadedSetName] = useState<string | null>(null)
@@ -129,46 +128,6 @@ export function CohortRail() {
       .catch(err => console.error('Failed to load unique names', err))
     return () => { cancelled = true }
   }, [getToken])
-
-  const variableFiltersKey = useMemo(
-    () => state.variableFilters
-      .filter(f => f.values.length)
-      .map(f => `${f.name}=${[...f.values].sort().join(',')}`)
-      .sort()
-      .join(';'),
-    [state.variableFilters],
-  )
-
-  useEffect(() => {
-    let cancelled = false
-    setLoadingCandidates(true)
-    const h = setTimeout(async () => {
-      try {
-        const token = await getToken()
-        const body = await fetchCandidateExperiments(token, {
-          strainIds: state.strainIds,
-          parentStrainIds: state.parentStrainIds,
-          batchMediaIds: state.batchMediaIds,
-          feedMediaIds: state.feedMediaIds,
-          variableFilters: state.variableFilters,
-        })
-        if (!cancelled) {
-          setCandidates(body.experiments.map(e => ({
-            id: e.id,
-            title: e.title,
-            // ExperimentSerializer returns strain as a bare string (or null).
-            strain_name: ((e as unknown) as { strain?: string | null }).strain ?? null,
-          })))
-        }
-      } catch (err) {
-        console.error('Failed to load candidates', err)
-      } finally {
-        if (!cancelled) setLoadingCandidates(false)
-      }
-    }, 300)
-    return () => { cancelled = true; clearTimeout(h) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getToken, state.strainIds, state.parentStrainIds, state.batchMediaIds, state.feedMediaIds, variableFiltersKey])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
