@@ -1,0 +1,93 @@
+<h2>Putting it together</h2>
+<p class="subtitle">Cohort theme tab active. Sidebar still has filters. Main area is two columns with search, click-to-toggle, and filter-variable tags.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Analysis &gt; Cohort</div>
+  <div class="mockup-body" style="padding:0;">
+    <!-- Theme tabs -->
+    <div style="display:flex;gap:6px;border-bottom:2px solid #eb5234;padding:6px 12px 0 12px;background:#fafafa;">
+      <div style="background:#eb5234;color:white;padding:6px 12px;border-radius:6px 6px 0 0;font-size:12px;">Cohort</div>
+      <div style="padding:6px 12px;color:#666;font-size:12px;">Kinetics</div>
+      <div style="padding:6px 12px;color:#666;font-size:12px;">Variable impact &amp; DoE</div>
+      <div style="padding:6px 12px;color:#666;font-size:12px;">Metabolic eng.</div>
+      <div style="padding:6px 12px;color:#666;font-size:12px;">Pattern finding</div>
+    </div>
+
+    <div style="display:flex;min-height:520px;">
+      <!-- Sidebar -->
+      <div style="width:240px;background:#fafafa;border-right:1px solid #e5e7eb;padding:10px;font-size:11px;">
+        <div style="font-weight:600;margin-bottom:6px;">Cohort</div>
+        <div style="text-transform:uppercase;color:#999;font-size:9px;margin:8px 0 4px;">Filters</div>
+        <div style="background:white;border:1px solid #ddd;padding:4px 6px;border-radius:4px;margin-bottom:4px;">Strain: any ▾</div>
+        <div style="background:white;border:1px solid #ddd;padding:4px 6px;border-radius:4px;margin-bottom:4px;">Parent strain: any ▾</div>
+        <div style="background:white;border:1px solid #ddd;padding:4px 6px;border-radius:4px;margin-bottom:4px;">Batch media: any ▾</div>
+        <div style="background:white;border:1px solid #ddd;padding:4px 6px;border-radius:4px;margin-bottom:4px;">Feed media: any ▾</div>
+        <div style="background:white;border:1px solid #ddd;padding:4px 6px;border-radius:4px;margin-bottom:8px;">Variables ▾<br><span style="background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:8px;font-size:9px;">pulse size: 40</span></div>
+        <div style="background:white;border:1px solid #ddd;padding:4px 6px;border-radius:4px;margin-top:6px;">Load from set…</div>
+        <div style="text-transform:uppercase;color:#999;font-size:9px;margin:12px 0 4px;">Outcome</div>
+        <div style="background:white;border:1px solid #ddd;padding:4px 6px;border-radius:4px;">Final titer · CBDa ▾</div>
+      </div>
+
+      <!-- Two columns -->
+      <div style="flex:1;display:flex;gap:12px;padding:12px;background:#f9fafb;">
+        <!-- Candidates -->
+        <div style="flex:1;background:white;border:1px solid #e5e7eb;border-radius:6px;display:flex;flex-direction:column;">
+          <div style="padding:8px 10px;border-bottom:1px solid #eee;">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+              <div style="text-transform:uppercase;color:#888;font-weight:600;">Candidates (124)</div>
+              <div><a href="#" style="color:#eb5234;font-size:10px;">All</a> · <a href="#" style="color:#888;font-size:10px;">None</a></div>
+            </div>
+            <input style="margin-top:6px;width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:11px;" placeholder="Search candidates…">
+          </div>
+          <div style="overflow:auto;font-size:11px;">
+            <div style="padding:6px 10px;border-bottom:1px solid #f3f4f6;background:#f3f4f6;display:flex;align-items:center;gap:6px;color:#666;">
+              <input type="checkbox" checked disabled>
+              <span style="flex:1;">Ferm 100-BO</span>
+              <span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:8px;font-size:10px;">pulse size: 40</span>
+              <span style="color:#aaa;font-size:10px;">JS-X1</span>
+            </div>
+            <div style="padding:6px 10px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" disabled>
+              <span style="flex:1;">Ferm 101-BO</span>
+              <span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:8px;font-size:10px;">pulse size: 40</span>
+              <span style="color:#888;font-size:10px;">JS-X1</span>
+            </div>
+            <div style="padding:6px 10px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" disabled>
+              <span style="flex:1;">Ferm 102-BO</span>
+              <span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:8px;font-size:10px;">pulse size: 40</span>
+              <span style="color:#888;font-size:10px;">JS-X2</span>
+            </div>
+            <div style="padding:6px 10px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" disabled>
+              <span style="flex:1;">Ferm 103-BO</span>
+              <span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:8px;font-size:10px;">pulse size: 40</span>
+              <span style="color:#888;font-size:10px;">JS-X2</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cohort -->
+        <div style="flex:1;background:white;border:1px solid #e5e7eb;border-radius:6px;display:flex;flex-direction:column;">
+          <div style="padding:8px 10px;border-bottom:1px solid #eee;">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+              <div style="text-transform:uppercase;color:#888;font-weight:600;">Cohort (1)</div>
+              <div><a href="#" style="color:#888;font-size:10px;">Clear</a></div>
+            </div>
+            <input style="margin-top:6px;width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:11px;" placeholder="Search cohort…">
+          </div>
+          <div style="overflow:auto;font-size:11px;">
+            <div style="padding:6px 10px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:6px;">
+              <span style="flex:1;">Ferm 100-BO</span>
+              <span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:8px;font-size:10px;">pulse size: 40</span>
+              <span style="color:#888;font-size:10px;">JS-X1</span>
+              <span style="color:#bbb;cursor:pointer;">×</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:14px;">Does this look like what you want? Reply "yes" or describe any tweaks.</p>

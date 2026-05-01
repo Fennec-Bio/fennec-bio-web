@@ -162,6 +162,13 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
   const [primaryPoints, setPrimaryPoints] = useState<PointValue[]>([])
   const [secondaryPoints, setSecondaryPoints] = useState<PointValue[]>([])
   const [processPoints, setProcessPoints] = useState<PointValue[]>([])
+  // Process data is lazy-loaded when the user opens the Process Data tab.
+  // Tracking "loaded" separately from "has rows" lets us distinguish "not
+  // fetched yet" from "fetched and empty" (the latter shows the upload CTA).
+  // The save flow must omit `process_data` when not loaded — the backend
+  // treats a present-but-empty key as "wipe all process data".
+  const [processDataLoaded, setProcessDataLoaded] = useState(false)
+  const [processDataLoading, setProcessDataLoading] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -318,6 +325,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       setPrimaryPoints([])
       setSecondaryPoints([])
       setProcessPoints([])
+      setProcessDataLoaded(false)
+      setProcessDataLoading(false)
       setEditTitle('')
       setEditNote('')
       setEditVariables([])
@@ -335,26 +344,31 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       return
     }
     let cancelled = false
+    // Reset process state up-front so a stale tab from the previous
+    // experiment never shows for the new one. The lazy-fetch effect below
+    // re-fills it when the user opens the Process Data tab.
+    setProcessEdits(null)
+    setProcessPoints([])
+    setProcessDataLoaded(false)
+    setProcessDataLoading(false)
     const fetchData = async () => {
       setLoading(true)
       try {
         const token = await getToken()
         const res = await fetch(
-          `${apiUrl}/api/experiment/title/${encodeURIComponent(selectedTitle)}/?fields=products,secondary_products,process_data,variables,events,anomalies,note_images`,
+          `${apiUrl}/api/experiment/title/${encodeURIComponent(selectedTitle)}/?fields=products,secondary_products,variables,events,anomalies,note_images`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         if (res.ok && !cancelled) {
           const detail: ExperimentDetail = await res.json()
-          setData(detail)
+          // process_data is fetched lazily; keep the cached object consistent.
+          setData({ ...detail, process_data: detail.process_data ?? [] })
           const primary = partitionByDataType(detail.products)
           const secondary = partitionByDataType(detail.secondary_products)
-          const process = partitionByDataType(detail.process_data)
           setPrimaryEdits(buildSpreadsheet(primary.timeSeries))
           setSecondaryEdits(buildSpreadsheet(secondary.timeSeries))
-          setProcessEdits(buildSpreadsheet(process.timeSeries))
           setPrimaryPoints(primary.points)
           setSecondaryPoints(secondary.points)
-          setProcessPoints(process.points)
           setEditTitle(detail.experiment.title)
           setEditDate(detail.experiment.date || '')
           setEditNote(detail.experiment.experiment_note || '')
@@ -381,6 +395,40 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     fetchData()
     return () => { cancelled = true }
   }, [selectedTitle, getToken, apiUrl])
+
+  // Lazy-fetch process_data the first time the user opens the Process Data tab
+  // for an experiment. Cancellation guards against the user switching tabs (or
+  // experiments) before the fetch returns.
+  useEffect(() => {
+    if (activeTab !== 'process-data') return
+    if (!selectedTitle) return
+    if (processDataLoaded || processDataLoading) return
+    let cancelled = false
+    const run = async () => {
+      setProcessDataLoading(true)
+      try {
+        const token = await getToken()
+        const res = await fetch(
+          `${apiUrl}/api/experiment/title/${encodeURIComponent(selectedTitle)}/?fields=process_data`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!res.ok || cancelled) return
+        const detail: { process_data: Product[] } = await res.json()
+        const points = detail.process_data ?? []
+        const process = partitionByDataType(points)
+        setProcessEdits(buildSpreadsheet(process.timeSeries))
+        setProcessPoints(process.points)
+        setData(prev => prev ? { ...prev, process_data: points } : prev)
+        setProcessDataLoaded(true)
+      } catch (err) {
+        console.error('Error fetching process data:', err)
+      } finally {
+        if (!cancelled) setProcessDataLoading(false)
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [activeTab, selectedTitle, processDataLoaded, processDataLoading, getToken, apiUrl])
 
   const handleGridChange = useCallback((tab: Tab) => (grid: GridData) => {
     if (tab === 'primary-products') setPrimaryEdits(grid)
@@ -576,7 +624,8 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         }),
       })
       if (res.ok) {
-        // Re-fetch the experiment to refresh all tabs
+        // The user just uploaded process_data, so we definitely want it back.
+        // Mark as loaded so the lazy-fetch effect doesn't re-fetch it.
         const detailRes = await fetch(
           `${apiUrl}/api/experiment/title/${encodeURIComponent(data.experiment.title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,note_images`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -593,6 +642,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           setPrimaryPoints(primaryR.points)
           setSecondaryPoints(secondaryR.points)
           setProcessPoints(processR.points)
+          setProcessDataLoaded(true)
         }
         // Clear upload state
         setParsedSpreadsheet(null)
@@ -763,10 +813,15 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     setSaving(true)
     try {
       const token = await getToken()
-      const body = {
+      // Only include process_data in the PATCH if it was actually loaded.
+      // The backend wipes process_data on `key in request.data`, so sending
+      // [] when the user never opened the tab would destroy their data.
+      const body: Record<string, unknown> = {
         products: serializeTabForSave('product', primaryEdits, primaryPoints),
         secondary_products: serializeTabForSave('secondary_product', secondaryEdits, secondaryPoints),
-        process_data: serializeTabForSave('process_data', processEdits, processPoints),
+      }
+      if (processDataLoaded) {
+        body.process_data = serializeTabForSave('process_data', processEdits, processPoints)
       }
       const res = await fetch(`${apiUrl}/api/experiments/${data.experiment.id}/`, {
         method: 'PATCH',
@@ -780,23 +835,28 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         console.error('Failed to save experiment data')
         return
       }
-      // Re-fetch the experiment so all tabs reflect the freshly persisted state.
+      // Re-fetch the experiment. Skip process_data when it isn't loaded —
+      // there's no reason to download it just because we saved.
+      const fields = ['products', 'secondary_products', 'variables', 'events', 'anomalies', 'note_images']
+      if (processDataLoaded) fields.push('process_data')
       const detailRes = await fetch(
-        `${apiUrl}/api/experiment/title/${encodeURIComponent(data.experiment.title)}/?fields=products,secondary_products,process_data,variables,events,anomalies,note_images`,
+        `${apiUrl}/api/experiment/title/${encodeURIComponent(data.experiment.title)}/?fields=${fields.join(',')}`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       if (detailRes.ok) {
         const detail: ExperimentDetail = await detailRes.json()
-        setData(detail)
+        setData({ ...detail, process_data: detail.process_data ?? [] })
         const primary = partitionByDataType(detail.products)
         const secondary = partitionByDataType(detail.secondary_products)
-        const process = partitionByDataType(detail.process_data)
         setPrimaryEdits(buildSpreadsheet(primary.timeSeries))
         setSecondaryEdits(buildSpreadsheet(secondary.timeSeries))
-        setProcessEdits(buildSpreadsheet(process.timeSeries))
         setPrimaryPoints(primary.points)
         setSecondaryPoints(secondary.points)
-        setProcessPoints(process.points)
+        if (processDataLoaded) {
+          const process = partitionByDataType(detail.process_data ?? [])
+          setProcessEdits(buildSpreadsheet(process.timeSeries))
+          setProcessPoints(process.points)
+        }
       }
       setHasChanges(false)
     } catch (err) {
@@ -1503,9 +1563,18 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     const activeGrid = getActiveGrid()
 
     if (activeTab === 'process-data') {
+      // While the lazy fetch is in flight, suppress the upload-CTA so the
+      // user doesn't think there's no data — we just haven't loaded it yet.
+      const showLoading = processDataLoading && !processDataLoaded
+      const showUploadCta = !showLoading && (!processEdits || processEdits.names.length === 0)
       return (
         <>
-          {(!processEdits || processEdits.names.length === 0) && (
+          {showLoading && (
+            <div className="flex items-center justify-center h-[400px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+              <p className="text-gray-400 text-sm">Loading process data…</p>
+            </div>
+          )}
+          {showUploadCta && (
             <div
               className="flex flex-col items-center justify-center h-[400px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
               onClick={() => fileInputRef.current?.click()}

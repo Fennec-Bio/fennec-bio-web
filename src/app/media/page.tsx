@@ -9,7 +9,6 @@ import { EditMedia } from '@/components/media/EditMedia'
 interface Media {
   id: number
   name: string
-  media_type: 'defined' | 'complex'
   project: number | null
   created_at: string
   updated_at: string

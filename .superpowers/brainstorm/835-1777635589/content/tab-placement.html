@@ -1,0 +1,45 @@
+<h2>Where should the Cohort tab live?</h2>
+<p class="subtitle">Today there are two tab levels in the analysis section. Which row do you mean by "far left"?</p>
+
+<div class="options" style="grid-template-columns:1fr;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>New top-level theme (recommended)</h3>
+      <p>Becomes the first theme tab, before "Kinetics". Selecting it replaces the analysis area with the expanded two-column cohort view.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:10px;">
+          <div style="display:flex;gap:6px;border-bottom:2px solid #eb5234;padding-bottom:4px;">
+            <div style="background:#eb5234;color:white;padding:6px 12px;border-radius:6px 6px 0 0;font-size:12px;">Cohort</div>
+            <div style="padding:6px 12px;color:#666;font-size:12px;">Kinetics</div>
+            <div style="padding:6px 12px;color:#666;font-size:12px;">Variable impact &amp; DoE</div>
+            <div style="padding:6px 12px;color:#666;font-size:12px;">Metabolic eng.</div>
+            <div style="padding:6px 12px;color:#666;font-size:12px;">Pattern finding</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>New sub-tab inside an existing theme</h3>
+      <p>Lives under one of the existing themes (e.g. Kinetics) as a sub-tab, leftmost in that row.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:10px;">
+          <div style="display:flex;gap:6px;border-bottom:2px solid #eb5234;padding-bottom:4px;">
+            <div style="background:#eb5234;color:white;padding:6px 12px;border-radius:6px 6px 0 0;font-size:12px;">Kinetics</div>
+            <div style="padding:6px 12px;color:#666;font-size:12px;">Variable impact &amp; DoE</div>
+            <div style="padding:6px 12px;color:#666;font-size:12px;">Metabolic eng.</div>
+            <div style="padding:6px 12px;color:#666;font-size:12px;">Pattern finding</div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <div style="background:#e5e7eb;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;">Cohort</div>
+            <div style="padding:4px 10px;color:#666;font-size:11px;">Kinetic analysis</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

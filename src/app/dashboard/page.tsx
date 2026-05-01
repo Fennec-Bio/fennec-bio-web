@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ExperimentList } from '@/components/Shared/ExperimentList'
 import { QuickView } from '@/components/dashboard/QuickView'
 import { Overlay } from '@/components/dashboard/Overlay'
-import { VariableImpact } from '@/components/dashboard/VariableImpact'
 import { AIRecommendations } from '@/components/AIRecommendations'
 
 interface Experiment {
@@ -236,7 +236,20 @@ export default function Dashboard() {
               isOpen={isVariableImpactOpen}
               onToggle={() => setIsVariableImpactOpen(!isVariableImpactOpen)}
             >
-              <VariableImpact />
+              <Link
+                href="/dashboard/analysis"
+                className="block rounded-md border border-gray-200 bg-white p-6 hover:border-[#eb5234] transition-colors"
+              >
+                <div className="font-medium text-gray-900 mb-1">
+                  Variable Analysis
+                </div>
+                <div className="text-sm text-gray-500">
+                  Pick a cohort, choose an outcome, and run kinetic, DoE, and impact analyses.
+                </div>
+                <div className="mt-3 text-sm text-[#eb5234] font-medium">
+                  Open Variable Analysis →
+                </div>
+              </Link>
             </CollapsibleSection>
           </div>
         </div>

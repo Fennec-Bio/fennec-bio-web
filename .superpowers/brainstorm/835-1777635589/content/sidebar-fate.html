@@ -1,0 +1,55 @@
+<h2>What happens to the left sidebar when Cohort tab is active?</h2>
+<p class="subtitle">The 280px CohortRail today holds: filters, "Load from set", candidates list, outcome picker. In the expanded view we have a lot more room to spread out.</p>
+
+<div class="options" style="grid-template-columns:1fr;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Hide sidebar entirely (full-bleed two columns)</h3>
+      <p>Filters move into the expanded view (e.g. a top filter bar above the two columns). Maximum horizontal room for the lists.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;">
+          <div style="background:#fafafa;border:1px dashed #ccc;padding:6px;font-size:11px;color:#666;">Filters bar (strain, parent strain, batch media, feed media, variables, load from set)</div>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <div style="flex:1;background:#fff;border:1px solid #ddd;padding:8px;font-size:11px;">Filtered candidates (124)</div>
+            <div style="flex:1;background:#fff;border:1px solid #ddd;padding:8px;font-size:11px;">Cohort (8 selected)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Keep sidebar as the filter rail; two columns are just lists</h3>
+      <p>Sidebar (280px) keeps filters &amp; "Load from set", but its candidate list disappears. Main area gets two columns: candidates | cohort.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;display:flex;gap:8px;">
+          <div style="width:120px;background:#fafafa;border:1px dashed #ccc;padding:6px;font-size:11px;color:#666;">Filters sidebar</div>
+          <div style="flex:1;display:flex;gap:8px;">
+            <div style="flex:1;background:#fff;border:1px solid #ddd;padding:8px;font-size:11px;">Filtered candidates (124)</div>
+            <div style="flex:1;background:#fff;border:1px solid #ddd;padding:8px;font-size:11px;">Cohort (8 selected)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Keep sidebar exactly as-is; lists in main area duplicate it</h3>
+      <p>Sidebar still shows filters + small candidates list. Main area mirrors with the bigger two-column view. (More information, but redundant.)</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;display:flex;gap:8px;">
+          <div style="width:120px;background:#fafafa;border:1px dashed #ccc;padding:6px;font-size:11px;color:#666;">Sidebar (filters + small candidates list)</div>
+          <div style="flex:1;display:flex;gap:8px;">
+            <div style="flex:1;background:#fff;border:1px solid #ddd;padding:8px;font-size:11px;">Candidates</div>
+            <div style="flex:1;background:#fff;border:1px solid #ddd;padding:8px;font-size:11px;">Cohort</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

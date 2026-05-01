@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import {
-  apiComponentsToRows, ComponentRow, MediaFormFields, MediaType, rowsToPayload,
+  apiComponentsToRows, apiComplexComponentsToRows,
+  ComplexComponentRow, ComponentRow, MediaFormFields,
+  complexRowsToPayload, rowsToPayload,
 } from './MediaFormShared'
 import { useMediaComponentCatalog } from './useMediaComponentCatalog'
 
@@ -16,11 +18,16 @@ interface EditMediaProps {
 interface MediaDetailResponse {
   id: number
   name: string
-  media_type: MediaType
   project: number | null
   carbon_sources: { name: string; molecular_weight: number | null; concentration: number | null }[]
   nitrogen_sources: { name: string; molecular_weight: number | null; concentration: number | null }[]
-  complex_components: { name: string; molecular_weight: number | null; concentration: number | null }[]
+  complex_components: {
+    name: string
+    molecular_weight: number | null
+    concentration: number | null
+    percent_carbon: number | null
+    percent_nitrogen: number | null
+  }[]
   additional_components: { name: string; molecular_weight: number | null; concentration: number | null }[]
 }
 
@@ -35,16 +42,14 @@ export function EditMedia({ selectedMediaId, onUpdated, catalogRefreshKey }: Edi
   const [successMessage, setSuccessMessage] = useState('')
 
   const [name, setName] = useState('')
-  const [mediaType, setMediaType] = useState<MediaType | ''>('')
   const [carbonSources, setCarbonSources] = useState<ComponentRow[]>([])
   const [nitrogenSources, setNitrogenSources] = useState<ComponentRow[]>([])
-  const [complexComponents, setComplexComponents] = useState<ComponentRow[]>([])
+  const [complexComponents, setComplexComponents] = useState<ComplexComponentRow[]>([])
   const [additionalComponents, setAdditionalComponents] = useState<ComponentRow[]>([])
 
   useEffect(() => {
     if (selectedMediaId == null) {
       setName('')
-      setMediaType('')
       setCarbonSources([])
       setNitrogenSources([])
       setComplexComponents([])
@@ -66,10 +71,9 @@ export function EditMedia({ selectedMediaId, onUpdated, catalogRefreshKey }: Edi
         const data: MediaDetailResponse = await res.json()
         if (cancelled) return
         setName(data.name)
-        setMediaType(data.media_type)
         setCarbonSources(apiComponentsToRows(data.carbon_sources))
         setNitrogenSources(apiComponentsToRows(data.nitrogen_sources))
-        setComplexComponents(apiComponentsToRows(data.complex_components))
+        setComplexComponents(apiComplexComponentsToRows(data.complex_components))
         setAdditionalComponents(apiComponentsToRows(data.additional_components))
       } catch (err) {
         if (!cancelled) {
@@ -97,20 +101,15 @@ export function EditMedia({ selectedMediaId, onUpdated, catalogRefreshKey }: Edi
       setErrorMessage('Media name is required')
       return
     }
-    if (mediaType !== 'defined' && mediaType !== 'complex') {
-      setErrorMessage('Media type is required')
-      return
-    }
 
     setIsSaving(true)
     try {
       const token = await getToken()
       const body = {
         name: name.trim(),
-        media_type: mediaType,
-        carbon_sources: mediaType === 'defined' ? rowsToPayload(carbonSources) : [],
-        nitrogen_sources: mediaType === 'defined' ? rowsToPayload(nitrogenSources) : [],
-        complex_components: mediaType === 'complex' ? rowsToPayload(complexComponents) : [],
+        carbon_sources: rowsToPayload(carbonSources),
+        nitrogen_sources: rowsToPayload(nitrogenSources),
+        complex_components: complexRowsToPayload(complexComponents),
         additional_components: rowsToPayload(additionalComponents),
       }
 
@@ -154,8 +153,6 @@ export function EditMedia({ selectedMediaId, onUpdated, catalogRefreshKey }: Edi
       <MediaFormFields
         name={name}
         onNameChange={setName}
-        mediaType={mediaType}
-        onMediaTypeChange={setMediaType}
         carbonSources={carbonSources}
         onCarbonSourcesChange={setCarbonSources}
         nitrogenSources={nitrogenSources}
@@ -171,7 +168,7 @@ export function EditMedia({ selectedMediaId, onUpdated, catalogRefreshKey }: Edi
         <button
           type="button"
           onClick={handleSave}
-          disabled={!name.trim() || !mediaType || isSaving}
+          disabled={!name.trim() || isSaving}
           className="px-5 py-2 text-sm font-medium border border-gray-200 rounded-md shadow-xs hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSaving ? 'Saving…' : 'Save Changes'}
