@@ -133,74 +133,78 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
 
   if (layout === 'bar') {
     return (
-      <div className="flex flex-wrap items-start gap-2 p-3 bg-white border border-gray-200 rounded-lg">
-        <MultiSelectDropdown
-          label="Strain"
-          options={unique.strains}
-          selected={state.strainIds}
-          onChange={ids => setState({ strainIds: ids })}
-          layout="bar"
-        />
-        <MultiSelectDropdown
-          label="Parent strain"
-          options={unique.parent_strains}
-          selected={state.parentStrainIds}
-          onChange={ids => setState({ parentStrainIds: ids })}
-          layout="bar"
-        />
-        <MultiSelectDropdown
-          label="Batch media"
-          options={unique.batch_media_list}
-          selected={state.batchMediaIds}
-          onChange={ids => setState({ batchMediaIds: ids })}
-          layout="bar"
-        />
-        <MultiSelectDropdown
-          label="Feed media"
-          options={unique.feed_media_list}
-          selected={state.feedMediaIds}
-          onChange={ids => setState({ feedMediaIds: ids })}
-          layout="bar"
-        />
-        <VariableFilter
-          variablesCatalog={unique.variables}
-          filters={state.variableFilters}
-          onChange={next => setState({ variableFilters: next })}
-        />
+      <div className="flex flex-col gap-2 p-3 bg-white border border-gray-200 rounded-lg">
+        <div className="flex flex-wrap items-start gap-2">
+          <MultiSelectDropdown
+            label="Strain"
+            options={unique.strains}
+            selected={state.strainIds}
+            onChange={ids => setState({ strainIds: ids })}
+            layout="bar"
+          />
+          <MultiSelectDropdown
+            label="Parent strain"
+            options={unique.parent_strains}
+            selected={state.parentStrainIds}
+            onChange={ids => setState({ parentStrainIds: ids })}
+            layout="bar"
+          />
+          <MultiSelectDropdown
+            label="Batch media"
+            options={unique.batch_media_list}
+            selected={state.batchMediaIds}
+            onChange={ids => setState({ batchMediaIds: ids })}
+            layout="bar"
+          />
+          <MultiSelectDropdown
+            label="Feed media"
+            options={unique.feed_media_list}
+            selected={state.feedMediaIds}
+            onChange={ids => setState({ feedMediaIds: ids })}
+            layout="bar"
+          />
+          <VariableFilter
+            variablesCatalog={unique.variables}
+            filters={state.variableFilters}
+            onChange={next => setState({ variableFilters: next })}
+          />
+        </div>
 
-        <div className="relative">
-          <button
-            onClick={openSetPicker}
-            className="h-9 px-3 py-2 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all"
-          >
-            Load from set…
-          </button>
-          {setPickerOpen && (
-            <div className="absolute z-[9999] mt-1 w-64 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-              {sets === null && <div className="px-3 py-2 text-sm text-gray-400">Loading…</div>}
-              {sets?.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">No sets</div>}
-              {sets?.map(s => (
-                <div
-                  key={s.id}
-                  onClick={() => loadFromSet(s)}
-                  className="px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer"
-                >
-                  <div className="font-medium">{s.name}</div>
-                  <div className="text-xs text-gray-400">
-                    {s.experiment_ids.length} experiments
+        <div className="flex flex-wrap items-start gap-2">
+          <div className="relative">
+            <button
+              onClick={openSetPicker}
+              className="h-9 px-3 py-2 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all"
+            >
+              Load from set…
+            </button>
+            {setPickerOpen && (
+              <div className="absolute z-[9999] mt-1 w-64 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                {sets === null && <div className="px-3 py-2 text-sm text-gray-400">Loading…</div>}
+                {sets?.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">No sets</div>}
+                {sets?.map(s => (
+                  <div
+                    key={s.id}
+                    onClick={() => loadFromSet(s)}
+                    className="px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+                  >
+                    <div className="font-medium">{s.name}</div>
+                    <div className="text-xs text-gray-400">
+                      {s.experiment_ids.length} experiments
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {loadedSetName && (
+            <div className="inline-flex items-center gap-2 px-2 h-9 rounded bg-orange-50 text-[#eb5234] text-xs">
+              via {loadedSetName}
+              <button onClick={() => setLoadedSetName(null)} className="text-[#eb5234]">×</button>
             </div>
           )}
         </div>
-
-        {loadedSetName && (
-          <div className="inline-flex items-center gap-2 px-2 h-9 rounded bg-orange-50 text-[#eb5234] text-xs">
-            via {loadedSetName}
-            <button onClick={() => setLoadedSetName(null)} className="text-[#eb5234]">×</button>
-          </div>
-        )}
       </div>
     )
   }
