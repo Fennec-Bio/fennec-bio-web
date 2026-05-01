@@ -20,9 +20,11 @@ export const THEMES: Array<{
   label: string
   analyses: Array<{ slug: AnalysisSlug; label: string; availableInP1: boolean }>
 }> = [
+  { id: 'cohort', label: 'Cohort', analyses: [
+    { slug: 'cohort-overview', label: 'Cohort', availableInP1: true },
+  ]},
   { id: 'kinetics', label: 'Kinetics', analyses: [
-    { slug: 'kinetic-overlay',    label: 'Overlay',              availableInP1: true  },
-    { slug: 'derived-parameters', label: 'Derived parameters',   availableInP1: true  },
+    { slug: 'kinetic-analysis', label: 'Kinetic Analysis', availableInP1: true },
   ]},
   { id: 'doe', label: 'Variable impact & DoE', analyses: [
     { slug: 'anova-heatmap',    label: 'ANOVA heatmap',     availableInP1: true  },
@@ -44,5 +46,5 @@ export const THEMES: Array<{
   ]},
 ]
 
-export const DEFAULT_THEME: ThemeId = 'kinetics'
-export const DEFAULT_ANALYSIS: AnalysisSlug = 'kinetic-overlay'
+export const DEFAULT_THEME: ThemeId = 'cohort'
+export const DEFAULT_ANALYSIS: AnalysisSlug = 'cohort-overview'

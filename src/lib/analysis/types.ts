@@ -3,13 +3,14 @@ export type OutcomeMetric =
   | 'yps' | 'ypx' | 'biomass' | 'mu_max' | 'substrate_rate'
 
 export type AnalysisSlug =
-  | 'kinetic-overlay' | 'derived-parameters'
+  | 'cohort-overview'
+  | 'kinetic-analysis'
   | 'anova-heatmap' | 'main-effects' | 'response-surface'
   | 'pareto' | 'regression'
   | 'strain-lineage' | 'carbon-balance' | 'yield-summary' | 'media-scan'
   | 'pca' | 'cohort-diff' | 'percentile-overlay'
 
-export type ThemeId = 'kinetics' | 'doe' | 'metabolic' | 'pattern'
+export type ThemeId = 'cohort' | 'kinetics' | 'doe' | 'metabolic' | 'pattern'
 
 export interface MediaComponent {
   name: string
