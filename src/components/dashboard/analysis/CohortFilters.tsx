@@ -3,12 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
-import { useCohortPayload } from '@/hooks/useCohortPayload'
 import {
   fetchUniqueNames,
   type UniqueNamesResponse,
 } from '@/lib/analysis/api'
-import { OutcomePicker } from './OutcomePicker'
 import { VariableFilter } from './VariableFilter'
 
 interface ExperimentSetRow {
@@ -125,9 +123,6 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
     return () => { cancelled = true }
   }, [getToken])
 
-  const { payload } = useCohortPayload(state.ids)
-  const availableProducts = payload?.products ?? []
-
   if (!unique) {
     return (
       <div className={layout === 'sidebar' ? 'p-4 text-sm text-gray-500' : 'p-3 text-sm text-gray-500'}>
@@ -206,10 +201,6 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
             <button onClick={() => setLoadedSetName(null)} className="text-[#eb5234]">×</button>
           </div>
         )}
-
-        <div className="ml-auto">
-          <OutcomePicker availableProducts={availableProducts} />
-        </div>
       </div>
     )
   }
@@ -284,8 +275,6 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
           </div>
         )}
       </div>
-
-      <OutcomePicker availableProducts={availableProducts} />
     </div>
   )
 }
