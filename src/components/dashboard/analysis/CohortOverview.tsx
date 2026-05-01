@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCandidateExperiments, type Candidate } from '@/hooks/useCandidateExperiments'
+import { CohortFilters } from './CohortFilters'
 import { ExperimentRow } from './ExperimentRow'
 
 function matchesSearch(c: Candidate, q: string): boolean {
@@ -92,7 +93,10 @@ export function CohortOverview() {
   })
 
   return (
-    <div className="grid grid-cols-2 gap-3 h-[calc(100vh-220px)]">
+    <div className="flex flex-col gap-3 h-[calc(100vh-220px)]">
+      <CohortFilters layout="bar" />
+
+      <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
       {/* Candidates column */}
       <div className="bg-white border border-gray-200 rounded-lg flex flex-col overflow-hidden">
         <div className="px-3 py-2 border-b border-gray-200">
@@ -189,6 +193,7 @@ export function CohortOverview() {
             />
           ))}
         </div>
+      </div>
       </div>
     </div>
   )

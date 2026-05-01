@@ -34,9 +34,11 @@ function AnalysisPageInner() {
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
-      <aside className="w-[280px] shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
-        <CohortRail />
-      </aside>
+      {state.analysis !== 'cohort-overview' && (
+        <aside className="w-[280px] shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
+          <CohortRail />
+        </aside>
+      )}
       <main className="flex-1 overflow-auto bg-gray-50 p-6">
         <ThemeTabs cohortSize={state.ids.length} />
         <div className="mt-6">
