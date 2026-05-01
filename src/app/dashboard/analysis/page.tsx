@@ -4,9 +4,9 @@ import { Suspense } from 'react'
 import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
 import { BestVsWorstDiff } from '@/components/dashboard/analysis/BestVsWorstDiff'
 import { CarbonBalance } from '@/components/dashboard/analysis/CarbonBalance'
+import { CohortOverview } from '@/components/dashboard/analysis/CohortOverview'
 import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
-import { DerivedParameters } from '@/components/dashboard/analysis/DerivedParameters'
-import { KineticOverlay } from '@/components/dashboard/analysis/KineticOverlay'
+import { KineticAnalysis } from '@/components/dashboard/analysis/kinetics/KineticAnalysis'
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { MediaScan } from '@/components/dashboard/analysis/MediaScan'
 import { Pareto } from '@/components/dashboard/analysis/Pareto'
@@ -40,30 +40,33 @@ function AnalysisPageInner() {
       <main className="flex-1 overflow-auto bg-gray-50 p-6">
         <ThemeTabs cohortSize={state.ids.length} />
         <div className="mt-6">
-          {state.ids.length === 0 && (
+          {state.analysis === 'cohort-overview' && (
+            <CohortOverview />
+          )}
+          {state.analysis !== 'cohort-overview' && state.ids.length === 0 && (
             <div className="rounded-md border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
               Pick experiments on the left to begin.
             </div>
           )}
-          {state.ids.length > 0 && loading && (
+          {state.analysis !== 'cohort-overview' && state.ids.length > 0 && loading && (
             <div className="text-sm text-gray-500">Loading cohort…</div>
           )}
-          {state.ids.length > 0 && error && (
+          {state.analysis !== 'cohort-overview' && state.ids.length > 0 && error && (
             <div className="rounded-md border border-red-200 bg-red-50 text-sm text-red-700 p-3">
               {error}
             </div>
           )}
-          {payload && (
+          {state.analysis !== 'cohort-overview' && payload && (
             <>
-              {state.analysis === 'kinetic-overlay' && <KineticOverlay payload={payload} />}
-              {state.analysis === 'derived-parameters' && (
-                <DerivedParameters payload={payload} product={state.product} />
+              {state.analysis === 'kinetic-analysis' && (
+                <KineticAnalysis payload={payload} />
               )}
               {state.analysis === 'anova-heatmap' && (
                 <AnovaHeatmap ids={state.ids} outcome={state.outcome} product={state.product} />
               )}
               {state.analysis === 'main-effects' && (
-                <MainEffects ids={state.ids} outcome={state.outcome} product={state.product} />
+                <MainEffects ids={state.ids} outcome={state.outcome}
+                             product={state.product} payload={payload} />
               )}
               {state.analysis === 'pareto' && (
                 <Pareto ids={state.ids} outcome={state.outcome} product={state.product} />
