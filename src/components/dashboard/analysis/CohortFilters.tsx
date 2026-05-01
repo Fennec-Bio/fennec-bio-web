@@ -158,13 +158,6 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
             layout="bar"
           />
           <MultiSelectDropdown
-            label="Parent strain"
-            options={unique.parent_strains}
-            selected={state.parentStrainIds}
-            onChange={ids => setState({ parentStrainIds: ids })}
-            layout="bar"
-          />
-          <MultiSelectDropdown
             label="Batch media"
             options={unique.batch_media_list}
             selected={state.batchMediaIds}
@@ -233,13 +226,6 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
         options={unique.strains}
         selected={state.strainIds}
         onChange={ids => setState({ strainIds: ids })}
-        layout="sidebar"
-      />
-      <MultiSelectDropdown
-        label="Parent strain"
-        options={unique.parent_strains}
-        selected={state.parentStrainIds}
-        onChange={ids => setState({ parentStrainIds: ids })}
         layout="sidebar"
       />
       <MultiSelectDropdown
