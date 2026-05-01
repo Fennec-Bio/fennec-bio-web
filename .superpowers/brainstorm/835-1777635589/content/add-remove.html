@@ -1,0 +1,61 @@
+<h2>How does a user add or remove an experiment from the cohort?</h2>
+<p class="subtitle">In the existing sidebar you click a row to toggle. With two columns, there are a few common UX patterns.</p>
+
+<div class="options" style="grid-template-columns:1fr;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Click row to toggle (consistent with current sidebar)</h3>
+      <p>Click a candidate row → it moves into the cohort column (and a checkmark/highlight appears). Click a row in the cohort column → it leaves the cohort. No drag, no buttons. Bulk "All / None" buttons stay above each column.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;font-size:11px;display:flex;gap:8px;">
+          <div style="flex:1;">
+            <div style="font-weight:600;margin-bottom:4px;">Filtered candidates</div>
+            <div style="background:#fff;border:1px solid #ddd;padding:4px;">
+              <div style="padding:4px;background:#f3f4f6;">Ferm 100-BO ✓ <span style="color:#888;">(in cohort)</span></div>
+              <div style="padding:4px;">Ferm 101-BO</div>
+              <div style="padding:4px;">Ferm 102-BO</div>
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-weight:600;margin-bottom:4px;">Cohort (1)</div>
+            <div style="background:#fff;border:1px solid #ddd;padding:4px;">
+              <div style="padding:4px;">Ferm 100-BO ×</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Explicit "Add →" / "← Remove" buttons</h3>
+      <p>Each candidate row has an "Add →" button on the right. Each cohort row has a "← Remove" or × button. Less ambiguous about what clicking does, but heavier visual weight.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;font-size:11px;display:flex;gap:8px;">
+          <div style="flex:1;">
+            <div style="background:#fff;border:1px solid #ddd;padding:4px;">
+              <div style="padding:4px;display:flex;justify-content:space-between;">Ferm 101-BO <button style="font-size:10px;">Add →</button></div>
+              <div style="padding:4px;display:flex;justify-content:space-between;">Ferm 102-BO <button style="font-size:10px;">Add →</button></div>
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div style="background:#fff;border:1px solid #ddd;padding:4px;">
+              <div style="padding:4px;display:flex;justify-content:space-between;">Ferm 100-BO <button style="font-size:10px;">×</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Drag and drop between columns</h3>
+      <p>Grab a row, drop it in the other column. Feels physical but is harder on touch/keyboard, slower for bulk ops, and inconsistent with the sidebar.</p>
+    </div>
+  </div>
+</div>

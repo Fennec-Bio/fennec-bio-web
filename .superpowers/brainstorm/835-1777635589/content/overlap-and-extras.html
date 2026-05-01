@@ -1,0 +1,77 @@
+<h2>A few smaller decisions</h2>
+<p class="subtitle">Pick the option you prefer in each row. Leave defaults if recommended is fine.</p>
+
+<h3>1. When a candidate is already in the cohort, how do we show it in the left column?</h3>
+<div class="options" data-multiselect style="grid-template-columns:1fr;">
+  <div class="option" data-choice="overlap-show" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Show it in both columns, greyed/checked in the candidates column (recommended)</h3>
+      <p>Easier to see "did I already pick this?" while scanning candidates. Click toggles either side.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="overlap-hide" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Hide it from the candidates column once added</h3>
+      <p>Candidates column shrinks to "what's still addable". Cleaner but you lose context if you remove from cohort.</p>
+    </div>
+  </div>
+</div>
+
+<h3>2. What if cohort has experiments that don't match current filters? (e.g. you loaded a set, then narrowed filters)</h3>
+<div class="options" data-multiselect style="grid-template-columns:1fr;">
+  <div class="option" data-choice="orphan-keep" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Keep them in the cohort column with a small "outside filter" tag (recommended)</h3>
+      <p>Cohort is independent of filters. The tag warns the user; they can still click to remove.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="orphan-drop" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Auto-drop them when filters narrow</h3>
+      <p>Cohort always equals selected ∩ filtered. Simpler invariant, but destructive if a filter change is exploratory.</p>
+    </div>
+  </div>
+</div>
+
+<h3>3. Sort order in each column</h3>
+<div class="options" data-multiselect style="grid-template-columns:1fr;">
+  <div class="option" data-choice="sort-title" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>By experiment title (recommended, matches sidebar today)</h3>
+    </div>
+  </div>
+  <div class="option" data-choice="sort-date" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>By date (newest first)</h3>
+    </div>
+  </div>
+  <div class="option" data-choice="sort-toggle" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Sort dropdown (title / date / strain) on each column</h3>
+    </div>
+  </div>
+</div>
+
+<h3>4. Search within each column?</h3>
+<div class="options" data-multiselect style="grid-template-columns:1fr;">
+  <div class="option" data-choice="search-yes" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Yes — small search box at top of each column (recommended)</h3>
+      <p>Useful when candidates list is hundreds long, and to verify a specific experiment is in the cohort.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="search-no" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>No — rely on filters and scrolling</h3>
+    </div>
+  </div>
+</div>

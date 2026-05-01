@@ -222,6 +222,7 @@ export async function fetchResponseSurface(
     product: string | null
     var_x: string
     var_y: string
+    var_z?: string | null
   },
 ): Promise<ResponseSurfaceResult> {
   return postAnalysis<ResponseSurfaceResult>(token, 'response-surface/', req)

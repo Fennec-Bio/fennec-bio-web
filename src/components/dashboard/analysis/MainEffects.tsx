@@ -1,28 +1,50 @@
 'use client'
 
 import * as d3 from 'd3'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { fetchMainEffects } from '@/lib/analysis/api'
 import type {
+  CohortPayload,
   InteractionEntry,
   MainEffectFactor,
   MainEffectsResult,
   OutcomeMetric,
 } from '@/lib/analysis/types'
 
-export function MainEffects({ ids, outcome, product, factors }: {
+function availableFactorsFromPayload(payload: CohortPayload | null | undefined): string[] {
+  if (!payload) return []
+  const names = new Set<string>()
+  let hasStrain = false
+  for (const e of payload.experiments) {
+    if (e.strain) hasStrain = true
+    for (const v of e.variables ?? []) names.add(v.name)
+  }
+  if (hasStrain) names.add('strain')
+  return Array.from(names).sort((a, b) => a.localeCompare(b))
+}
+
+export function MainEffects({ ids, outcome, product, factors, payload }: {
   ids: number[]
   outcome: OutcomeMetric
   product: string | null
   factors?: string[]
+  payload?: CohortPayload | null
 }) {
   const { getToken } = useAuth()
   const [data, setData] = useState<MainEffectsResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const availableFactors = useMemo(() => availableFactorsFromPayload(payload), [payload])
+  // null = let backend auto-pick (top-by-eta²); otherwise = explicit user picks.
+  const [selectedFactors, setSelectedFactors] = useState<string[] | null>(factors ?? null)
+
+  // Reset selection when the cohort changes so we don't carry stale picks over.
   const idsKey = ids.join(',')
-  const factorsKey = (factors ?? []).join(',')
+  useEffect(() => { setSelectedFactors(factors ?? null) }, [idsKey, factors])
+
+  const factorsForRequest = selectedFactors ?? undefined
+  const factorsKey = (factorsForRequest ?? ['__auto__']).join(',')
 
   useEffect(() => {
     let cancelled = false
@@ -31,7 +53,7 @@ export function MainEffects({ ids, outcome, product, factors }: {
     ;(async () => {
       try {
         const token = await getToken()
-        const r = await fetchMainEffects(token, ids, outcome, product, factors)
+        const r = await fetchMainEffects(token, ids, outcome, product, factorsForRequest)
         if (!cancelled) setData(r)
       } catch (e) {
         if (!cancelled) setError(String(e))
@@ -43,26 +65,71 @@ export function MainEffects({ ids, outcome, product, factors }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsKey, outcome, product, factorsKey, getToken])
 
-  if (loading) return <div className="text-sm text-gray-500">Running main effects…</div>
-  if (error)   return <div className="rounded-md border border-red-200 bg-red-50 text-sm text-red-700 p-3">{error}</div>
-  if (!data)   return null
+  function toggleFactor(name: string) {
+    setSelectedFactors(prev => {
+      const base = prev ?? data?.main_effects.map(f => f.factor) ?? []
+      const set = new Set(base)
+      if (set.has(name)) set.delete(name); else set.add(name)
+      return Array.from(set)
+    })
+  }
 
-  const meCols = Math.min(data.main_effects.length || 1, 3)
-  const interCols = Math.min(data.interactions.length || 1, 3)
+  if (error)   return <div className="rounded-md border border-red-200 bg-red-50 text-sm text-red-700 p-3">{error}</div>
+
+  const meCols = Math.min(data?.main_effects.length || 1, 3)
+  const interCols = Math.min(data?.interactions.length || 1, 3)
+  const activeSet = new Set(selectedFactors ?? data?.main_effects.map(f => f.factor) ?? [])
 
   return (
     <div className="space-y-6">
       <div className="bg-white border border-gray-200 rounded-md p-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Main effects</h3>
-        {data.main_effects.length === 0 ? (
+        <div className="flex items-baseline justify-between mb-3">
+          <h3 className="text-sm font-medium text-gray-900">Main effects</h3>
+          {selectedFactors !== null && (
+            <button type="button" onClick={() => setSelectedFactors(null)}
+                    className="text-xs text-blue-600 hover:underline">
+              reset to auto-picked
+            </button>
+          )}
+        </div>
+
+        {availableFactors.length > 0 && (
+          <div className="mb-4">
+            <div className="text-xs text-gray-500 mb-1.5">
+              Variables {selectedFactors === null
+                ? '(auto — click any to override)'
+                : `(${activeSet.size} selected)`}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {availableFactors.map(name => {
+                const on = activeSet.has(name)
+                return (
+                  <button key={name} type="button" onClick={() => toggleFactor(name)}
+                          className={
+                            'inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ' +
+                            (on
+                              ? 'bg-blue-100 border-blue-300 text-blue-800'
+                              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50')
+                          }>
+                    {name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {loading && <div className="text-sm text-gray-500">Running main effects…</div>}
+        {!loading && data && data.main_effects.length === 0 && (
           <div className="text-sm text-gray-500">No factor levels available in this cohort.</div>
-        ) : (
+        )}
+        {!loading && data && data.main_effects.length > 0 && (
           <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${meCols}, 1fr)` }}>
             {data.main_effects.map(f => <MainEffectPlot key={f.factor} factor={f} />)}
           </div>
         )}
       </div>
-      {data.interactions.length > 0 && (
+      {data && data.interactions.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-md p-4">
           <h3 className="text-sm font-medium text-gray-900 mb-3">2-way interactions</h3>
           <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${interCols}, 1fr)` }}>

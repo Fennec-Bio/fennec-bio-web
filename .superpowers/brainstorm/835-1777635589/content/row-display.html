@@ -1,0 +1,65 @@
+<h2>Which variable tags should we show on each row?</h2>
+<p class="subtitle">Variables in this app are arbitrary key/value strings (e.g. "pulse size":"40", "feed rate":"0.2"). Each experiment can have many. We need to decide which ones get shown as tags inline.</p>
+
+<div class="options" style="grid-template-columns:1fr;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Show only variables you've filtered on (recommended)</h3>
+      <p>If your filters include "pulse size" and "feed rate", every row shows those two as small tags. Compact, relevant, and the tags answer the question "why did this row match my filter?".</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;font-size:11px;">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #eee;">
+            <input type="checkbox" checked disabled>
+            <span style="flex:1;">Ferm 128-BO</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">pulse size: 40</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">feed rate: 0.2</span>
+            <span style="color:#888;">Strain X</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Show all variables on each row</h3>
+      <p>Every variable for every experiment becomes a tag. Most informative, but rows become wide/wrap heavily; harder to scan.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;font-size:11px;">
+          <div style="display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid #eee;flex-wrap:wrap;">
+            <input type="checkbox" checked disabled>
+            <span>Ferm 128-BO</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">pulse size: 40</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">feed rate: 0.2</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">induction: IPTG</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">temp shift: 30C</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">media: SD-Ura</span>
+            <span style="color:#888;">Strain X</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Filtered variables inline + "more" expander for the rest</h3>
+      <p>Filter-active variables show as tags. A small "+3" pill expands the row on click to reveal the remaining variables.</p>
+      <div class="mockup" style="margin-top:10px;">
+        <div class="mockup-body" style="padding:8px;font-size:11px;">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #eee;">
+            <input type="checkbox" checked disabled>
+            <span style="flex:1;">Ferm 128-BO</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">pulse size: 40</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;">feed rate: 0.2</span>
+            <span style="background:#e5e7eb;color:#444;padding:2px 6px;border-radius:10px;cursor:pointer;">+3</span>
+            <span style="color:#888;">Strain X</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
