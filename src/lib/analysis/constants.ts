@@ -25,6 +25,7 @@ export const THEMES: Array<{
   ]},
   { id: 'kinetics', label: 'Kinetics', analyses: [
     { slug: 'kinetic-analysis', label: 'Kinetic Analysis', availableInP1: true },
+    { slug: 'yield-summary',    label: 'Yield summary',    availableInP1: true },
   ]},
   { id: 'doe', label: 'Variable impact & DoE', analyses: [
     { slug: 'anova-heatmap',    label: 'ANOVA heatmap',     availableInP1: true  },
@@ -36,7 +37,6 @@ export const THEMES: Array<{
   { id: 'metabolic', label: 'Metabolic eng.', analyses: [
     { slug: 'strain-lineage', label: 'Strain lineage',       availableInP1: true  },
     { slug: 'carbon-balance', label: 'Carbon balance',       availableInP1: true  },
-    { slug: 'yield-summary',  label: 'Yield summary',        availableInP1: true  },
     { slug: 'media-scan',     label: 'Media component scan', availableInP1: true  },
   ]},
   { id: 'pattern', label: 'Pattern finding', analyses: [
