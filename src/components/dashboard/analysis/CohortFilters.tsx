@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import {
@@ -34,6 +34,17 @@ async function fetchExperimentSets(token: string | null): Promise<ExperimentSetR
   }))
 }
 
+function useOutsideClick(ref: React.RefObject<HTMLElement | null>, onOutside: () => void, enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [ref, onOutside, enabled])
+}
+
 function MultiSelectDropdown({
   label,
   options,
@@ -48,13 +59,15 @@ function MultiSelectDropdown({
   layout: 'sidebar' | 'bar'
 }) {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  useOutsideClick(containerRef, () => setOpen(false), open)
   const display = selected.length === 0
     ? 'any'
     : selected.length === 1
       ? (options.find(o => o.id === selected[0])?.name ?? '1 selected')
       : `${selected.length} selected`
   return (
-    <div className={layout === 'sidebar' ? 'relative mb-2' : 'relative'}>
+    <div ref={containerRef} className={layout === 'sidebar' ? 'relative mb-2' : 'relative'}>
       <button
         onClick={() => setOpen(v => !v)}
         className={[
@@ -98,6 +111,8 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
   const [setPickerOpen, setSetPickerOpen] = useState(false)
   const [sets, setSets] = useState<ExperimentSetRow[] | null>(null)
   const [loadedSetName, setLoadedSetName] = useState<string | null>(null)
+  const setPickerRef = useRef<HTMLDivElement>(null)
+  useOutsideClick(setPickerRef, () => setSetPickerOpen(false), setPickerOpen)
 
   const openSetPicker = async () => {
     setSetPickerOpen(true)
@@ -171,7 +186,7 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
         </div>
 
         <div className="flex flex-wrap items-start gap-2">
-          <div className="relative">
+          <div ref={setPickerRef} className="relative">
             <button
               onClick={openSetPicker}
               className="h-9 px-3 py-2 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all"
@@ -247,7 +262,7 @@ export function CohortFilters({ layout }: { layout: 'sidebar' | 'bar' }) {
         onChange={next => setState({ variableFilters: next })}
       />
 
-      <div className="mt-3 relative">
+      <div ref={setPickerRef} className="mt-3 relative">
         <button
           onClick={openSetPicker}
           className="h-9 w-full px-3 py-2 border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-100 transition-all text-left"
