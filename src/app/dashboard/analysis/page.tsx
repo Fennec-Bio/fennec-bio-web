@@ -5,7 +5,6 @@ import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
 import { BestVsWorstDiff } from '@/components/dashboard/analysis/BestVsWorstDiff'
 import { CarbonBalance } from '@/components/dashboard/analysis/CarbonBalance'
 import { CohortOverview } from '@/components/dashboard/analysis/CohortOverview'
-import { CohortRail } from '@/components/dashboard/analysis/CohortRail'
 import { KineticAnalysis } from '@/components/dashboard/analysis/kinetics/KineticAnalysis'
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { MediaScan } from '@/components/dashboard/analysis/MediaScan'
@@ -34,11 +33,6 @@ function AnalysisPageInner() {
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
-      {state.analysis !== 'cohort-overview' && (
-        <aside className="w-[280px] shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
-          <CohortRail />
-        </aside>
-      )}
       <main className="flex-1 overflow-auto bg-gray-50 p-6">
         <ThemeTabs cohortSize={state.ids.length} />
         <div className="mt-6">
