@@ -6,7 +6,7 @@ export type AnalysisSlug =
   | 'cohort-overview'
   | 'kinetic-analysis'
   | 'anova-heatmap' | 'main-effects' | 'response-surface'
-  | 'pareto' | 'regression'
+  | 'regression'
   | 'strain-lineage' | 'carbon-balance' | 'yield-summary' | 'media-scan'
   | 'pca' | 'cohort-diff' | 'percentile-overlay'
 
@@ -174,8 +174,9 @@ export interface RegressionPrediction {
   }
 }
 
-export interface ResponseSurfaceResult {
-  beta: number[]
+export interface ResponseSurfaceResult2D {
+  mode: '2d'
+  beta: number[]   // [b0, b1, b2, b11, b22, b12]
   r_squared: number
   x_range: [number, number]
   y_range: [number, number]
@@ -185,6 +186,19 @@ export interface ResponseSurfaceResult {
   observed_points: Array<{ x: number; y: number; z: number }>
   optimum: { x: number; y: number; predicted_outcome: number } | null
 }
+
+export interface ResponseSurfaceResult3D {
+  mode: '3d'
+  beta: number[]   // [b0, b1, b2, b3, b11, b22, b33, b12, b13, b23]
+  r_squared: number
+  x_range: [number, number]
+  y_range: [number, number]
+  z_range: [number, number]
+  observed_points: Array<{ x: number; y: number; z: number; w: number }>
+  optimum: { x: number; y: number; z: number; predicted_outcome: number } | null
+}
+
+export type ResponseSurfaceResult = ResponseSurfaceResult2D | ResponseSurfaceResult3D
 
 export interface PcaScore { experiment_id: number; pc1: number; pc2: number }
 export interface PcaLoading { variable: string; pc1: number; pc2: number }

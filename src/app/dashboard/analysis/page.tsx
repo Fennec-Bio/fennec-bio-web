@@ -9,7 +9,6 @@ import { KineticAnalysis } from '@/components/dashboard/analysis/kinetics/Kineti
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
 import { MediaScan } from '@/components/dashboard/analysis/MediaScan'
 import { OutcomePicker } from '@/components/dashboard/analysis/OutcomePicker'
-import { Pareto } from '@/components/dashboard/analysis/Pareto'
 import { PCABiplot } from '@/components/dashboard/analysis/PCABiplot'
 import { PercentileOverlay } from '@/components/dashboard/analysis/PercentileOverlay'
 import { Regression } from '@/components/dashboard/analysis/Regression'
@@ -56,7 +55,7 @@ function AnalysisPageInner() {
           {state.analysis !== 'cohort-overview' && payload && (
             <>
               {[
-                'anova-heatmap', 'main-effects', 'pareto', 'regression',
+                'anova-heatmap', 'main-effects', 'regression',
                 'response-surface', 'media-scan', 'pca',
                 'strain-lineage', 'cohort-diff',
               ].includes(state.analysis) && (
@@ -73,9 +72,6 @@ function AnalysisPageInner() {
               {state.analysis === 'main-effects' && (
                 <MainEffects ids={state.ids} outcome={state.outcome}
                              product={state.product} payload={payload} />
-              )}
-              {state.analysis === 'pareto' && (
-                <Pareto ids={state.ids} outcome={state.outcome} product={state.product} />
               )}
               {state.analysis === 'regression' && (
                 <Regression ids={state.ids} outcome={state.outcome} product={state.product} />

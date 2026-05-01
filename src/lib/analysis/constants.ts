@@ -31,7 +31,6 @@ export const THEMES: Array<{
     { slug: 'anova-heatmap',    label: 'ANOVA heatmap',     availableInP1: true  },
     { slug: 'main-effects',     label: 'Main effects',      availableInP1: true  },
     { slug: 'response-surface', label: 'Response surface',  availableInP1: true  },
-    { slug: 'pareto',           label: 'Pareto',            availableInP1: true  },
     { slug: 'regression',       label: 'Regression',        availableInP1: true  },
   ]},
   { id: 'metabolic', label: 'Metabolic eng.', analyses: [
