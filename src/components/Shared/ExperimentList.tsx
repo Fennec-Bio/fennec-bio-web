@@ -7,6 +7,7 @@ import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { DashboardTabs, DashboardSection } from '@/components/Plate/DashboardTabs'
 import { usePlateExperiments } from '@/hooks/usePlateExperiment'
+import type { PlateExperimentListItem } from '@/hooks/usePlateExperiment'
 
 interface Experiment {
   id: number
@@ -49,9 +50,26 @@ interface ExperimentListProps {
   onExperimentSetSelect?: (setId: string) => void
   isMobileDrawer?: boolean
   refreshKey?: number
+  // Controlled mode (all optional, all backwards-compatible)
+  section?: DashboardSection
+  onSectionChange?: (s: DashboardSection) => void
+  onPlateExperimentSelect?: (id: string) => void
+  selectedPlateExperimentId?: string | null
+  onPlateExperimentsChange?: (items: PlateExperimentListItem[]) => void
 }
 
-export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExperimentSetSelect, isMobileDrawer = false, refreshKey }: ExperimentListProps) => {
+export const ExperimentList = ({
+  onExperimentSelect,
+  onExperimentsChange,
+  onExperimentSetSelect,
+  isMobileDrawer = false,
+  refreshKey,
+  section: controlledSection,
+  onSectionChange,
+  onPlateExperimentSelect,
+  selectedPlateExperimentId,
+  onPlateExperimentsChange,
+}: ExperimentListProps) => {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
 
@@ -71,10 +89,22 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     anomalies: []
   })
 
-  const [section, setSection] = useState<DashboardSection>('reactor')
+  const [internalSection, setInternalSection] = useState<DashboardSection>('reactor')
+  const sectionControlled = controlledSection !== undefined && onSectionChange !== undefined
+  const section: DashboardSection = sectionControlled ? controlledSection! : internalSection
+  const setSection = (s: DashboardSection) => {
+    if (sectionControlled) onSectionChange!(s)
+    else setInternalSection(s)
+  }
   const [viewMode, setViewMode] = useState<'experiments' | 'sets'>('experiments')
   const { data: plateData, loading: platesLoading, error: platesError } =
     usePlateExperiments({ projectId: activeProject?.id ?? null })
+
+  useEffect(() => {
+    if (onPlateExperimentsChange && plateData) {
+      onPlateExperimentsChange(plateData.results)
+    }
+  }, [plateData, onPlateExperimentsChange])
   const [experimentSets, setExperimentSets] = useState<ExperimentSetData[]>([])
   const [expandedSets, setExpandedSets] = useState<Set<string>>(new Set())
   const [setsLoading, setSetsLoading] = useState(false)
