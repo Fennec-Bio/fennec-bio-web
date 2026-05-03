@@ -68,8 +68,33 @@ export function Results({ plateExperimentId }: ResultsProps) {
       <div className="text-sm text-gray-500">
         {data.title} · {plate.label} ({plate.format}-well)
       </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        {data.plates.length > 1 && (
+          <select
+            className="h-9 px-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#eb5234]"
+            value={plateIndex}
+            onChange={e => setPlateIndex(Number(e.target.value))}
+            aria-label="Plate"
+          >
+            {data.plates.map((p, i) => (
+              <option key={p.id} value={i}>{p.label}</option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          className={
+            groupReplicates
+              ? 'px-3 py-1.5 bg-[#eb5234] text-white rounded-md text-sm font-medium'
+              : 'px-3 py-1.5 border border-gray-200 bg-white text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50'
+          }
+          onClick={() => setGroupReplicates(v => !v)}
+        >
+          {groupReplicates ? 'Grouping replicates' : 'Individual wells'}
+        </button>
+      </div>
       <div className="text-xs text-gray-400">
-        {selectedMeasurementIds.length} measurement(s) selected · groupReplicates={String(groupReplicates)}
+        {selectedMeasurementIds.length} measurement(s) selected
       </div>
     </div>
   )
