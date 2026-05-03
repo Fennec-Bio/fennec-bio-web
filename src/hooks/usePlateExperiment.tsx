@@ -62,8 +62,19 @@ export type PlateExperimentDetail = {
   updated_at: string
 }
 
+export type PlateFiltersParam = {
+  variables?: { name: string; value: string }[]
+  strain?: string
+  media?: { id: number; name: string }
+  keyword?: string
+}
+
+export type PlateSortParam = { by: string; order: 'asc' | 'desc' }
+
 export function usePlateExperiments(params: {
   projectId?: number | null
+  filters?: PlateFiltersParam
+  sort?: PlateSortParam
   page?: number
   pageSize?: number
 }) {
@@ -71,6 +82,12 @@ export function usePlateExperiments(params: {
   const [data, setData] = useState<ListResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Stringify filter/sort to give useCallback a stable dependency. The objects
+  // passed in are recreated on every parent render, but their JSON identity is
+  // what actually drives a refetch.
+  const filtersKey = JSON.stringify(params.filters ?? {})
+  const sortKey = JSON.stringify(params.sort ?? null)
 
   const refetch = useCallback(async () => {
     setLoading(true)
@@ -81,6 +98,20 @@ export function usePlateExperiments(params: {
       if (params.projectId) qs.set('project', String(params.projectId))
       if (params.page) qs.set('page', String(params.page))
       if (params.pageSize) qs.set('page_size', String(params.pageSize))
+
+      const f = params.filters
+      if (f?.variables && f.variables.length > 0) {
+        qs.set('variables', f.variables.map(v => `${v.name}:${v.value}`).join(','))
+      }
+      if (f?.strain) qs.set('strain', f.strain)
+      if (f?.media) qs.set('media_id', String(f.media.id))
+      if (f?.keyword) qs.set('keyword', f.keyword)
+
+      if (params.sort) {
+        qs.set('sort_by', params.sort.by)
+        qs.set('sort_order', params.sort.order)
+      }
+
       const resp = await fetch(`${API}/api/plate-experiments/?${qs}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -91,7 +122,8 @@ export function usePlateExperiments(params: {
     } finally {
       setLoading(false)
     }
-  }, [getToken, params.projectId, params.page, params.pageSize])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getToken, params.projectId, params.page, params.pageSize, filtersKey, sortKey])
 
   useEffect(() => { refetch() }, [refetch])
 
