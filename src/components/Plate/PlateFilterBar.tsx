@@ -174,6 +174,7 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
 
   // Render placeholder until we add the menu JSX in the next task
   return (
+    <>
     <div className="flex gap-2 mt-4 relative" ref={menuRef}>
       <div className="flex-1 relative">
         <button
@@ -504,6 +505,63 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
         </button>
       </div>
     </div>
+
+    {/* Active filter chips */}
+    {(value.variables?.length || value.strain || value.media || value.keyword) && (
+      <div className="flex flex-wrap gap-2 mt-4">
+        {value.variables?.map((v, i) => (
+          <span key={i} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center gap-1">
+            {v.name}{v.value && ` = ${v.value}`}
+            <button
+              className="ml-1 hover:text-blue-600"
+              onClick={() => {
+                const newVars = (value.variables ?? []).filter((_, idx) => idx !== i)
+                onChange({ ...value, variables: newVars.length > 0 ? newVars : undefined })
+              }}
+            >x</button>
+          </span>
+        ))}
+        {value.strain && (
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center gap-1">
+            Strain: {value.strain}
+            <button className="ml-1 hover:text-blue-600"
+              onClick={() => onChange({ ...value, strain: undefined })}>x</button>
+          </span>
+        )}
+        {value.media && (
+          <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full flex items-center gap-1">
+            Media: {value.media.name}
+            <button className="ml-1 hover:text-orange-600"
+              onClick={() => onChange({ ...value, media: undefined })}>x</button>
+          </span>
+        )}
+        {value.keyword && (
+          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full flex items-center gap-1">
+            Keyword: {value.keyword}
+            <button className="ml-1 hover:text-yellow-600"
+              onClick={() => onChange({ ...value, keyword: undefined })}>x</button>
+          </span>
+        )}
+      </div>
+    )}
+
+    {/* Current sort */}
+    {value.sortBy && value.sortOrder && (
+      <div className="flex flex-wrap gap-2 mt-2">
+        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+          Sorted by: {
+            value.sortBy === 'date'
+              ? 'Date'
+              : value.sortBy.replace(/^secondary_product_/, '').replace(/^product_/, '')
+          }
+          {' '}({value.sortOrder === 'desc'
+            ? (value.sortBy === 'date' ? 'Newest first' : 'Highest first')
+            : (value.sortBy === 'date' ? 'Oldest first'  : 'Lowest first')
+          })
+        </span>
+      </div>
+    )}
+    </>
   )
 }
 
