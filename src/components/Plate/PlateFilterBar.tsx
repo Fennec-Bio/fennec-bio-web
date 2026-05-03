@@ -193,15 +193,19 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
                 setVariablesMenu(true); setStrainMenu(false); setMediaMenu(false); setKeywordMenu(false)
                 setOpenStrainSection(null); setOpenMediaSection(null); setOpenMediaComponent(null)
               }}
-              onMouseLeave={() => setWithDelay(() => setVariablesMenu(false))}
+              onMouseLeave={() => setWithDelay(() => { setVariablesMenu(false); setVariableValuesMenu(null) })}
             >
               <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Variables</div>
               {variablesMenu && (
                 <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
                   {Object.entries(uniqueNames.variables)
-                    .sort(([a], [b]) => sortItems([a, b])[0] === a ? -1 : 1)
-                    .map(([variableName, variableValues], index) => (
-                      <div className="relative" key={index}
+                    .sort(([a], [b]) => {
+                      const an = parseFloat(a), bn = parseFloat(b)
+                      if (!isNaN(an) && !isNaN(bn)) return an - bn
+                      return a.toLowerCase().localeCompare(b.toLowerCase())
+                    })
+                    .map(([variableName, variableValues]) => (
+                      <div className="relative" key={variableName}
                         onMouseEnter={() => { clearAllTimeouts(); setVariableValuesMenu(variableName) }}
                         onMouseLeave={() => setWithDelay(() => setVariableValuesMenu(null))}
                       >
@@ -237,7 +241,9 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
             >
               <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Strain</div>
               {strainMenu && (
-                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1"
+                  onMouseEnter={() => clearAllTimeouts()}
+                >
                   {(['most_recent', 'most_common', 'all'] as const).map(section => {
                     const items = strainTree[section]
                     const label = section === 'most_recent' ? 'Most recent'
@@ -327,7 +333,9 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
                   { key: 'all', label: 'All', render: () => renderList(mediaTree.all, 'No media') },
                 ]
                 return (
-                  <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                  <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1"
+                    onMouseEnter={() => clearAllTimeouts()}
+                  >
                     {sections.map(({ key, label, render }) => (
                       <div className="relative" key={key}
                         onMouseEnter={() => enterSection(key)}
