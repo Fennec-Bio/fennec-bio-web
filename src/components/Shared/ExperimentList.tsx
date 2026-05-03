@@ -1140,18 +1140,38 @@ export const ExperimentList = ({
             </div>
           ) : (
             <div className="space-y-2">
-              {plateData.results.map((pe) => (
-                <Link
-                  key={pe.id}
-                  href={`/dashboard/plates/${pe.id}`}
-                  className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <h4 className="font-medium">{pe.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {pe.plate_count} plate{pe.plate_count === 1 ? '' : 's'} · {pe.date ?? '—'}
-                  </p>
-                </Link>
-              ))}
+              {plateData.results.map((pe) => {
+                const isSelected = selectedPlateExperimentId === pe.id
+                const baseClass = 'block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
+                const itemClass = `${baseClass}${onPlateExperimentSelect && isSelected ? ' bg-blue-100 border-blue-300' : ''}`
+                if (onPlateExperimentSelect) {
+                  return (
+                    <button
+                      key={pe.id}
+                      type="button"
+                      onClick={() => onPlateExperimentSelect(pe.id)}
+                      className={`${itemClass} text-left w-full`}
+                    >
+                      <h4 className="font-medium">{pe.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {pe.plate_count} plate{pe.plate_count === 1 ? '' : 's'} · {pe.date ?? '—'}
+                      </p>
+                    </button>
+                  )
+                }
+                return (
+                  <Link
+                    key={pe.id}
+                    href={`/dashboard/plates/${pe.id}`}
+                    className={itemClass}
+                  >
+                    <h4 className="font-medium">{pe.title}</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {pe.plate_count} plate{pe.plate_count === 1 ? '' : 's'} · {pe.date ?? '—'}
+                    </p>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
