@@ -390,7 +390,9 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
         </button>
 
         {sortMenu && (
-          <div className="absolute top-full left-0 w-auto min-w-full bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] mt-1">
+          <div className="absolute top-full left-0 w-auto min-w-full bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] mt-1"
+            onMouseEnter={() => clearAllTimeouts()}
+          >
 
             {/* Products */}
             <div className="relative"
@@ -402,17 +404,22 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
             >
               <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Products</div>
               {productsMenu && (
-                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1"
+                  onMouseEnter={() => clearAllTimeouts()}
+                >
                   {uniqueNames.measurements.products.length === 0 ? (
                     <div className="px-4 py-3 text-sm text-gray-400">No products</div>
-                  ) : sortItems([...uniqueNames.measurements.products]).map((p, i) => (
-                    <div className="relative" key={i}
-                      onMouseEnter={() => setActiveSortItem('p:' + p)}
-                      onMouseLeave={() => setActiveSortItem(null)}
+                  ) : sortItems([...uniqueNames.measurements.products]).map((p) => (
+                    <div className="relative" key={`p:${p}`}
+                      onMouseEnter={() => { clearAllTimeouts(); setActiveSortItem('p:' + p) }}
+                      onMouseLeave={() => setWithDelay(() => setActiveSortItem(null))}
                     >
                       <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{p}</div>
                       {activeSortItem === 'p:' + p && (
-                        <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg ml-1" style={{ zIndex: 9999 }}>
+                        <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg ml-1" style={{ zIndex: 9999 }}
+                          onMouseEnter={() => clearAllTimeouts()}
+                          onMouseLeave={() => setWithDelay(() => setActiveSortItem(null))}
+                        >
                           <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
                             onClick={() => applySort(`product_${p}`, 'desc')}>Highest first</div>
                           <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
@@ -435,17 +442,22 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
             >
               <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Secondary Products</div>
               {secondaryProductsMenu && (
-                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1"
+                  onMouseEnter={() => clearAllTimeouts()}
+                >
                   {uniqueNames.measurements.secondary_products.length === 0 ? (
                     <div className="px-4 py-3 text-sm text-gray-400">No secondary products</div>
-                  ) : sortItems([...uniqueNames.measurements.secondary_products]).map((sp, i) => (
-                    <div className="relative" key={i}
-                      onMouseEnter={() => setActiveSortItem('sp:' + sp)}
-                      onMouseLeave={() => setActiveSortItem(null)}
+                  ) : sortItems([...uniqueNames.measurements.secondary_products]).map((sp) => (
+                    <div className="relative" key={`sp:${sp}`}
+                      onMouseEnter={() => { clearAllTimeouts(); setActiveSortItem('sp:' + sp) }}
+                      onMouseLeave={() => setWithDelay(() => setActiveSortItem(null))}
                     >
                       <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{sp}</div>
                       {activeSortItem === 'sp:' + sp && (
-                        <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                        <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1"
+                          onMouseEnter={() => clearAllTimeouts()}
+                          onMouseLeave={() => setWithDelay(() => setActiveSortItem(null))}
+                        >
                           <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
                             onClick={() => applySort(`secondary_product_${sp}`, 'desc')}>Highest first</div>
                           <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
@@ -469,7 +481,10 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
             >
               <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Date</div>
               {activeSortItem === 'dated' && (
-                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1"
+                  onMouseEnter={() => clearAllTimeouts()}
+                  onMouseLeave={() => setWithDelay(() => setActiveSortItem(null))}
+                >
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
                     onClick={() => applySort('date', 'desc')}>Newest first</div>
                   <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
