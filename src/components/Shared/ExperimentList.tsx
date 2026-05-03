@@ -8,6 +8,7 @@ import { useProjectContext } from '@/hooks/useProjectContext'
 import { DashboardTabs, DashboardSection } from '@/components/Plate/DashboardTabs'
 import { usePlateExperiments } from '@/hooks/usePlateExperiment'
 import type { PlateExperimentListItem } from '@/hooks/usePlateExperiment'
+import { PlateFilterBar, type PlateFilters } from '@/components/Plate/PlateFilterBar'
 
 interface Experiment {
   id: number
@@ -97,8 +98,20 @@ export const ExperimentList = ({
     else setInternalSection(s)
   }
   const [viewMode, setViewMode] = useState<'experiments' | 'sets'>('experiments')
+  const [plateFilters, setPlateFilters] = useState<PlateFilters>({})
   const { data: plateData, loading: platesLoading, error: platesError } =
-    usePlateExperiments({ projectId: activeProject?.id ?? null })
+    usePlateExperiments({
+      projectId: activeProject?.id ?? null,
+      filters: {
+        variables: plateFilters.variables,
+        strain: plateFilters.strain,
+        media: plateFilters.media,
+        keyword: plateFilters.keyword,
+      },
+      sort: plateFilters.sortBy
+        ? { by: plateFilters.sortBy, order: plateFilters.sortOrder ?? 'desc' }
+        : undefined,
+    })
 
   useEffect(() => {
     if (onPlateExperimentsChange && plateData) {
@@ -1122,6 +1135,13 @@ export const ExperimentList = ({
           </div>
         )}
         </>}
+        {section === 'plates' && (
+          <PlateFilterBar
+            projectId={activeProject?.id ?? null}
+            value={plateFilters}
+            onChange={setPlateFilters}
+          />
+        )}
       </div>
 
       {section === 'plates' ? (
