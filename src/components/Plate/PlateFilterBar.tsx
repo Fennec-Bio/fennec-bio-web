@@ -182,6 +182,196 @@ export function PlateFilterBar({ projectId, value, onChange }: PlateFilterBarPro
         >
           Filter
         </button>
+
+        {filterMenu && (
+          <div className="absolute top-full left-0 w-max min-w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] mt-1">
+
+            {/* Variables */}
+            <div className="relative"
+              onMouseEnter={() => {
+                clearAllTimeouts()
+                setVariablesMenu(true); setStrainMenu(false); setMediaMenu(false); setKeywordMenu(false)
+                setOpenStrainSection(null); setOpenMediaSection(null); setOpenMediaComponent(null)
+              }}
+              onMouseLeave={() => setWithDelay(() => setVariablesMenu(false))}
+            >
+              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Variables</div>
+              {variablesMenu && (
+                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                  {Object.entries(uniqueNames.variables)
+                    .sort(([a], [b]) => sortItems([a, b])[0] === a ? -1 : 1)
+                    .map(([variableName, variableValues], index) => (
+                      <div className="relative" key={index}
+                        onMouseEnter={() => { clearAllTimeouts(); setVariableValuesMenu(variableName) }}
+                        onMouseLeave={() => setWithDelay(() => setVariableValuesMenu(null))}
+                      >
+                        <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{variableName}</div>
+                        {variableValuesMenu === variableName && (
+                          <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1"
+                            onMouseEnter={() => clearAllTimeouts()}
+                            onMouseLeave={() => setWithDelay(() => setVariableValuesMenu(null))}
+                          >
+                            {sortItems(variableValues).map((val, vi) => (
+                              <div key={vi}
+                                className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+                                onClick={() => applyVariableFilter(variableName, val)}>
+                                {val}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Strain */}
+            <div className="relative"
+              onMouseEnter={() => {
+                clearAllTimeouts()
+                setStrainMenu(true); setVariablesMenu(false); setMediaMenu(false); setKeywordMenu(false)
+                setOpenMediaSection(null); setOpenMediaComponent(null); setVariableValuesMenu(null)
+              }}
+              onMouseLeave={() => setWithDelay(() => { setStrainMenu(false); setOpenStrainSection(null) })}
+            >
+              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Strain</div>
+              {strainMenu && (
+                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                  {(['most_recent', 'most_common', 'all'] as const).map(section => {
+                    const items = strainTree[section]
+                    const label = section === 'most_recent' ? 'Most recent'
+                                : section === 'most_common' ? 'Most common' : 'All'
+                    const empty = section === 'most_recent' ? 'No recent strains'
+                                : section === 'most_common' ? 'No common strains' : 'No strains'
+                    return (
+                      <div className="relative" key={section}
+                        onMouseEnter={() => { clearAllTimeouts(); setOpenStrainSection(section) }}
+                        onMouseLeave={() => setWithDelay(() => setOpenStrainSection(null))}
+                      >
+                        <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">{label}</div>
+                        {openStrainSection === section && (
+                          <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                            {items.length === 0 ? (
+                              <div className="px-4 py-2 text-sm text-gray-400">{empty}</div>
+                            ) : items.map(s => (
+                              <div key={s}
+                                className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer whitespace-nowrap"
+                                onClick={() => applyStrainFilter(s)}>
+                                {s}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Media — FLAT (no batch/feed split) */}
+            <div className="relative"
+              onMouseEnter={() => {
+                clearAllTimeouts()
+                setMediaMenu(true); setVariablesMenu(false); setStrainMenu(false); setKeywordMenu(false)
+                setOpenStrainSection(null); setVariableValuesMenu(null)
+              }}
+              onMouseLeave={() => setWithDelay(() => { setMediaMenu(false); setOpenMediaSection(null); setOpenMediaComponent(null) })}
+            >
+              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Media</div>
+              {mediaMenu && (() => {
+                const renderList = (items: MediaTreeEntry[], emptyText: string) => (
+                  <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                    {items.length === 0 ? (
+                      <div className="px-4 py-2 text-sm text-gray-400">{emptyText}</div>
+                    ) : items.map(m => (
+                      <div key={m.id}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm cursor-pointer"
+                        onClick={() => applyMediaFilter(m)}>
+                        {m.name}
+                      </div>
+                    ))}
+                  </div>
+                )
+                const renderGrouped = (groups: MediaTreeGroup[], section: MediaSection) => (
+                  <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                    {groups.length === 0 ? (
+                      <div className="px-4 py-2 text-sm text-gray-400">None</div>
+                    ) : groups.map(g => (
+                      <div key={g.name} className="relative"
+                        onMouseEnter={() => { clearAllTimeouts(); setOpenMediaComponent(section + ':' + g.name) }}
+                        onMouseLeave={() => setWithDelay(() => setOpenMediaComponent(null))}
+                      >
+                        <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{g.name}</div>
+                        {openMediaComponent === section + ':' + g.name && renderList(g.media, 'No media')}
+                      </div>
+                    ))}
+                  </div>
+                )
+                const enterSection = (target: MediaSection) => {
+                  clearAllTimeouts()
+                  if (openMediaSection !== target) {
+                    setOpenMediaSection(target); setOpenMediaComponent(null)
+                  }
+                }
+                const closeSectionSoon = () => setWithDelay(() => {
+                  setOpenMediaSection(null); setOpenMediaComponent(null)
+                })
+                const sections: { key: MediaSection; label: string; render: () => React.ReactNode }[] = [
+                  { key: 'most_recent', label: 'Most recent', render: () => renderList(mediaTree.most_recent, 'No recent media') },
+                  { key: 'most_common', label: 'Most common', render: () => renderList(mediaTree.most_common, 'No common media') },
+                  { key: 'by_carbon_source', label: 'Carbon Source', render: () => renderGrouped(mediaTree.by_carbon_source, 'by_carbon_source') },
+                  { key: 'by_nitrogen_source', label: 'Nitrogen Source', render: () => renderGrouped(mediaTree.by_nitrogen_source, 'by_nitrogen_source') },
+                  { key: 'by_complex_component', label: 'Complex Component', render: () => renderGrouped(mediaTree.by_complex_component, 'by_complex_component') },
+                  { key: 'all', label: 'All', render: () => renderList(mediaTree.all, 'No media') },
+                ]
+                return (
+                  <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                    {sections.map(({ key, label, render }) => (
+                      <div className="relative" key={key}
+                        onMouseEnter={() => enterSection(key)}
+                        onMouseLeave={closeSectionSoon}
+                      >
+                        <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">{label}</div>
+                        {openMediaSection === key && render()}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Keyword */}
+            <div className="relative"
+              onMouseEnter={() => {
+                clearAllTimeouts()
+                setKeywordMenu(true); setVariablesMenu(false); setStrainMenu(false); setMediaMenu(false)
+                setOpenStrainSection(null); setOpenMediaSection(null); setOpenMediaComponent(null); setVariableValuesMenu(null)
+              }}
+              onMouseLeave={() => setWithDelay(() => setKeywordMenu(false))}
+            >
+              <div className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap">Keyword</div>
+              {keywordMenu && (
+                <div className="absolute left-full top-0 w-auto min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] ml-1">
+                  <div className="p-3">
+                    <input
+                      type="text"
+                      placeholder="Enter keyword..."
+                      className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const kw = e.currentTarget.value.trim()
+                          if (kw) applyKeywordFilter(kw)
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex-1 relative">
         <button
