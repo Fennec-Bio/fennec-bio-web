@@ -109,13 +109,11 @@ export function Results({ plateExperimentId }: ResultsProps) {
   }, [measurementsOpen])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlateIndex(0)
   }, [plateExperimentId])
 
   useEffect(() => {
     if (measurementCategories.length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedMeasurementIds([])
       return
     }
@@ -125,6 +123,125 @@ export function Results({ plateExperimentId }: ResultsProps) {
       return [measurementCategories[0].id]
     })
   }, [measurementCategories])
+
+  const svgRef = useRef<SVGSVGElement | null>(null)
+
+  const activePlate = useMemo<Plate | null>(() => {
+    if (!data || data.plates.length === 0) return null
+    return data.plates[Math.min(plateIndex, data.plates.length - 1)]
+  }, [data, plateIndex])
+
+  const bars = useMemo(
+    () => (activePlate ? buildBars(activePlate, selectedMeasurementIds, groupReplicates) : []),
+    [activePlate, selectedMeasurementIds, groupReplicates],
+  )
+
+  const CHART_PALETTE = ['#eb5234', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6']
+  const measurementColor = (mid: number, total: number): string => {
+    if (total === 1) return '#eb5234'
+    const pos = selectedMeasurementIds.indexOf(mid)
+    return CHART_PALETTE[(pos % CHART_PALETTE.length + CHART_PALETTE.length) % CHART_PALETTE.length]
+  }
+
+  useEffect(() => {
+    if (!svgRef.current) return
+    const svg = d3.select(svgRef.current)
+    svg.selectAll('*').remove()
+
+    const margin = { top: 16, right: 16, bottom: 70, left: 48 }
+    const width = 720 - margin.left - margin.right
+    const height = 320 - margin.top - margin.bottom
+
+    svg
+      .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`)
+
+    if (selectedMeasurementIds.length === 0) {
+      g.append('text').attr('x', width / 2).attr('y', height / 2)
+        .attr('text-anchor', 'middle').attr('fill', '#6b7280')
+        .text('Select at least one measurement.')
+      return
+    }
+    if (bars.length === 0) {
+      g.append('text').attr('x', width / 2).attr('y', height / 2)
+        .attr('text-anchor', 'middle').attr('fill', '#6b7280')
+        .text('No data for this measurement on this plate.')
+      return
+    }
+
+    const x = d3.scaleBand<string>()
+      .domain(bars.map(b => b.key))
+      .range([0, width])
+      .padding(0.2)
+
+    const stackTotals = bars.map(b => b.segments.reduce((s, seg) => s + seg.mean, 0))
+    const maxCi = d3.max(bars, b =>
+      d3.max(b.segments.map((seg, i) =>
+        b.segments.slice(0, i + 1).reduce((s, x) => s + x.mean, 0) + seg.ci,
+      )) ?? 0,
+    ) ?? 0
+    const maxY = Math.max(d3.max(stackTotals) ?? 0, maxCi)
+    const y = d3.scaleLinear().domain([0, (maxY * 1.1) || 1]).range([height, 0])
+
+    g.append('g')
+      .attr('transform', `translate(0,${height})`)
+      .call(d3.axisBottom(x))
+      .selectAll('text')
+      .attr('transform', 'rotate(-40)')
+      .style('text-anchor', 'end')
+
+    g.selectAll<SVGTextElement, string>('.tick text').each(function (d) {
+      const bar = bars.find(b => b.key === d)
+      if (bar) d3.select(this).text(bar.label)
+    })
+
+    g.append('g').call(d3.axisLeft(y))
+
+    const total = selectedMeasurementIds.length
+
+    bars.forEach(bar => {
+      let cum = 0
+      bar.segments.forEach(seg => {
+        const segTop = cum + seg.mean
+        const xPos = x(bar.key) ?? 0
+        const w = x.bandwidth()
+        g.append('rect')
+          .attr('x', xPos)
+          .attr('y', y(segTop))
+          .attr('width', w)
+          .attr('height', y(cum) - y(segTop))
+          .attr('fill', measurementColor(seg.measurementId, total))
+          .append('title')
+          .text(() => {
+            const cat = measurementCategories.find(c => c.id === seg.measurementId)
+            const unit = cat?.unit ? ` ${cat.unit}` : ''
+            const ciStr = seg.n >= 2 ? ` ± ${seg.ci.toFixed(2)}${unit} (n=${seg.n}, 95% CI)` : ` (n=${seg.n})`
+            return `${bar.label} · ${cat?.name ?? ''}: ${seg.mean.toFixed(2)}${unit}${ciStr}`
+          })
+
+        if (seg.n >= 2 && seg.ci > 0) {
+          const cx = xPos + w / 2
+          g.append('line')
+            .attr('x1', cx).attr('x2', cx)
+            .attr('y1', y(segTop - seg.ci)).attr('y2', y(segTop + seg.ci))
+            .attr('stroke', '#111827').attr('stroke-width', 1)
+          g.append('line')
+            .attr('x1', cx - 4).attr('x2', cx + 4)
+            .attr('y1', y(segTop + seg.ci)).attr('y2', y(segTop + seg.ci))
+            .attr('stroke', '#111827').attr('stroke-width', 1)
+          g.append('line')
+            .attr('x1', cx - 4).attr('x2', cx + 4)
+            .attr('y1', y(segTop - seg.ci)).attr('y2', y(segTop - seg.ci))
+            .attr('stroke', '#111827').attr('stroke-width', 1)
+        }
+        cum = segTop
+      })
+    })
+    // measurementColor and measurementCategories are stable enough for this read; bars/selectedMeasurementIds drive rerenders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bars, selectedMeasurementIds, measurementCategories])
 
   if (plateExperimentId === null) {
     return (
@@ -148,7 +265,7 @@ export function Results({ plateExperimentId }: ResultsProps) {
     )
   }
 
-  const plate = data.plates[Math.min(plateIndex, data.plates.length - 1)]
+  const plate = activePlate!
 
   return (
     <div className="bg-white rounded-lg shadow p-4 space-y-3">
@@ -218,6 +335,34 @@ export function Results({ plateExperimentId }: ResultsProps) {
           {groupReplicates ? 'Grouping replicates' : 'Individual wells'}
         </button>
       </div>
+      <svg ref={svgRef} className="w-full" />
+      {selectedMeasurementIds.length >= 2 && (
+        <div className="flex flex-wrap gap-3 text-xs text-gray-700">
+          {selectedMeasurementIds.map(mid => {
+            const c = measurementCategories.find(c => c.id === mid)
+            if (!c) return null
+            return (
+              <span key={mid} className="inline-flex items-center gap-1">
+                <span
+                  className="inline-block w-3 h-3 rounded-sm"
+                  style={{ background: measurementColor(mid, selectedMeasurementIds.length) }}
+                />
+                {c.name}
+              </span>
+            )
+          })}
+        </div>
+      )}
+      {(() => {
+        const selected = measurementCategories.filter(c => selectedMeasurementIds.includes(c.id))
+        const units = new Set(selected.map(c => c.unit || ''))
+        if (selected.length === 0) return null
+        return (
+          <div className="text-xs text-gray-500">
+            Y-axis: {units.size === 1 ? (selected[0].unit || '—') : 'Mixed units'}
+          </div>
+        )
+      })()}
     </div>
   )
 }
