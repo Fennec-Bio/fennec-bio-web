@@ -2,8 +2,81 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import * as d3 from 'd3'
 import { usePlateExperiment } from '@/hooks/usePlateExperiment'
+import type { Plate, Well } from '@/hooks/usePlateExperiment'
 import { useDataCategories } from '@/hooks/useDataCategories'
+import { tCritical95 } from '@/lib/stats'
+
+type BarSegment = { measurementId: number; mean: number; ci: number; n: number }
+type Bar = { key: string; label: string; segments: BarSegment[] }
+
+function conditionKey(well: Well): string {
+  return well.variables
+    .map(v => `${v.name}=${v.value}`)
+    .sort()
+    .join('|')
+}
+
+function strainLabel(well: Well): string | undefined {
+  return well.variables.find(v => v.name.toLowerCase() === 'strain')?.value
+}
+
+export function buildBars(
+  plate: Plate,
+  measurementIds: number[],
+  groupReplicates: boolean,
+): Bar[] {
+  if (measurementIds.length === 0) return []
+
+  if (!groupReplicates) {
+    return plate.wells.map(w => ({
+      key: `${w.row}${w.column}`,
+      label: `${w.row}${w.column}`,
+      segments: measurementIds.map(mid => {
+        const dp = w.data_points.find(d => d.data_category === mid)
+        return { measurementId: mid, mean: dp?.value ?? 0, ci: 0, n: dp ? 1 : 0 }
+      }),
+    }))
+  }
+
+  const groups = new Map<string, Well[]>()
+  plate.wells.forEach(w => {
+    const k = conditionKey(w) || `${w.row}${w.column}`
+    if (!groups.has(k)) groups.set(k, [])
+    groups.get(k)!.push(w)
+  })
+
+  const baseLabels = new Map<string, string>()
+  groups.forEach((wells, k) => {
+    const label = strainLabel(wells[0]) ?? `${wells[0].row}${wells[0].column}`
+    baseLabels.set(k, label)
+  })
+
+  const labelCounts = new Map<string, number>()
+  const finalLabels = new Map<string, string>()
+  baseLabels.forEach((label, k) => {
+    const seen = labelCounts.get(label) ?? 0
+    labelCounts.set(label, seen + 1)
+    finalLabels.set(k, seen === 0 ? label : `${label} (${seen + 1})`)
+  })
+
+  return Array.from(groups.entries()).map(([k, wells]) => {
+    const segments: BarSegment[] = measurementIds.map(mid => {
+      const values = wells
+        .map(w => w.data_points.find(d => d.data_category === mid)?.value)
+        .filter((v): v is number => typeof v === 'number')
+      const n = values.length
+      if (n === 0) return { measurementId: mid, mean: 0, ci: 0, n: 0 }
+      const mean = d3.mean(values) ?? 0
+      if (n < 2) return { measurementId: mid, mean, ci: 0, n }
+      const sd = d3.deviation(values) ?? 0
+      const ci = tCritical95(n - 1) * sd / Math.sqrt(n)
+      return { measurementId: mid, mean, ci, n }
+    })
+    return { key: k, label: finalLabels.get(k) ?? k, segments }
+  })
+}
 
 interface ResultsProps {
   plateExperimentId: string | null
