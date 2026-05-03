@@ -9,6 +9,7 @@ import { ExperimentList } from '@/components/Shared/ExperimentList'
 import { QuickView } from '@/components/dashboard/QuickView'
 import { Overlay } from '@/components/dashboard/Overlay'
 import { AIRecommendations } from '@/components/AIRecommendations'
+import { Results } from '@/components/dashboard/Results'
 import { DashboardSection } from '@/components/Plate/DashboardTabs'
 import type { PlateExperimentListItem } from '@/hooks/usePlateExperiment'
 
@@ -64,6 +65,7 @@ export default function Dashboard() {
   const [isOverlayOpen, setIsOverlayOpen] = useState(true)
   const [isVariableImpactOpen, setIsVariableImpactOpen] = useState(true)
   const [isAIRecommendationsOpen, setIsAIRecommendationsOpen] = useState(true)
+  const [isResultsOpen, setIsResultsOpen] = useState(true)
 
   const [section, setSection] = useState<DashboardSection>('reactor')
   const [selectedPlateExperimentId, setSelectedPlateExperimentId] = useState<string | null>(null)
@@ -237,28 +239,42 @@ export default function Dashboard() {
               <AIRecommendations />
             </CollapsibleSection>
 
-            <CollapsibleSection
-              title="Quick Graph"
-              isOpen={isQuickGraphOpen}
-              onToggle={() => setIsQuickGraphOpen(!isQuickGraphOpen)}
-            >
-              <QuickView
-                selectedExperiment={selectedExperiment}
-                onExperimentSelect={handleExperimentSelect}
-                experiments={experiments}
-                experimentSetData={selectedSetData}
-                rightGraphDefault={rightGraphDefault}
-                resetKey={activeProject?.id ?? null}
-              />
-            </CollapsibleSection>
+            {section === 'reactor' && (
+              <>
+                <CollapsibleSection
+                  title="Quick Graph"
+                  isOpen={isQuickGraphOpen}
+                  onToggle={() => setIsQuickGraphOpen(!isQuickGraphOpen)}
+                >
+                  <QuickView
+                    selectedExperiment={selectedExperiment}
+                    onExperimentSelect={handleExperimentSelect}
+                    experiments={experiments}
+                    experimentSetData={selectedSetData}
+                    rightGraphDefault={rightGraphDefault}
+                    resetKey={activeProject?.id ?? null}
+                  />
+                </CollapsibleSection>
 
-            <CollapsibleSection
-              title="Overlay"
-              isOpen={isOverlayOpen}
-              onToggle={() => setIsOverlayOpen(!isOverlayOpen)}
-            >
-              <Overlay experiments={experiments} preselectedExperiments={overlayPreselected} />
-            </CollapsibleSection>
+                <CollapsibleSection
+                  title="Overlay"
+                  isOpen={isOverlayOpen}
+                  onToggle={() => setIsOverlayOpen(!isOverlayOpen)}
+                >
+                  <Overlay experiments={experiments} preselectedExperiments={overlayPreselected} />
+                </CollapsibleSection>
+              </>
+            )}
+
+            {section === 'plates' && (
+              <CollapsibleSection
+                title="Results"
+                isOpen={isResultsOpen}
+                onToggle={() => setIsResultsOpen(!isResultsOpen)}
+              >
+                <Results plateExperimentId={selectedPlateExperimentId} />
+              </CollapsibleSection>
+            )}
 
             <CollapsibleSection
               title="Analysis"
