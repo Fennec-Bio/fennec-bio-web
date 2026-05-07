@@ -4,109 +4,39 @@ import * as d3 from 'd3'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CohortPayload,
-  ExperimentInPayload,
   OutcomeMetric,
 } from '@/lib/analysis/types'
-
-type ScanAxis =
-  | { kind: 'carbon_identity' }
-  | { kind: 'cn_ratio' }
-  | {
-      kind: 'component_concentration'
-      componentName: string
-      source: 'carbon' | 'nitrogen' | 'complex' | 'additional'
-    }
-
-function outcomeValue(
-  e: ExperimentInPayload,
-  outcome: OutcomeMetric,
-  product: string | null,
-): number | null {
-  if (outcome === 'biomass') return e.outcomes.biomass
-  if (outcome === 'mu_max') return e.outcomes.mu_max
-  if (outcome === 'substrate_rate') return e.outcomes.substrate_rate
-  const dict = (e.outcomes as unknown as Record<string, Record<string, number | null>>)[outcome]
-  return dict && product ? (dict[product] ?? null) : null
-}
-
-function carbonIdentityOf(e: ExperimentInPayload): string {
-  const m = e.batch_media
-  if (!m || m.carbon_sources.length === 0) return '—'
-  return m.carbon_sources.map(c => c.name).sort().join(', ')
-}
-
-function cnRatioOf(e: ExperimentInPayload): number | null {
-  const m = e.batch_media
-  if (!m) return null
-  const c = m.carbon_sources.reduce((a, s) => a + (s.concentration ?? 0), 0)
-  const n = m.nitrogen_sources.reduce((a, s) => a + (s.concentration ?? 0), 0)
-  return n > 0 ? c / n : null
-}
-
-function componentConcOf(
-  e: ExperimentInPayload,
-  source: 'carbon' | 'nitrogen' | 'complex' | 'additional',
-  name: string,
-): number | null {
-  const m = e.batch_media
-  if (!m) return null
-  const list = source === 'carbon' ? m.carbon_sources
-    : source === 'nitrogen' ? m.nitrogen_sources
-    : source === 'complex' ? m.complex_components
-    : m.additional_components
-  const c = list.find(x => x.name === name)
-  return c ? (c.concentration ?? null) : null
-}
+import {
+  buildMediaScanCatalog,
+  buildMediaScanPointData,
+  notebookUrlForExperimentTitle,
+  sourceLabels,
+  type MediaComponentSource,
+  type ScanAxis,
+} from './mediaScanLogic'
 
 export function MediaScan({ payload, outcome, product }: {
   payload: CohortPayload
   outcome: OutcomeMetric
   product: string | null
 }) {
-  const catalog = useMemo(() => {
-    const out = {
-      carbon: new Set<string>(), nitrogen: new Set<string>(),
-      complex: new Set<string>(), additional: new Set<string>(),
-    }
-    for (const e of payload.experiments) {
-      const m = e.batch_media
-      if (!m) continue
-      for (const c of m.carbon_sources) out.carbon.add(c.name)
-      for (const c of m.nitrogen_sources) out.nitrogen.add(c.name)
-      for (const c of m.complex_components) out.complex.add(c.name)
-      for (const c of m.additional_components) out.additional.add(c.name)
-    }
-    return {
-      carbon: [...out.carbon].sort(),
-      nitrogen: [...out.nitrogen].sort(),
-      complex: [...out.complex].sort(),
-      additional: [...out.additional].sort(),
-    }
-  }, [payload])
-
-  const [axis, setAxis] = useState<ScanAxis>({ kind: 'carbon_identity' })
+  const catalog = useMemo(() => buildMediaScanCatalog(payload), [payload])
+  const experimentTitlesById = useMemo(
+    () => new Map(payload.experiments.map(e => [e.id, e.title])),
+    [payload],
+  )
+  const [axis, setAxis] = useState<ScanAxis>({ kind: 'component_identity', source: 'carbon' })
   const ref = useRef<SVGSVGElement | null>(null)
 
   const pointData = useMemo(() => {
-    return payload.experiments.map(e => {
-      const v = outcomeValue(e, outcome, product)
-      if (v === null) return null
-      if (axis.kind === 'carbon_identity') {
-        return { x: carbonIdentityOf(e), y: v, isCategorical: true as const, id: e.id }
-      }
-      if (axis.kind === 'cn_ratio') {
-        const r = cnRatioOf(e)
-        if (r === null) return null
-        return { x: r, y: v, isCategorical: false as const, id: e.id }
-      }
-      const c = componentConcOf(e, axis.source, axis.componentName)
-      if (c === null) return null
-      return { x: c, y: v, isCategorical: false as const, id: e.id }
-    }).filter(Boolean) as Array<
-      | { x: string; y: number; isCategorical: true; id: number }
-      | { x: number; y: number; isCategorical: false; id: number }
-    >
+    return buildMediaScanPointData(payload, axis, outcome, product)
   }, [payload, axis, outcome, product])
+
+  const axisValue = axis.kind === 'component_identity'
+    ? `identity:${axis.source}`
+    : axis.kind === 'component_concentration'
+      ? `conc:${axis.source}:${axis.componentName}`
+      : axis.kind
 
   useEffect(() => {
     if (!ref.current) return
@@ -118,6 +48,15 @@ export function MediaScan({ payload, outcome, product }: {
     const iw = W - m.left - m.right, ih = H - m.top - m.bottom
     svg.attr('viewBox', `0 0 ${W} ${H}`)
     const g = svg.append('g').attr('transform', `translate(${m.left},${m.top})`)
+    const openNotebook = (id: number) => {
+      const title = experimentTitlesById.get(id)
+      if (!title) return
+      window.open(notebookUrlForExperimentTitle(title, id), '_blank')
+    }
+    const notebookTitle = (id: number) => {
+      const title = experimentTitlesById.get(id)
+      return title ? `Open ${title} in Notebook` : 'Open experiment in Notebook'
+    }
 
     const ys = pointData.map(p => p.y)
     const y = d3.scaleLinear().domain(d3.extent(ys) as [number, number]).nice().range([ih, 0])
@@ -128,7 +67,10 @@ export function MediaScan({ payload, outcome, product }: {
       const x = d3.scaleBand().domain(cats).range([0, iw]).padding(0.25)
       g.append('g').attr('transform', `translate(0,${ih})`).call(d3.axisBottom(x))
       for (const cat of cats) {
-        const vals = pointData.filter(p => (p.x as string) === cat).map(p => p.y).sort((a, b) => a - b)
+        const catPoints = pointData
+          .filter(p => (p.x as string) === cat)
+          .sort((a, b) => a.y - b.y)
+        const vals = catPoints.map(p => p.y)
         const q1 = d3.quantile(vals, 0.25) ?? vals[0]
         const med = d3.quantile(vals, 0.5) ?? vals[0]
         const q3 = d3.quantile(vals, 0.75) ?? vals[0]
@@ -140,9 +82,16 @@ export function MediaScan({ payload, outcome, product }: {
         g.append('line').attr('x1', cx - bw / 2).attr('x2', cx + bw / 2)
           .attr('y1', y(med)).attr('y2', y(med))
           .attr('stroke', '#1d4ed8').attr('stroke-width', 2)
-        for (const v of vals) {
+        for (const point of catPoints) {
           g.append('circle').attr('cx', cx + (Math.random() - 0.5) * bw * 0.3)
-            .attr('cy', y(v)).attr('r', 3).attr('fill', '#eb5234')
+            .attr('cy', y(point.y)).attr('r', 3).attr('fill', '#eb5234')
+            .attr('cursor', 'pointer')
+            .on('click', event => {
+              event.stopPropagation()
+              openNotebook(point.id)
+            })
+            .append('title')
+            .text(notebookTitle(point.id))
         }
       }
     } else {
@@ -163,6 +112,13 @@ export function MediaScan({ payload, outcome, product }: {
       g.selectAll('circle').data(pointData).enter().append('circle')
         .attr('cx', d => x(d.x as number)).attr('cy', d => y(d.y))
         .attr('r', 4).attr('fill', '#eb5234').attr('opacity', 0.8)
+        .attr('cursor', 'pointer')
+        .on('click', (event, d) => {
+          event.stopPropagation()
+          openNotebook(d.id)
+        })
+        .append('title')
+        .text(d => notebookTitle(d.id))
       const ssRes = xs.reduce((a, xv, i) => {
         const yhat = slope * xv + intercept
         return a + (ys[i] - yhat) ** 2
@@ -171,47 +127,59 @@ export function MediaScan({ payload, outcome, product }: {
       const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0
       g.append('text').attr('x', iw - 8).attr('y', 12).attr('text-anchor', 'end')
         .attr('fill', '#1d4ed8').attr('font-size', 11)
-        .text(`R² = ${r2.toFixed(2)}`)
+        .text(`R^2 = ${r2.toFixed(2)}`)
     }
-  }, [pointData])
+  }, [pointData, experimentTitlesById])
 
   return (
     <div className="bg-white border border-gray-200 rounded-md p-4">
       <div className="flex gap-3 items-center mb-3 text-sm flex-wrap">
         <span className="text-gray-500">Axis:</span>
         <select
-          value={axis.kind === 'component_concentration' ? `conc:${axis.source}:${axis.componentName}` : axis.kind}
+          value={axisValue}
           onChange={e => {
             const v = e.target.value
-            if (v === 'carbon_identity') setAxis({ kind: 'carbon_identity' })
-            else if (v === 'cn_ratio') setAxis({ kind: 'cn_ratio' })
-            else if (v.startsWith('conc:')) {
+            if (v.startsWith('identity:')) {
+              const [, src] = v.split(':')
+              setAxis({
+                kind: 'component_identity',
+                source: src as MediaComponentSource,
+              })
+            } else if (v === 'cn_ratio') {
+              setAxis({ kind: 'cn_ratio' })
+            } else if (v.startsWith('conc:')) {
               const [, src, ...nameParts] = v.split(':')
-              setAxis({ kind: 'component_concentration',
-                source: src as 'carbon' | 'nitrogen' | 'complex' | 'additional',
-                componentName: nameParts.join(':') })
+              setAxis({
+                kind: 'component_concentration',
+                source: src as MediaComponentSource,
+                componentName: nameParts.join(':'),
+              })
             }
           }}
           className="h-8 px-2 border border-gray-200 rounded-md">
-          <option value="carbon_identity">Carbon source (identity)</option>
+          {(Object.keys(sourceLabels) as MediaComponentSource[]).map(source => (
+            <option key={`identity:${source}`} value={`identity:${source}`}>
+              {sourceLabels[source]} (identity)
+            </option>
+          ))}
           <option value="cn_ratio">C:N ratio</option>
           <optgroup label="Carbon source concentration">
-            {catalog.carbon.map(n =>
+            {catalog.concentration.carbon.map(n =>
               <option key={`carbon:${n}`} value={`conc:carbon:${n}`}>{n} (carbon)</option>
             )}
           </optgroup>
           <optgroup label="Nitrogen source concentration">
-            {catalog.nitrogen.map(n =>
+            {catalog.concentration.nitrogen.map(n =>
               <option key={`nitrogen:${n}`} value={`conc:nitrogen:${n}`}>{n} (nitrogen)</option>
             )}
           </optgroup>
           <optgroup label="Complex component concentration">
-            {catalog.complex.map(n =>
+            {catalog.concentration.complex.map(n =>
               <option key={`complex:${n}`} value={`conc:complex:${n}`}>{n} (complex)</option>
             )}
           </optgroup>
           <optgroup label="Additional component concentration">
-            {catalog.additional.map(n =>
+            {catalog.concentration.additional.map(n =>
               <option key={`additional:${n}`} value={`conc:additional:${n}`}>{n} (additional)</option>
             )}
           </optgroup>

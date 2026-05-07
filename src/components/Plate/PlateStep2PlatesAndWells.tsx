@@ -21,6 +21,7 @@ export function PlateStep2PlatesAndWells({
   dataCategories,
   projectId,
   strainSuggestions,
+  mediaSuggestions,
   onBack, onNext,
 }: {
   plates: PlateDraft[]
@@ -30,6 +31,7 @@ export function PlateStep2PlatesAndWells({
   dataCategories: DataCategory[]
   projectId: number | null
   strainSuggestions: string[]
+  mediaSuggestions: string[]
   onBack: () => void
   onNext: () => void
 }) {
@@ -267,6 +269,7 @@ export function PlateStep2PlatesAndWells({
           plateTemplates={plateTemplates}
           onApplyTemplate={applyTemplateToSelected}
           strainSuggestions={strainSuggestions}
+          mediaSuggestions={mediaSuggestions}
         />
       ) : (
         <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">

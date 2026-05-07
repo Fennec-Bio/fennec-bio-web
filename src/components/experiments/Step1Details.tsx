@@ -38,6 +38,8 @@ interface Step1DetailsProps {
   onBatchMediaChange: (id: number | null) => void
   feedMediaId: number | null
   onFeedMediaChange: (id: number | null) => void
+  batchVolumeMl: string
+  onBatchVolumeMlChange: (volume: string) => void
   extractEventsWithAI?: boolean
   onExtractEventsWithAIChange?: (val: boolean) => void
   extractAnomaliesWithAI?: boolean
@@ -81,6 +83,8 @@ export function Step1Details({
   onBatchMediaChange,
   feedMediaId,
   onFeedMediaChange,
+  batchVolumeMl,
+  onBatchVolumeMlChange,
   extractEventsWithAI = false,
   onExtractEventsWithAIChange,
   extractAnomaliesWithAI = false,
@@ -311,6 +315,20 @@ export function Step1Details({
           ))}
           <option value="__add_new_media__">Add New...</option>
         </select>
+      </div>
+
+      {/* ---- Batch Volume ---- */}
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Batch Volume (mL)</label>
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={batchVolumeMl}
+          onChange={(e) => onBatchVolumeMlChange(e.target.value)}
+          placeholder="e.g. 750"
+          className={inputClass}
+        />
       </div>
 
       {/* ---- Variables ---- */}

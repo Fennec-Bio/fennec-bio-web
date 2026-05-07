@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { useDataCategories } from '@/hooks/useDataCategories'
+import { useProjectMedia } from '@/hooks/useProjectMedia'
 import { useProjectStrains } from '@/hooks/useProjectStrains'
 import { PlateStepIndicator } from '@/components/Plate/PlateStepIndicator'
 import { PlateStep1Details } from '@/components/Plate/PlateStep1Details'
@@ -71,12 +72,13 @@ export function CreatePlateWizard({
   const projectId = activeProject?.id ?? null
   const { categories } = useDataCategories(projectId)
   const { names: strainSuggestions } = useProjectStrains(projectId)
+  const { names: mediaSuggestions } = useProjectMedia(projectId)
   const API = process.env.NEXT_PUBLIC_API_URL
 
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [date, setDate] = useState('')
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [plates, setPlates] = useState<PlateDraft[]>(freshSeedPlates)
   const [selectedPlateKey, setSelectedPlateKey] = useState<string>(() => plates[0].localKey)
   const [isCreating, setIsCreating] = useState(false)
@@ -88,7 +90,7 @@ export function CreatePlateWizard({
     setStep(1)
     setTitle('')
     setDescription('')
-    setDate('')
+    setDate(new Date().toISOString().slice(0, 10))
     setPlates(seeded)
     setSelectedPlateKey(seeded[0].localKey)
     setErrorMessage('')
@@ -188,6 +190,7 @@ export function CreatePlateWizard({
           dataCategories={categories}
           projectId={projectId}
           strainSuggestions={strainSuggestions}
+          mediaSuggestions={mediaSuggestions}
           onBack={() => setStep(1)}
           onNext={() => setStep(3)}
         />

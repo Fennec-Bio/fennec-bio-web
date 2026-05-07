@@ -1,3 +1,5 @@
+import type { TimeSeriesEntry } from './types'
+
 export type PhaseName = 'lag' | 'exponential' | 'stationary'
 
 export interface Phase {
@@ -16,6 +18,36 @@ export interface KineticParams {
   finalTiter: number | null
   phases: Phase[]
   biomassType?: string
+}
+
+export interface BiomassSeries {
+  name: string
+  timepoints: number[]
+  values: number[]
+}
+
+const BIOMASS_NAME_PATTERNS: Array<{ pattern: RegExp; name: string }> = [
+  { pattern: /dcw|dry\s*cell\s*weight/i, name: 'DCW' },
+  { pattern: /biomass/i, name: 'Biomass' },
+  { pattern: /od|optical\s*density/i, name: 'OD' },
+  { pattern: /cell\s*(weight|mass|density)/i, name: 'Cell' },
+]
+
+export function findBiomassData(timeSeries: TimeSeriesEntry[]): BiomassSeries | null {
+  const flagged = timeSeries.find((s) => s.role === 'biomass')
+  if (flagged) return { name: flagged.name, timepoints: flagged.timepoints_h, values: flagged.values }
+
+  for (const { pattern } of BIOMASS_NAME_PATTERNS) {
+    const hit = timeSeries.find((s) => pattern.test(s.name))
+    if (hit) return { name: hit.name, timepoints: hit.timepoints_h, values: hit.values }
+  }
+  return null
+}
+
+export function findSubstrateData(timeSeries: TimeSeriesEntry[]): TimeSeriesEntry | null {
+  const flagged = timeSeries.find((s) => s.role === 'substrate')
+  if (flagged) return flagged
+  return timeSeries.find((s) => /glucose|sugar|substrate/i.test(s.name)) ?? null
 }
 
 function linearRegressionSlope(xs: number[], ys: number[]): number {
@@ -232,4 +264,92 @@ export function getFinalTiter(timepoints: number[], values: number[]): number | 
     .map((t, i) => ({ time: t, value: values[i] }))
     .sort((a, b) => a.time - b.time)
   return data[data.length - 1].value
+}
+
+export type CumulativeDirection = 'increase' | 'decrease'
+
+export function computeCumulativeMassSeries(
+  series: { timepoints: number[]; values: number[] },
+  direction: CumulativeDirection,
+): { timepoints: number[]; cumulative: number[] } {
+  const n = Math.min(series.timepoints.length, series.values.length)
+  if (n === 0) return { timepoints: [], cumulative: [] }
+  const sorted = Array.from({ length: n }, (_, i) => ({ t: series.timepoints[i], v: series.values[i] }))
+    .sort((a, b) => a.t - b.t)
+  const first = sorted[0].v
+  const sign = direction === 'increase' ? 1 : -1
+  return {
+    timepoints: sorted.map((p) => p.t),
+    cumulative: sorted.map((p) => {
+      const delta = sign * (p.v - first)
+      return Object.is(delta, -0) ? 0 : delta
+    }),
+  }
+}
+
+export function computeYpsOverall(
+  product: TimeSeriesEntry,
+  substrate: TimeSeriesEntry,
+): number | null {
+  if (product.timepoints_h.length < 2 || substrate.timepoints_h.length < 2) return null
+
+  const sortByT = (ts: number[], vs: number[]): { t: number[]; v: number[] } => {
+    const pairs = ts.map((t, i) => ({ t, v: vs[i] })).sort((a, b) => a.t - b.t)
+    return { t: pairs.map((p) => p.t), v: pairs.map((p) => p.v) }
+  }
+  const p = sortByT(product.timepoints_h, product.values)
+  const s = sortByT(substrate.timepoints_h, substrate.values)
+
+  const deltaP = p.v[p.v.length - 1] - p.v[0]
+  const deltaS = s.v[0] - s.v[s.v.length - 1]
+  if (deltaS <= 0) return null
+  return deltaP / deltaS
+}
+
+export function computeQsMax(
+  substrate: TimeSeriesEntry,
+  biomass: { timepoints: number[]; values: number[] },
+): { qsMax: number; qsMaxTime: number } | null {
+  if (substrate.timepoints_h.length < 2) return null
+
+  const subData = substrate.timepoints_h
+    .map((t, i) => ({ time: t, value: substrate.values[i] }))
+    .sort((a, b) => a.time - b.time)
+  const biomassData = biomass.timepoints
+    .map((t, i) => ({ time: t, value: biomass.values[i] }))
+    .sort((a, b) => a.time - b.time)
+  if (biomassData.length === 0) return null
+
+  const interpolateX = (time: number): number => {
+    if (time <= biomassData[0].time) return biomassData[0].value
+    if (time >= biomassData[biomassData.length - 1].time) return biomassData[biomassData.length - 1].value
+    for (let i = 0; i < biomassData.length - 1; i++) {
+      const a = biomassData[i]
+      const b = biomassData[i + 1]
+      if (time >= a.time && time <= b.time) {
+        const r = (time - a.time) / (b.time - a.time)
+        return a.value + r * (b.value - a.value)
+      }
+    }
+    return biomassData[biomassData.length - 1].value
+  }
+
+  let bestQs = 0
+  let bestTime = 0
+  for (let i = 0; i < subData.length - 1; i++) {
+    const dt = subData[i + 1].time - subData[i].time
+    if (dt <= 0) continue
+    const dS = subData[i + 1].value - subData[i].value
+    if (dS >= 0) continue
+    const avgTime = (subData[i].time + subData[i + 1].time) / 2
+    const avgX = interpolateX(avgTime)
+    if (avgX <= 0) continue
+    const qs = (-dS / dt) / avgX
+    if (qs > bestQs) {
+      bestQs = qs
+      bestTime = avgTime
+    }
+  }
+
+  return bestQs > 0 ? { qsMax: bestQs, qsMaxTime: bestTime } : null
 }

@@ -4,13 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import { Plate, Well } from '@/hooks/usePlateExperiment'
 import { DataCategory } from '@/hooks/useDataCategories'
-
-function conditionKey(well: Well): string {
-  return well.variables
-    .map(v => `${v.name}=${v.value}`)
-    .sort()
-    .join('|')
-}
+import {
+  conditionKey,
+  groupedWellLabel,
+} from '@/components/Plate/plateReplicateGrouping'
 
 export function PlateBarChart({
   plate, dataCategories,
@@ -53,8 +50,7 @@ export function PlateBarChart({
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key)!.push(value)
       if (!labels.has(key)) {
-        const strain = well.variables.find(v => v.name.toLowerCase() === 'strain')?.value
-        labels.set(key, strain ?? `${well.row}${well.column}`)
+        labels.set(key, groupedWellLabel(well))
       }
     })
 

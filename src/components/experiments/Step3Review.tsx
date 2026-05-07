@@ -1,10 +1,17 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ClassifiedData } from './Step2Upload'
 import { SpreadsheetGrid, GridData } from './SpreadsheetGrid'
 import { DataChart } from './DataChart'
 import { Step1Details } from './Step1Details'
+import { buildPumpSeriesOptions, PumpSeriesOption } from './experimentFermentationMetadata'
+
+interface MediaOption {
+  id: number
+  name: string
+  media_type: 'defined' | 'complex'
+}
 
 interface Step3ReviewProps {
   classifiedData: ClassifiedData
@@ -30,6 +37,17 @@ interface Step3ReviewProps {
   onExperimentDateChange: (date: string) => void
   noteImages: File[]
   onNoteImagesChange: (images: File[]) => void
+  mediaOptions: MediaOption[]
+  batchMediaId: number | null
+  onBatchMediaChange: (id: number | null) => void
+  feedMediaId: number | null
+  onFeedMediaChange: (id: number | null) => void
+  batchVolumeMl: string
+  onBatchVolumeMlChange: (volume: string) => void
+  feedPumpSeries: string
+  onFeedPumpSeriesChange: (series: string) => void
+  wastePumpSeries: string
+  onWastePumpSeriesChange: (series: string) => void
   onBack: () => void
   onCreate: () => void
   isCreating: boolean
@@ -57,6 +75,17 @@ export function Step3Review({
   onExperimentDateChange,
   noteImages,
   onNoteImagesChange,
+  mediaOptions,
+  batchMediaId,
+  onBatchMediaChange,
+  feedMediaId,
+  onFeedMediaChange,
+  batchVolumeMl,
+  onBatchVolumeMlChange,
+  feedPumpSeries,
+  onFeedPumpSeriesChange,
+  wastePumpSeries,
+  onWastePumpSeriesChange,
   onBack,
   onCreate,
   isCreating,
@@ -66,6 +95,29 @@ export function Step3Review({
 
   const variableCount = variables.filter(v => v.name.trim() !== '').length
   const eventCount = events.filter(e => e.name.trim() !== '').length
+  const pumpSeriesOptions = useMemo(
+    () => buildPumpSeriesOptions(classifiedData),
+    [classifiedData],
+  )
+  const pumpSeriesNames = useMemo(
+    () => new Set(pumpSeriesOptions.map(option => option.name)),
+    [pumpSeriesOptions],
+  )
+
+  useEffect(() => {
+    if (feedPumpSeries && !pumpSeriesNames.has(feedPumpSeries)) {
+      onFeedPumpSeriesChange('')
+    }
+    if (wastePumpSeries && !pumpSeriesNames.has(wastePumpSeries)) {
+      onWastePumpSeriesChange('')
+    }
+  }, [
+    feedPumpSeries,
+    wastePumpSeries,
+    pumpSeriesNames,
+    onFeedPumpSeriesChange,
+    onWastePumpSeriesChange,
+  ])
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
     { key: 'details', label: 'Experiment Details', count: variableCount + eventCount },
@@ -234,6 +286,11 @@ export function Step3Review({
     return 'Discrete'
   }
 
+  const pumpOptionLabel = (option: PumpSeriesOption): string => {
+    const unit = option.unit ? `, ${option.unit}` : ''
+    return `${option.name} (${option.pointCount} point${option.pointCount === 1 ? '' : 's'}${unit})`
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* Tab bar */}
@@ -258,33 +315,78 @@ export function Step3Review({
       {/* Tab content */}
       <div className="flex flex-col gap-6">
         {activeTab === 'details' && (
-          <Step1Details
-            title={title}
-            onTitleChange={onTitleChange}
-            experimentDate={experimentDate}
-            onExperimentDateChange={onExperimentDateChange}
-            strains={[]}
-            selectedStrain=""
-            onStrainChange={() => {}}
-            variables={variables}
-            onVariablesChange={onVariablesChange}
-            events={events}
-            onEventsChange={onEventsChange}
-            anomalies={anomalies}
-            onAnomaliesChange={onAnomaliesChange}
-            uniqueNames={uniqueNames}
-            experimentSummary={experimentSummary}
-            onExperimentSummaryChange={onExperimentSummaryChange}
-            experimentNote={experimentNote}
-            onExperimentNoteChange={onExperimentNoteChange}
-            noteImages={noteImages}
-            onNoteImagesChange={onNoteImagesChange}
-            mediaOptions={[]}
-            batchMediaId={null}
-            onBatchMediaChange={() => {}}
-            feedMediaId={null}
-            onFeedMediaChange={() => {}}
-          />
+          <>
+            <Step1Details
+              title={title}
+              onTitleChange={onTitleChange}
+              experimentDate={experimentDate}
+              onExperimentDateChange={onExperimentDateChange}
+              strains={[]}
+              selectedStrain=""
+              onStrainChange={() => {}}
+              variables={variables}
+              onVariablesChange={onVariablesChange}
+              events={events}
+              onEventsChange={onEventsChange}
+              anomalies={anomalies}
+              onAnomaliesChange={onAnomaliesChange}
+              uniqueNames={uniqueNames}
+              experimentSummary={experimentSummary}
+              onExperimentSummaryChange={onExperimentSummaryChange}
+              experimentNote={experimentNote}
+              onExperimentNoteChange={onExperimentNoteChange}
+              noteImages={noteImages}
+              onNoteImagesChange={onNoteImagesChange}
+              mediaOptions={mediaOptions}
+              batchMediaId={batchMediaId}
+              onBatchMediaChange={onBatchMediaChange}
+              feedMediaId={feedMediaId}
+              onFeedMediaChange={onFeedMediaChange}
+              batchVolumeMl={batchVolumeMl}
+              onBatchVolumeMlChange={onBatchVolumeMlChange}
+            />
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Fermentation Volumes</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Feed Pump / Cumulative Feed Volume (mL)
+                  </label>
+                  <select
+                    value={feedPumpSeries}
+                    onChange={(e) => onFeedPumpSeriesChange(e.target.value)}
+                    disabled={pumpSeriesOptions.length === 0}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                  >
+                    <option value="">{pumpSeriesOptions.length === 0 ? 'No process data' : 'None'}</option>
+                    {pumpSeriesOptions.map((option) => (
+                      <option key={option.name} value={option.name}>
+                        {pumpOptionLabel(option)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Waste Pump / Cumulative Waste Volume (mL)
+                  </label>
+                  <select
+                    value={wastePumpSeries}
+                    onChange={(e) => onWastePumpSeriesChange(e.target.value)}
+                    disabled={pumpSeriesOptions.length === 0}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                  >
+                    <option value="">{pumpSeriesOptions.length === 0 ? 'No process data' : 'None'}</option>
+                    {pumpSeriesOptions.map((option) => (
+                      <option key={option.name} value={option.name}>
+                        {pumpOptionLabel(option)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {activeTab === 'products' && (

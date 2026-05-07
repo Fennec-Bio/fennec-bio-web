@@ -1,4 +1,5 @@
 import type {
+  AiReport,
   AnovaResult,
   CohortPayload,
   MainEffectsResult,
@@ -142,6 +143,19 @@ export async function fetchAnova(
   product: string | null,
 ): Promise<AnovaResult> {
   return postAnalysis<AnovaResult>(token, 'anova/', {
+    experiment_ids: experimentIds,
+    outcome,
+    product,
+  })
+}
+
+export async function fetchAiReport(
+  token: string | null,
+  experimentIds: number[],
+  outcome: OutcomeMetric,
+  product: string | null,
+): Promise<AiReport> {
+  return postAnalysis<AiReport>(token, 'ai-report/', {
     experiment_ids: experimentIds,
     outcome,
     product,
