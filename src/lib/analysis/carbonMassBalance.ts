@@ -1,4 +1,4 @@
-import type { ExperimentInPayload, TimeSeriesEntry } from './types'
+import type { ExperimentInPayload, MediaInPayload, TimeSeriesEntry } from './types'
 
 export type MassBalanceMode = 'mass' | 'concentration-only'
 
@@ -46,4 +46,35 @@ export function pickFeedRateSeries(exp: ExperimentInPayload): TimeSeriesEntry | 
   return exp.time_series.find(
     (s) => s.category === 'process_data' && s.name === tag,
   ) ?? null
+}
+
+const PCT_W_V_TO_G_PER_L = 10
+
+function normalize(s: string): string {
+  return s.trim().toLowerCase()
+}
+
+function pickConcentrationGperL(
+  media: MediaInPayload | null,
+  substrateName: string,
+): number | null {
+  if (!media) return null
+  const target = normalize(substrateName)
+  const entry = media.carbon_sources.find((cs) => normalize(cs.name) === target)
+  if (!entry || entry.concentration == null) return null
+  return entry.concentration * PCT_W_V_TO_G_PER_L
+}
+
+export function pickBatchCarbonConcentrationGperL(
+  media: MediaInPayload | null,
+  substrateName: string,
+): number | null {
+  return pickConcentrationGperL(media, substrateName)
+}
+
+export function pickFeedCarbonConcentrationGperL(
+  media: MediaInPayload | null,
+  substrateName: string,
+): number | null {
+  return pickConcentrationGperL(media, substrateName)
 }
