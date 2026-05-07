@@ -15,6 +15,7 @@ In the 96/384-well plate create wizard:
 
 - The `Strain` column header shows a compact `No isolates` button when the current plate does not have an isolate variable column.
 - Clicking `No isolates` adds an `Isolate` variable column to the current plate, if it is not already present.
+- The new `Isolate` column appears immediately to the right of the `Strain` column. If a custom plate configuration has no `Strain` column, `Isolate` is appended to the end.
 - Once the `Isolate` column exists, the button text changes to `Isolate`.
 - The `Isolate` column is editable per well like other variable columns.
 - The `Isolate` column is stored in the same payload shape as other well variables:
@@ -56,7 +57,7 @@ The same label behavior will apply to both plate chart paths that currently labe
 
 - compute whether the current plate already has an isolate column by case-insensitive name comparison
 - render the button beside the `Strain` header
-- on click, append `Isolate` to `variableNames` if missing
+- on click, insert `Isolate` immediately after `Strain` in `variableNames` if missing, falling back to append when no `Strain` column exists
 
 The column will be added only to the currently selected plate because `PlateStep2PlatesAndWells` passes the selected plate's controlled state into `WellTableEditor`.
 
