@@ -278,3 +278,94 @@ describe('computeMassBalance - mass mode happy path', () => {
     assert.equal(result.scalars.massConsumedFinalG?.toFixed(2), '15.00')
   })
 })
+
+describe('computeMassBalance - fallbacks and safety', () => {
+  it('falls back to concentration-only when batch_volume_ml is missing', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: null,
+      feed_pump_series: 'dm_spump2',
+      batch_media: glucoseBatchMedia(2),
+      time_series: [series('process_data', 'Glucose', 'substrate', [20, 5], [0, 24])],
+    })
+    const substrate = exp.time_series[0]
+    const result = computeMassBalance({ experiment: exp, substrate })
+    assert.equal(result.mode, 'concentration-only')
+    assert.equal(result.missing.batchVolume, true)
+    assert.equal(result.scalars.massConsumedFinalG, null)
+  })
+
+  it('falls back to concentration-only when batch carbon concentration is missing', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: 1000,
+      batch_media: glucoseBatchMedia(null),
+      time_series: [series('process_data', 'Glucose', 'substrate', [20, 5], [0, 24])],
+    })
+    const result = computeMassBalance({ experiment: exp, substrate: exp.time_series[0] })
+    assert.equal(result.mode, 'concentration-only')
+    assert.equal(result.missing.batchCarbonConcentration, true)
+  })
+
+  it('stays in mass mode when only feed media carbon concentration is missing', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: 1000,
+      feed_pump_series: 'dm_spump2',
+      batch_media: glucoseBatchMedia(2),
+      feed_media: glucoseFeedMedia(null),
+      time_series: [
+        series('process_data', 'dm_spump2', null, [5, 5], [0, 24]),
+        series('process_data', 'Glucose', 'substrate', [20, 5], [0, 24]),
+      ],
+    })
+    const substrate = exp.time_series.find((s) => s.role === 'substrate')!
+    const result = computeMassBalance({ experiment: exp, substrate })
+    assert.equal(result.mode, 'mass')
+    assert.equal(result.missing.feedCarbonConcentration, true)
+    assert.equal(result.scalars.fedCarbonFinalG, 0)
+  })
+
+  it('falls back to concentration-only when substrate has fewer than 2 timepoints', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: 1000,
+      batch_media: glucoseBatchMedia(2),
+      time_series: [series('process_data', 'Glucose', 'substrate', [20], [0])],
+    })
+    const result = computeMassBalance({ experiment: exp, substrate: exp.time_series[0] })
+    assert.equal(result.mode, 'concentration-only')
+  })
+
+  it('clamps m_consumed to 0 when measurement noise makes m_remaining > m_added', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: 1000,
+      feed_pump_series: 'dm_spump2',
+      batch_media: glucoseBatchMedia(2),
+      feed_media: glucoseFeedMedia(50),
+      time_series: [
+        series('process_data', 'dm_spump2', null, [5, 5], [0, 24]),
+        series('process_data', 'Glucose', 'substrate', [20, 25, 5], [0, 12, 24]),
+      ],
+    })
+    const substrate = exp.time_series.find((s) => s.role === 'substrate')!
+    const result = computeMassBalance({ experiment: exp, substrate })
+    for (const v of result.massConsumedG.valuesG) {
+      assert.ok(v >= 0, `expected non-negative m_consumed, got ${v}`)
+      assert.ok(Number.isFinite(v), `expected finite m_consumed, got ${v}`)
+    }
+  })
+
+  it('handles a negative feed-rate spike without producing NaN', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: 1000,
+      feed_pump_series: 'dm_spump2',
+      batch_media: glucoseBatchMedia(2),
+      feed_media: glucoseFeedMedia(50),
+      time_series: [
+        series('process_data', 'dm_spump2', null, [5, -10, 5], [0, 12, 24]),
+        series('process_data', 'Glucose', 'substrate', [20, 8, 2], [0, 12, 24]),
+      ],
+    })
+    const substrate = exp.time_series.find((s) => s.role === 'substrate')!
+    const result = computeMassBalance({ experiment: exp, substrate })
+    for (const v of result.volumeML.valuesML) assert.ok(Number.isFinite(v))
+    for (const v of result.massConsumedG.valuesG) assert.ok(Number.isFinite(v))
+  })
+})
