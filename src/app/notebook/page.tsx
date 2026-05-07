@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import * as d3 from 'd3'
@@ -10,6 +10,10 @@ import type { PlateExperimentListItem } from '@/hooks/usePlateExperiment'
 import { usePlateExperiment } from '@/hooks/usePlateExperiment'
 import { PlateNotesPanel } from '@/components/Plate/PlateNotesPanel'
 import { Results } from '@/components/dashboard/Results'
+import {
+  resolveNotebookExperimentTarget,
+  type NotebookExperimentLookup,
+} from './notebookSelection'
 
 interface Experiment {
   id: number
@@ -18,6 +22,18 @@ interface Experiment {
   benchmark: string
   created_at: string
   updated_at: string
+}
+
+function toNotebookExperiment(target: NotebookExperimentLookup | Experiment): Experiment {
+  const full = target as Partial<Experiment>
+  return {
+    id: target.id,
+    title: target.title,
+    description: full.description ?? '',
+    benchmark: full.benchmark ?? '',
+    created_at: full.created_at ?? '',
+    updated_at: full.updated_at ?? '',
+  }
 }
 
 interface Product {
@@ -938,6 +954,17 @@ function NotebookContent() {
   const [selectedPlateExperimentId, setSelectedPlateExperimentId] = useState<string | null>(null)
   const [plateExperimentsList, setPlateExperimentsList] = useState<PlateExperimentListItem[]>([])
   const searchParams = useSearchParams()
+  const appliedUrlExperimentTargetRef = useRef<string | null>(null)
+  const queryExperimentTitle = searchParams.get('experiment')
+  const queryExperimentId = searchParams.get('id')
+  const hasQueryExperimentTarget = Boolean(queryExperimentTitle || queryExperimentId)
+  const urlExperimentTarget = useMemo(
+    () => resolveNotebookExperimentTarget(experiments, {
+      title: queryExperimentTitle,
+      id: queryExperimentId,
+    }),
+    [experiments, queryExperimentTitle, queryExperimentId],
+  )
 
   // Auto-select first plate experiment when entering plates mode (mirrors dashboard)
   useEffect(() => {
@@ -952,15 +979,15 @@ function NotebookContent() {
     setIsMobileMenuOpen(false)
   }, [])
 
-  // Auto-select experiment from URL query param
+  // URL-targeted notebook links should win over the sidebar's initial selection.
   useEffect(() => {
-    const title = searchParams.get('experiment')
-    if (title && experiments.length > 0 && !selectedExperiment) {
-      const match = experiments.find(e => e.title === title)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (match) setSelectedExperiment(match)
-    }
-  }, [searchParams, experiments, selectedExperiment])
+    if (!urlExperimentTarget) return
+    const targetKey = `${urlExperimentTarget.id}:${urlExperimentTarget.title}`
+    if (appliedUrlExperimentTargetRef.current === targetKey) return
+    appliedUrlExperimentTargetRef.current = targetKey
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedExperiment(toNotebookExperiment(urlExperimentTarget))
+  }, [urlExperimentTarget])
 
   const handleSelect = useCallback((experiment: Experiment) => {
     setSelectedExperiment(experiment)
@@ -987,6 +1014,7 @@ function NotebookContent() {
               onPlateExperimentSelect={handlePlateSelect}
               selectedPlateExperimentId={selectedPlateExperimentId}
               onPlateExperimentsChange={setPlateExperimentsList}
+              disableAutoSelect={hasQueryExperimentTarget}
             />
           </div>
         </div>
@@ -1012,6 +1040,7 @@ function NotebookContent() {
               onPlateExperimentSelect={handlePlateSelect}
               selectedPlateExperimentId={selectedPlateExperimentId}
               onPlateExperimentsChange={setPlateExperimentsList}
+              disableAutoSelect={hasQueryExperimentTarget}
             />
           </div>
 

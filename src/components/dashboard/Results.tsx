@@ -7,6 +7,10 @@ import { usePlateExperiment } from '@/hooks/usePlateExperiment'
 import type { Plate, Well } from '@/hooks/usePlateExperiment'
 import { useDataCategories } from '@/hooks/useDataCategories'
 import { tCritical95 } from '@/lib/stats'
+import {
+  conditionKey,
+  groupedWellLabel,
+} from '@/components/Plate/plateReplicateGrouping'
 
 type BarSegment = { measurementId: number; mean: number; ci: number; n: number }
 type Bar = { key: string; label: string; segments: BarSegment[]; vars: Record<string, string> }
@@ -18,17 +22,6 @@ function wellVars(well: Well): Record<string, string> {
   const out: Record<string, string> = {}
   well.variables.forEach(v => { out[v.name.toLowerCase()] = v.value })
   return out
-}
-
-function conditionKey(well: Well): string {
-  return well.variables
-    .map(v => `${v.name}=${v.value}`)
-    .sort()
-    .join('|')
-}
-
-function strainLabel(well: Well): string | undefined {
-  return well.variables.find(v => v.name.toLowerCase() === 'strain')?.value
 }
 
 export function buildBars(
@@ -59,8 +52,7 @@ export function buildBars(
 
   const baseLabels = new Map<string, string>()
   groups.forEach((wells, k) => {
-    const label = strainLabel(wells[0]) ?? `${wells[0].row}${wells[0].column}`
-    baseLabels.set(k, label)
+    baseLabels.set(k, groupedWellLabel(wells[0]))
   })
 
   const labelCounts = new Map<string, number>()

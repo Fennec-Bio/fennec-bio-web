@@ -23,8 +23,12 @@ export const THEMES: Array<{
   { id: 'cohort', label: 'Cohort', analyses: [
     { slug: 'cohort-overview', label: 'Cohort', availableInP1: true },
   ]},
+  { id: 'ai', label: 'AI', analyses: [
+    { slug: 'ai-report', label: 'AI', availableInP1: true },
+  ]},
   { id: 'kinetics', label: 'Kinetics', analyses: [
     { slug: 'kinetic-analysis', label: 'Kinetic Analysis', availableInP1: true },
+    { slug: 'carbon-flux',      label: 'Carbon flux',      availableInP1: true },
     { slug: 'yield-summary',    label: 'Yield summary',    availableInP1: true },
   ]},
   { id: 'doe', label: 'Variable impact & DoE', analyses: [
@@ -34,9 +38,10 @@ export const THEMES: Array<{
     { slug: 'regression',       label: 'Regression',        availableInP1: true  },
   ]},
   { id: 'metabolic', label: 'Metabolic eng.', analyses: [
-    { slug: 'strain-lineage', label: 'Strain lineage',       availableInP1: true  },
-    { slug: 'carbon-balance', label: 'Carbon balance',       availableInP1: true  },
-    { slug: 'media-scan',     label: 'Media component scan', availableInP1: true  },
+    { slug: 'strain-lineage',      label: 'Strain lineage',       availableInP1: true  },
+    { slug: 'carbon-balance',      label: 'Carbon balance',       availableInP1: true  },
+    { slug: 'carbon-consumption',  label: 'Carbon consumption',   availableInP1: true  },
+    { slug: 'media-scan',          label: 'Media component scan', availableInP1: true  },
   ]},
   { id: 'pattern', label: 'Pattern finding', analyses: [
     { slug: 'percentile-overlay', label: 'Percentile overlay',  availableInP1: true },

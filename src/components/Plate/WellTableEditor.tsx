@@ -1,8 +1,26 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DataCategory } from '@/hooks/useDataCategories'
 import type { PlateTemplate } from '@/hooks/usePlateTemplates'
+import {
+  filterSuggestions,
+  getSuggestionsForVariable,
+  type VariableSuggestionMap,
+} from '@/components/Plate/variableCellSuggestions'
+import {
+  hasVariableColumn,
+  insertVariableColumnAfterIfMissing,
+  normalizeVariableColumnName,
+} from '@/components/Plate/plateVariableColumns'
+import {
+  applyCellBlock,
+  buildFillRows,
+  parsePastedBlock,
+  type CellAddress,
+  type EditableColumn,
+  type FillDragState,
+} from '@/components/Plate/wellTableEditing'
 
 const ROWS_96 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const ROWS_384 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P']
@@ -21,12 +39,6 @@ function buildWellKeys(format: '96' | '384'): string[] {
   return keys
 }
 
-function parsePastedBlock(text: string): string[][] {
-  const lines = text.split(/\r?\n/)
-  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
-  return lines.map(l => l.split('\t'))
-}
-
 export type WellTableEditorProps = {
   plateFormat: '96' | '384'
   dataCategories: DataCategory[]
@@ -41,6 +53,7 @@ export type WellTableEditorProps = {
   plateTemplates?: PlateTemplate[]
   onApplyTemplate?: (t: PlateTemplate) => void
   strainSuggestions?: string[]
+  mediaSuggestions?: string[]
 }
 
 export function WellTableEditor({
@@ -50,10 +63,24 @@ export function WellTableEditor({
   variableNames, onVariableNamesChange,
   measurementIds, onMeasurementIdsChange,
   plateTemplates, onApplyTemplate,
-  strainSuggestions,
+  strainSuggestions, mediaSuggestions,
 }: WellTableEditorProps) {
-  const wellKeys = buildWellKeys(plateFormat)
-  const allowedCategories = dataCategories.filter(c => c.category !== 'process_data')
+  const wellKeys = useMemo(() => buildWellKeys(plateFormat), [plateFormat])
+  const allowedCategories = useMemo(
+    () => dataCategories.filter(c => c.category !== 'process_data'),
+    [dataCategories],
+  )
+  const editableColumns = useMemo<EditableColumn[]>(() => [
+    ...variableNames.map(name => ({ kind: 'variable' as const, key: name })),
+    ...measurementIds.flatMap(id => {
+      const cat = allowedCategories.find(c => c.id === id)
+      if (!cat) return []
+      return [{ kind: 'measurement' as const, key: id }]
+    }),
+  ], [allowedCategories, measurementIds, variableNames])
+  const [focusedCell, setFocusedCell] = useState<CellAddress | null>(null)
+  const [fillDrag, setFillDrag] = useState<FillDragState | null>(null)
+  const fillDragRef = useRef<FillDragState | null>(null)
 
   // "+ Add column" popover UI state (the only internal state the component owns).
   const [addOpen, setAddOpen] = useState(false)
@@ -109,62 +136,43 @@ export function WellTableEditor({
     })
   }
 
-  function fillVariableColumn(name: string, fromIdx: number, values: string[]) {
-    onVariableGridsChange(prev => {
-      const next = { ...prev }
-      const col = { ...(next[name] || {}) }
-      for (let i = 0; i < values.length; i++) {
-        const idx = fromIdx + i
-        if (idx >= wellKeys.length) break
-        const v = values[i].trim()
-        if (v === '') delete col[wellKeys[idx]]
-        else col[wellKeys[idx]] = v
-      }
-      next[name] = col
-      return next
-    })
-  }
+  const getCellValue = useCallback((address: CellAddress): string => {
+    const column = editableColumns[address.columnIndex]
+    const wellKey = wellKeys[address.wellIndex]
+    if (!column || !wellKey) return ''
+    if (column.kind === 'variable') return variableGrids[column.key]?.[wellKey] ?? ''
+    return measurementGrids[column.key]?.[wellKey] ?? ''
+  }, [editableColumns, measurementGrids, variableGrids, wellKeys])
 
-  function fillMeasurementColumn(id: number, fromIdx: number, values: string[]) {
-    onMeasurementGridsChange(prev => {
-      const next = { ...prev }
-      const col = { ...(next[id] || {}) }
-      for (let i = 0; i < values.length; i++) {
-        const idx = fromIdx + i
-        if (idx >= wellKeys.length) break
-        const v = values[i].trim()
-        if (v === '') delete col[wellKeys[idx]]
-        else col[wellKeys[idx]] = v
-      }
-      next[id] = col
-      return next
-    })
-  }
+  const writeBlock = useCallback((start: CellAddress, rows: string[][]) => {
+    if (start.columnIndex < 0 || start.wellIndex < 0) return
+    const next = applyCellBlock(
+      { variableGrids, measurementGrids },
+      editableColumns,
+      wellKeys,
+      start,
+      rows,
+    )
+    onVariableGridsChange(next.variableGrids)
+    onMeasurementGridsChange(next.measurementGrids)
+  }, [
+    editableColumns,
+    measurementGrids,
+    onMeasurementGridsChange,
+    onVariableGridsChange,
+    variableGrids,
+    wellKeys,
+  ])
 
-  // Smart paste: if the clipboard is a 2D (tab/newline) block or a multi-line
-  // column, prevent default and fill the current column starting at the focused
-  // row, consuming values row-major. Single-cell pastes fall through to the
-  // browser's normal text-input paste.
-  function handleVariablePaste(e: React.ClipboardEvent<HTMLInputElement>, name: string, wellIdx: number) {
+  // Smart paste: single-cell pastes fall through to normal text-input paste.
+  // Multi-cell spreadsheet blocks preserve their row/column shape.
+  function handleCellPaste(e: React.ClipboardEvent<HTMLInputElement>, address: CellAddress) {
     const text = e.clipboardData.getData('text')
     const rows = parsePastedBlock(text)
     if (rows.length === 0) return
     if (rows.length === 1 && rows[0].length === 1) return
     e.preventDefault()
-    const flat: string[] = []
-    for (const row of rows) for (const v of row) flat.push(v)
-    fillVariableColumn(name, wellIdx, flat)
-  }
-
-  function handleMeasurementPaste(e: React.ClipboardEvent<HTMLInputElement>, id: number, wellIdx: number) {
-    const text = e.clipboardData.getData('text')
-    const rows = parsePastedBlock(text)
-    if (rows.length === 0) return
-    if (rows.length === 1 && rows[0].length === 1) return
-    e.preventDefault()
-    const flat: string[] = []
-    for (const row of rows) for (const v of row) flat.push(v)
-    fillMeasurementColumn(id, wellIdx, flat)
+    writeBlock(address, rows)
   }
 
   function addVariable() {
@@ -219,6 +227,78 @@ export function WellTableEditor({
 
   const availableMeasurements = allowedCategories.filter(c => !measurementIds.includes(c.id))
   const hasNoColumns = variableNames.length === 0 && measurementIds.length === 0
+  const suggestionsByVariable: VariableSuggestionMap = {
+    strain: strainSuggestions,
+    media: mediaSuggestions,
+  }
+  const hasIsolateColumn = hasVariableColumn(variableNames, 'Isolate')
+
+  function addIsolateColumn() {
+    onVariableNamesChange(prev => insertVariableColumnAfterIfMissing(prev, 'Isolate', 'Strain'))
+  }
+
+  useEffect(() => {
+    fillDragRef.current = fillDrag
+  }, [fillDrag])
+
+  useEffect(() => {
+    if (!fillDrag) return
+
+    function finishFillDrag() {
+      const current = fillDragRef.current
+      if (current) {
+        const value = getCellValue(current.source)
+        const fill = buildFillRows(value, current.source.wellIndex, current.targetWellIndex)
+        writeBlock(
+          { columnIndex: current.source.columnIndex, wellIndex: fill.startWellIndex },
+          fill.rows,
+        )
+      }
+      fillDragRef.current = null
+      setFillDrag(null)
+    }
+
+    function cancelFillDrag() {
+      fillDragRef.current = null
+      setFillDrag(null)
+    }
+
+    document.addEventListener('pointerup', finishFillDrag)
+    document.addEventListener('pointercancel', cancelFillDrag)
+    return () => {
+      document.removeEventListener('pointerup', finishFillDrag)
+      document.removeEventListener('pointercancel', cancelFillDrag)
+    }
+  }, [fillDrag, getCellValue, writeBlock])
+
+  function isSameAddress(a: CellAddress | null, b: CellAddress): boolean {
+    return Boolean(a && a.columnIndex === b.columnIndex && a.wellIndex === b.wellIndex)
+  }
+
+  function isInFillPreview(address: CellAddress): boolean {
+    if (!fillDrag || fillDrag.source.columnIndex !== address.columnIndex) return false
+    const min = Math.min(fillDrag.source.wellIndex, fillDrag.targetWellIndex)
+    const max = Math.max(fillDrag.source.wellIndex, fillDrag.targetWellIndex)
+    return address.wellIndex >= min && address.wellIndex <= max
+  }
+
+  function handleCellPointerEnter(address: CellAddress) {
+    const current = fillDragRef.current
+    if (!current || address.columnIndex !== current.source.columnIndex) return
+    const next = { ...current, targetWellIndex: address.wellIndex }
+    fillDragRef.current = next
+    setFillDrag(next)
+  }
+
+  function handleFillPointerDown(e: React.PointerEvent<HTMLButtonElement>, address: CellAddress) {
+    if (address.columnIndex < 0 || address.wellIndex < 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const next = { source: address, targetWellIndex: address.wellIndex }
+    fillDragRef.current = next
+    setFocusedCell(address)
+    setFillDrag(next)
+  }
 
   return (
     <div className="bg-white rounded-lg shadow border border-gray-200">
@@ -360,19 +440,37 @@ export function WellTableEditor({
           <thead className="sticky top-0 bg-gray-50 z-10">
             <tr>
               <th className="px-2 py-2 text-left text-gray-500 font-medium border-b border-gray-200 w-16">Well</th>
-              {variableNames.map(name => (
-                <th key={`v-${name}`} className="px-2 py-2 text-left border-b border-gray-200">
-                  <div className="flex items-center gap-1">
-                    <span className="font-medium text-gray-900">{name}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeVariable(name)}
-                      className="text-gray-400 hover:text-red-600"
-                      aria-label={`Remove variable ${name}`}
-                    >×</button>
-                  </div>
-                </th>
-              ))}
+              {variableNames.map(name => {
+                const normalizedName = normalizeVariableColumnName(name)
+
+                return (
+                  <th key={`v-${name}`} className="px-2 py-2 text-left border-b border-gray-200">
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-gray-900">{name}</span>
+                      {normalizedName === 'strain' && (
+                        <button
+                          type="button"
+                          onClick={addIsolateColumn}
+                          className={`ml-1 rounded border px-1.5 py-0.5 text-[11px] font-medium ${
+                            hasIsolateColumn
+                              ? 'border-[#eb5234]/30 bg-[#eb5234]/10 text-[#c24127]'
+                              : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                          aria-label={hasIsolateColumn ? 'Isolate variable column enabled' : 'Add isolate variable column'}
+                        >
+                          {hasIsolateColumn ? 'Isolate' : 'No isolates'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeVariable(name)}
+                        className="text-gray-400 hover:text-red-600"
+                        aria-label={`Remove variable ${name}`}
+                      >×</button>
+                    </div>
+                  </th>
+                )
+              })}
               {measurementIds.map(id => {
                 const cat = allowedCategories.find(c => c.id === id)
                 if (!cat) return null
@@ -396,28 +494,58 @@ export function WellTableEditor({
             {wellKeys.map((wk, wellIdx) => (
               <tr key={wk} className="border-t border-gray-100">
                 <td className="px-2 py-1 text-gray-500 font-medium">{wk}</td>
-                {variableNames.map(name => (
-                  <td key={`cv-${name}-${wk}`} className="p-0">
-                    <VariableCellInput
-                      wellKey={wk}
-                      name={name}
-                      value={variableGrids[name]?.[wk] ?? ''}
-                      suggestions={strainSuggestions}
-                      onChange={next => setVariableCell(name, wk, next)}
-                      onPaste={e => handleVariablePaste(e, name, wellIdx)}
-                    />
-                  </td>
-                ))}
-                {measurementIds.map(id => (
-                  <td key={`cm-${id}-${wk}`} className="p-0">
-                    <input
-                      className="w-full px-2 py-1 text-xs focus:outline-none focus:bg-[#eb5234]/5"
-                      value={measurementGrids[id]?.[wk] ?? ''}
-                      onChange={e => setMeasurementCell(id, wk, e.target.value)}
-                      onPaste={e => handleMeasurementPaste(e, id, wellIdx)}
-                    />
-                  </td>
-                ))}
+                {variableNames.map(name => {
+                  const address = {
+                    columnIndex: editableColumns.findIndex(col => col.kind === 'variable' && col.key === name),
+                    wellIndex: wellIdx,
+                  }
+                  return (
+                    <td key={`cv-${name}-${wk}`} className="p-0">
+                      <EditableCellShell
+                        address={address}
+                        focused={isSameAddress(focusedCell, address)}
+                        preview={isInFillPreview(address)}
+                        onFocusCell={setFocusedCell}
+                        onPointerEnterCell={handleCellPointerEnter}
+                        onFillPointerDown={handleFillPointerDown}
+                      >
+                        <VariableCellInput
+                          wellKey={wk}
+                          name={name}
+                          value={variableGrids[name]?.[wk] ?? ''}
+                          suggestionsByVariable={suggestionsByVariable}
+                          onChange={next => setVariableCell(name, wk, next)}
+                          onPaste={e => handleCellPaste(e, address)}
+                        />
+                      </EditableCellShell>
+                    </td>
+                  )
+                })}
+                {measurementIds.map(id => {
+                  const address = {
+                    columnIndex: editableColumns.findIndex(col => col.kind === 'measurement' && col.key === id),
+                    wellIndex: wellIdx,
+                  }
+                  return (
+                    <td key={`cm-${id}-${wk}`} className="p-0">
+                      <EditableCellShell
+                        address={address}
+                        focused={isSameAddress(focusedCell, address)}
+                        preview={isInFillPreview(address)}
+                        onFocusCell={setFocusedCell}
+                        onPointerEnterCell={handleCellPointerEnter}
+                        onFillPointerDown={handleFillPointerDown}
+                      >
+                        <input
+                          className="w-full px-2 py-1 text-xs focus:outline-none focus:bg-[#eb5234]/5"
+                          value={measurementGrids[id]?.[wk] ?? ''}
+                          onChange={e => setMeasurementCell(id, wk, e.target.value)}
+                          onPaste={e => handleCellPaste(e, address)}
+                        />
+                      </EditableCellShell>
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>
@@ -427,19 +555,59 @@ export function WellTableEditor({
   )
 }
 
+function EditableCellShell({
+  address,
+  focused,
+  preview,
+  children,
+  onFocusCell,
+  onPointerEnterCell,
+  onFillPointerDown,
+}: {
+  address: CellAddress
+  focused: boolean
+  preview: boolean
+  children: React.ReactNode
+  onFocusCell: (address: CellAddress) => void
+  onPointerEnterCell: (address: CellAddress) => void
+  onFillPointerDown: (e: React.PointerEvent<HTMLButtonElement>, address: CellAddress) => void
+}) {
+  return (
+    <div
+      data-well-table-cell="true"
+      data-column-index={address.columnIndex}
+      data-well-index={address.wellIndex}
+      className={`relative min-w-32 ${
+        preview ? 'bg-[#eb5234]/10 ring-1 ring-[#eb5234]/40' : ''
+      } ${focused ? 'z-20 ring-1 ring-[#eb5234]' : ''}`}
+      onFocusCapture={() => onFocusCell(address)}
+      onPointerEnter={() => onPointerEnterCell(address)}
+    >
+      {children}
+      {focused && (
+        <button
+          type="button"
+          aria-label="Drag to fill this column"
+          className="absolute -right-1 top-1/2 h-3 w-3 -translate-y-1/2 cursor-ns-resize rounded-[2px] border border-white bg-[#eb5234] shadow"
+          onPointerDown={e => onFillPointerDown(e, address)}
+        />
+      )}
+    </div>
+  )
+}
+
 function VariableCellInput({
-  wellKey, name, value, suggestions, onChange, onPaste,
+  wellKey, name, value, suggestionsByVariable, onChange, onPaste,
 }: {
   wellKey: string
   name: string
   value: string
-  suggestions?: string[]
+  suggestionsByVariable: VariableSuggestionMap
   onChange: (next: string) => void
   onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => void
 }) {
-  const typeaheadEnabled = Boolean(
-    suggestions && suggestions.length > 0 && name.toLowerCase() === 'strain'
-  )
+  const suggestions = getSuggestionsForVariable(name, suggestionsByVariable)
+  const typeaheadEnabled = suggestions.length > 0
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -465,8 +633,7 @@ function VariableCellInput({
     )
   }
 
-  const q = value.trim().toLowerCase()
-  const filtered = (suggestions ?? []).filter(s => s.toLowerCase().includes(q))
+  const filtered = filterSuggestions(value, suggestions)
 
   return (
     <div ref={wrapperRef} className="relative">

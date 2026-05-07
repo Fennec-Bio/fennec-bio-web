@@ -4,13 +4,15 @@ export type OutcomeMetric =
 
 export type AnalysisSlug =
   | 'cohort-overview'
-  | 'kinetic-analysis'
+  | 'ai-report'
+  | 'kinetic-analysis' | 'carbon-flux'
   | 'anova-heatmap' | 'main-effects' | 'response-surface'
   | 'regression'
-  | 'strain-lineage' | 'carbon-balance' | 'yield-summary' | 'media-scan'
+  | 'strain-lineage' | 'carbon-balance' | 'carbon-consumption'
+  | 'yield-summary' | 'media-scan'
   | 'pca' | 'cohort-diff' | 'percentile-overlay'
 
-export type ThemeId = 'cohort' | 'kinetics' | 'doe' | 'metabolic' | 'pattern'
+export type ThemeId = 'cohort' | 'ai' | 'kinetics' | 'doe' | 'metabolic' | 'pattern'
 
 export interface MediaComponent {
   name: string
@@ -72,6 +74,52 @@ export interface CohortPayload {
   products: string[]
   role_map_version: number
   warnings: Array<{ experiment_id: number; code: string; affects: string[] }>
+}
+
+export interface AiReportFinding {
+  title: string
+  explanation: string
+  evidence: string[]
+  confidence: 'low' | 'medium' | 'high'
+}
+
+export interface AiReportHypothesis {
+  title: string
+  rationale: string
+  supporting_evidence: string[]
+  uncertainty: string
+  confidence: number
+  speculative: boolean
+}
+
+export type AiReportExperimentType =
+  | 'strain_engineering' | 'media' | 'process' | 'control'
+  | 'analytics' | 'validation' | 'other'
+
+export interface AiReportRecommendedExperiment {
+  title: string
+  experiment_type: AiReportExperimentType
+  objective: string
+  rationale: string
+  variables_to_change: string[]
+  controls: string[]
+  key_readouts: string[]
+  expected_outcome: string
+  risk: string
+}
+
+export interface AiReport {
+  executive_summary: string
+  key_findings: AiReportFinding[]
+  hypotheses: AiReportHypothesis[]
+  recommended_experiments: AiReportRecommendedExperiment[]
+  caveats: string[]
+  evidence_summary: {
+    experiment_count: number
+    outcome: string
+    product: string | null
+    warnings?: string[]
+  }
 }
 
 export interface AnovaImpact {

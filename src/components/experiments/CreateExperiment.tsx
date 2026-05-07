@@ -7,6 +7,7 @@ import { Step1Details } from './Step1Details'
 import { Step2Upload, ClassifiedData, DataCategoryEntry } from './Step2Upload'
 import { Step3Review } from './Step3Review'
 import { useProjectContext } from '@/hooks/useProjectContext'
+import { buildFermentationMetadataPayload } from './experimentFermentationMetadata'
 
 export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {}) {
   const { getToken } = useAuth()
@@ -33,6 +34,9 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
   const [mediaOptions, setMediaOptions] = useState<{ id: number; name: string; media_type: 'defined' | 'complex' }[]>([])
   const [batchMediaId, setBatchMediaId] = useState<number | null>(null)
   const [feedMediaId, setFeedMediaId] = useState<number | null>(null)
+  const [batchVolumeMl, setBatchVolumeMl] = useState('')
+  const [feedPumpSeries, setFeedPumpSeries] = useState('')
+  const [wastePumpSeries, setWastePumpSeries] = useState('')
 
   // UI state
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
@@ -236,6 +240,9 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
     setExtractAnomaliesWithAI(false)
     setBatchMediaId(null)
     setFeedMediaId(null)
+    setBatchVolumeMl('')
+    setFeedPumpSeries('')
+    setWastePumpSeries('')
   }
 
   const handleCreate = async () => {
@@ -266,6 +273,11 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
         date: experimentDate,
         batch_media_id: batchMediaId,
         feed_media_id: feedMediaId,
+        ...buildFermentationMetadataPayload({
+          batchVolumeMl,
+          feedPumpSeries,
+          wastePumpSeries,
+        }),
         variables: filledVars,
         events: finalEvents,
         anomalies: finalAnomalies,
@@ -420,6 +432,8 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
             onBatchMediaChange={setBatchMediaId}
             feedMediaId={feedMediaId}
             onFeedMediaChange={setFeedMediaId}
+            batchVolumeMl={batchVolumeMl}
+            onBatchVolumeMlChange={setBatchVolumeMl}
             extractEventsWithAI={extractEventsWithAI}
             onExtractEventsWithAIChange={setExtractEventsWithAI}
             extractAnomaliesWithAI={extractAnomaliesWithAI}
@@ -482,6 +496,17 @@ export function CreateExperiment({ onCreated }: { onCreated?: () => void } = {})
             onExperimentDateChange={setExperimentDate}
             noteImages={noteImages}
             onNoteImagesChange={setNoteImages}
+            mediaOptions={mediaOptions}
+            batchMediaId={batchMediaId}
+            onBatchMediaChange={setBatchMediaId}
+            feedMediaId={feedMediaId}
+            onFeedMediaChange={setFeedMediaId}
+            batchVolumeMl={batchVolumeMl}
+            onBatchVolumeMlChange={setBatchVolumeMl}
+            feedPumpSeries={feedPumpSeries}
+            onFeedPumpSeriesChange={setFeedPumpSeries}
+            wastePumpSeries={wastePumpSeries}
+            onWastePumpSeriesChange={setWastePumpSeries}
             onBack={() => setStep(2)}
             onCreate={handleCreate}
             isCreating={isCreating}

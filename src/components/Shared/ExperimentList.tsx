@@ -57,6 +57,7 @@ interface ExperimentListProps {
   onPlateExperimentSelect?: (id: string) => void
   selectedPlateExperimentId?: string | null
   onPlateExperimentsChange?: (items: PlateExperimentListItem[]) => void
+  disableAutoSelect?: boolean
 }
 
 export const ExperimentList = ({
@@ -70,6 +71,7 @@ export const ExperimentList = ({
   onPlateExperimentSelect,
   selectedPlateExperimentId,
   onPlateExperimentsChange,
+  disableAutoSelect = false,
 }: ExperimentListProps) => {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
@@ -366,12 +368,13 @@ export const ExperimentList = ({
   }, [currentSortBy, currentSortOrder, activeFilters, activeProject])
 
   useEffect(() => {
+    if (disableAutoSelect) return
     if (!shouldAutoSelectRef.current) return
     if (experiments.length > 0 && onExperimentSelect) {
       onExperimentSelect(experiments[0])
       shouldAutoSelectRef.current = false
     }
-  }, [experiments, onExperimentSelect])
+  }, [disableAutoSelect, experiments, onExperimentSelect])
 
   useEffect(() => {
     return () => { clearAllTimeouts() }

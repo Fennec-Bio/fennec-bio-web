@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { fetchCandidateExperiments } from '@/lib/analysis/api'
+import { isCandidateResultPending } from '@/hooks/candidateLoadingState'
 
 export interface Candidate {
   id: number
@@ -27,6 +28,7 @@ export function useCandidateExperiments(args: UseCandidateArgs): {
   const { getToken } = useAuth()
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadedFiltersKey, setLoadedFiltersKey] = useState<string | null>(null)
 
   // Stable string key — useAnalysisState re-parses URL params into fresh
   // array references on every state change (including selection toggles),
@@ -69,6 +71,7 @@ export function useCandidateExperiments(args: UseCandidateArgs): {
             strain_name: e.strain ?? null,
             variables: e.variables,
           })))
+          setLoadedFiltersKey(filtersKey)
         }
       } catch (err) {
         console.error('Failed to load candidates', err)
@@ -80,5 +83,8 @@ export function useCandidateExperiments(args: UseCandidateArgs): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getToken, filtersKey])
 
-  return { candidates, loading }
+  return {
+    candidates,
+    loading: isCandidateResultPending(filtersKey, loadedFiltersKey, loading),
+  }
 }

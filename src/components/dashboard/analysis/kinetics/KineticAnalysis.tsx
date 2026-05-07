@@ -9,38 +9,13 @@ import {
   calculateProductivity,
   calculateYield,
   detectPhases,
+  findBiomassData,
+  findSubstrateData,
   getFinalTiter,
 } from '@/lib/analysis/kineticsUtils'
 import { KineticSummary } from './KineticSummary'
 import { PhaseDetector } from './PhaseDetector'
 import { ComparisonTable } from './ComparisonTable'
-
-interface BiomassSeries { name: string; timepoints: number[]; values: number[] }
-
-// Find biomass: prefer entries flagged role='biomass', then fall back to
-// FT2's name-pattern priority (DCW > biomass > OD > cell).
-function findBiomassData(timeSeries: TimeSeriesEntry[]): BiomassSeries | null {
-  const flagged = timeSeries.find((s) => s.role === 'biomass')
-  if (flagged) return { name: flagged.name, timepoints: flagged.timepoints_h, values: flagged.values }
-
-  const priorityPatterns: Array<{ pattern: RegExp; name: string }> = [
-    { pattern: /dcw|dry\s*cell\s*weight/i, name: 'DCW' },
-    { pattern: /biomass/i,                  name: 'Biomass' },
-    { pattern: /od|optical\s*density/i,     name: 'OD' },
-    { pattern: /cell\s*(weight|mass|density)/i, name: 'Cell' },
-  ]
-  for (const { pattern } of priorityPatterns) {
-    const hit = timeSeries.find((s) => pattern.test(s.name))
-    if (hit) return { name: hit.name, timepoints: hit.timepoints_h, values: hit.values }
-  }
-  return null
-}
-
-function findSubstrateData(timeSeries: TimeSeriesEntry[]): TimeSeriesEntry | null {
-  const flagged = timeSeries.find((s) => s.role === 'substrate')
-  if (flagged) return flagged
-  return timeSeries.find((s) => /glucose|sugar|substrate/i.test(s.name)) ?? null
-}
 
 function findProductSeries(exp: ExperimentInPayload, productName: string): TimeSeriesEntry | null {
   return exp.time_series.find((s) => s.category === 'product' && s.name === productName) ?? null

@@ -1,9 +1,13 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { AiReport } from '@/components/dashboard/analysis/AiReport'
 import { AnovaHeatmap } from '@/components/dashboard/analysis/AnovaHeatmap'
 import { BestVsWorstDiff } from '@/components/dashboard/analysis/BestVsWorstDiff'
 import { CarbonBalance } from '@/components/dashboard/analysis/CarbonBalance'
+import { CarbonConsumption } from '@/components/dashboard/analysis/CarbonConsumption'
+import { CarbonFlux } from '@/components/dashboard/analysis/CarbonFlux'
 import { CohortOverview } from '@/components/dashboard/analysis/CohortOverview'
 import { KineticAnalysis } from '@/components/dashboard/analysis/kinetics/KineticAnalysis'
 import { MainEffects } from '@/components/dashboard/analysis/MainEffects'
@@ -18,6 +22,7 @@ import { ThemeTabs } from '@/components/dashboard/analysis/ThemeTabs'
 import { YieldSummary } from '@/components/dashboard/analysis/YieldSummary'
 import { useAnalysisState } from '@/hooks/useAnalysisState'
 import { useCohortPayload } from '@/hooks/useCohortPayload'
+import { useProjectContext } from '@/hooks/useProjectContext'
 
 export default function AnalysisPage() {
   return (
@@ -30,6 +35,7 @@ export default function AnalysisPage() {
 function AnalysisPageInner() {
   const [state] = useAnalysisState()
   const { payload, loading, error } = useCohortPayload(state.ids)
+  useAnalysisStatePersistence()
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
@@ -55,9 +61,10 @@ function AnalysisPageInner() {
           {state.analysis !== 'cohort-overview' && payload && (
             <>
               {[
+                'ai-report',
                 'anova-heatmap', 'main-effects', 'regression',
                 'response-surface', 'media-scan', 'pca',
-                'strain-lineage', 'cohort-diff',
+                'strain-lineage', 'cohort-diff', 'carbon-flux',
               ].includes(state.analysis) && (
                 <div className="mb-4">
                   <OutcomePicker availableProducts={payload.products ?? []} />
@@ -65,6 +72,13 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'kinetic-analysis' && (
                 <KineticAnalysis payload={payload} />
+              )}
+              {state.analysis === 'ai-report' && (
+                <AiReport ids={state.ids} outcome={state.outcome}
+                          product={state.product} payload={payload} />
+              )}
+              {state.analysis === 'carbon-flux' && (
+                <CarbonFlux payload={payload} product={state.product} />
               )}
               {state.analysis === 'anova-heatmap' && (
                 <AnovaHeatmap ids={state.ids} outcome={state.outcome} product={state.product} />
@@ -82,6 +96,9 @@ function AnalysisPageInner() {
               )}
               {state.analysis === 'carbon-balance' && (
                 <CarbonBalance payload={payload} />
+              )}
+              {state.analysis === 'carbon-consumption' && (
+                <CarbonConsumption payload={payload} product={state.product} />
               )}
               {state.analysis === 'media-scan' && (
                 <MediaScan payload={payload} outcome={state.outcome} product={state.product} />
@@ -108,4 +125,37 @@ function AnalysisPageInner() {
       </main>
     </div>
   )
+}
+
+function useAnalysisStatePersistence() {
+  const params = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const { activeProject } = useProjectContext()
+  const restoredRef = useRef(false)
+
+  const storageKey = activeProject ? `analysis-state:${activeProject.id}` : null
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    if (!storageKey) return
+    if (typeof window === 'undefined') return
+    const qs = params?.toString() ?? ''
+    if (qs) {
+      restoredRef.current = true
+      return
+    }
+    const saved = sessionStorage.getItem(storageKey)
+    if (saved) {
+      router.replace(`${pathname}?${saved}`)
+    }
+    restoredRef.current = true
+  }, [storageKey, params, pathname, router])
+
+  useEffect(() => {
+    if (!restoredRef.current) return
+    if (!storageKey) return
+    if (typeof window === 'undefined') return
+    sessionStorage.setItem(storageKey, params?.toString() ?? '')
+  }, [params, storageKey])
 }

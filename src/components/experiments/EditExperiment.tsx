@@ -1,11 +1,16 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import * as XLSX from 'xlsx'
 import { SpreadsheetGrid, GridData, buildSpreadsheet } from './SpreadsheetGrid'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import type { ClassifiedData } from './Step2Upload'
+import {
+  buildFermentationMetadataPayload,
+  buildPumpSeriesOptionsFromProcessRows,
+  type PumpSeriesOption,
+} from './experimentFermentationMetadata'
 
 interface Experiment {
   id: number
@@ -16,6 +21,9 @@ interface Experiment {
   benchmark: string
   batch_media?: number | null
   feed_media?: number | null
+  batch_volume_ml?: number | null
+  feed_pump_series?: string
+  waste_pump_series?: string
   created_at: string
   updated_at: string
 }
@@ -65,6 +73,12 @@ interface ExperimentDetail {
   products: Product[]
   secondary_products: Product[]
   process_data: Product[]
+  unique_names?: {
+    products?: string[]
+    secondary_products?: string[]
+    process_data?: string[]
+    custom?: string[]
+  }
   variables: { id: number; name: string; value: string }[]
   events: { id: number; name: string; timepoint: string; value: number }[]
   anomalies: { id: number; name: string; timepoint: string; description?: string }[]
@@ -187,6 +201,10 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
   const [mediaOptions, setMediaOptions] = useState<{ id: number; name: string; media_type: 'defined' | 'complex' }[]>([])
   const [editBatchMediaId, setEditBatchMediaId] = useState<number | null>(null)
   const [editFeedMediaId, setEditFeedMediaId] = useState<number | null>(null)
+  const [editBatchVolumeMl, setEditBatchVolumeMl] = useState('')
+  const [editFeedPumpSeries, setEditFeedPumpSeries] = useState('')
+  const [editWastePumpSeries, setEditWastePumpSeries] = useState('')
+  const [processVariableNames, setProcessVariableNames] = useState<string[]>([])
 
   // Unique names for dropdowns
   const [uniqueNames, setUniqueNames] = useState<{
@@ -218,6 +236,40 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
 
   const selectedTitle = selectedExperiment?.title ?? null
   const apiUrl = process.env.NEXT_PUBLIC_API_URL
+
+  const pumpSeriesOptions = useMemo(() => {
+    const rows = processDataLoaded
+      ? [
+          ...(processEdits?.names ?? []).map((name) => {
+            const catalog = dataCategories.find(c => c.category === 'process_data' && c.name === name)
+            return { name, unit: catalog?.unit ?? '' }
+          }),
+          ...processPoints.map((point) => ({ name: point.name, unit: point.unit })),
+        ]
+      : processVariableNames.map((name) => {
+          const catalog = dataCategories.find(c => c.category === 'process_data' && c.name === name)
+          return { name, unit: catalog?.unit ?? '' }
+        })
+    const byName = new Map<string, PumpSeriesOption>()
+    for (const option of buildPumpSeriesOptionsFromProcessRows(rows)) {
+      byName.set(option.name, option)
+    }
+    for (const selected of [editFeedPumpSeries, editWastePumpSeries]) {
+      const name = selected.trim()
+      if (name && !byName.has(name)) {
+        byName.set(name, { name, unit: '', pointCount: 0 })
+      }
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [
+    dataCategories,
+    editFeedPumpSeries,
+    editWastePumpSeries,
+    processDataLoaded,
+    processEdits,
+    processPoints,
+    processVariableNames,
+  ])
 
   // Fetch unique names + data templates
   useEffect(() => {
@@ -341,6 +393,10 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
       setSelectedStrain('')
       setEditBatchMediaId(null)
       setEditFeedMediaId(null)
+      setEditBatchVolumeMl('')
+      setEditFeedPumpSeries('')
+      setEditWastePumpSeries('')
+      setProcessVariableNames([])
       return
     }
     let cancelled = false
@@ -351,12 +407,13 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
     setProcessPoints([])
     setProcessDataLoaded(false)
     setProcessDataLoading(false)
+    setProcessVariableNames([])
     const fetchData = async () => {
       setLoading(true)
       try {
         const token = await getToken()
         const res = await fetch(
-          `${apiUrl}/api/experiment/title/${encodeURIComponent(selectedTitle)}/?fields=products,secondary_products,variables,events,anomalies,note_images`,
+          `${apiUrl}/api/experiment/title/${encodeURIComponent(selectedTitle)}/?fields=products,secondary_products,variables,events,anomalies,note_images,unique_names`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         if (res.ok && !cancelled) {
@@ -374,6 +431,10 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           setEditNote(detail.experiment.experiment_note || '')
           setEditBatchMediaId(detail.experiment.batch_media ?? null)
           setEditFeedMediaId(detail.experiment.feed_media ?? null)
+          setEditBatchVolumeMl(detail.experiment.batch_volume_ml == null ? '' : String(detail.experiment.batch_volume_ml))
+          setEditFeedPumpSeries(detail.experiment.feed_pump_series ?? '')
+          setEditWastePumpSeries(detail.experiment.waste_pump_series ?? '')
+          setProcessVariableNames(detail.unique_names?.process_data ?? [])
           setEditVariables(detail.variables.map(v => ({ name: v.name, value: v.value })))
           const strainVar = detail.variables.find(v => v.name.toLowerCase() === 'strain')
           setSelectedStrain(strainVar?.value || '')
@@ -419,6 +480,7 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
         setProcessEdits(buildSpreadsheet(process.timeSeries))
         setProcessPoints(process.points)
         setData(prev => prev ? { ...prev, process_data: points } : prev)
+        setProcessVariableNames([...new Set(points.map(point => point.name))].sort((a, b) => a.localeCompare(b)))
         setProcessDataLoaded(true)
       } catch (err) {
         console.error('Error fetching process data:', err)
@@ -642,6 +704,10 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           setPrimaryPoints(primaryR.points)
           setSecondaryPoints(secondaryR.points)
           setProcessPoints(processR.points)
+          setProcessVariableNames(
+            [...new Set((detail.process_data ?? []).map(point => point.name))]
+              .sort((a, b) => a.localeCompare(b)),
+          )
           setProcessDataLoaded(true)
         }
         // Clear upload state
@@ -748,6 +814,11 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           experiment_note: editNote,
           batch_media_id: editBatchMediaId,
           feed_media_id: editFeedMediaId,
+          ...buildFermentationMetadataPayload({
+            batchVolumeMl: editBatchVolumeMl,
+            feedPumpSeries: editFeedPumpSeries,
+            wastePumpSeries: editWastePumpSeries,
+          }),
           variables: editVariables,
           events: editEvents,
           anomalies: editAnomalies,
@@ -856,6 +927,10 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
           const process = partitionByDataType(detail.process_data ?? [])
           setProcessEdits(buildSpreadsheet(process.timeSeries))
           setProcessPoints(process.points)
+          setProcessVariableNames(
+            [...new Set((detail.process_data ?? []).map(point => point.name))]
+              .sort((a, b) => a.localeCompare(b)),
+          )
         }
       }
       setHasChanges(false)
@@ -1076,6 +1151,14 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
 
   const varNameKeys = Object.keys(uniqueNames.variables)
 
+  const pumpOptionLabel = (option: PumpSeriesOption): string => {
+    const unit = option.unit ? `, ${option.unit}` : ''
+    if (option.pointCount > 0) {
+      return `${option.name} (${option.pointCount} point${option.pointCount === 1 ? '' : 's'}${unit})`
+    }
+    return option.unit ? `${option.name} (${option.unit})` : option.name
+  }
+
   const renderDetailsTab = () => {
     return (
       <div className="space-y-5">
@@ -1177,6 +1260,70 @@ export function EditExperiment({ selectedExperiment }: EditExperimentProps) {
             ))}
             <option value="__add_new_media__">Add New...</option>
           </select>
+        </div>
+
+        {/* Fermentation Volumes */}
+        <div className="border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Fermentation Volumes</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Batch Volume (mL)</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={editBatchVolumeMl}
+                onChange={(e) => {
+                  setEditBatchVolumeMl(e.target.value)
+                  markChanged()
+                }}
+                placeholder="e.g. 750"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Feed Pump / Cumulative Feed Volume (mL)
+              </label>
+              <select
+                value={editFeedPumpSeries}
+                onChange={(e) => {
+                  setEditFeedPumpSeries(e.target.value)
+                  markChanged()
+                }}
+                disabled={pumpSeriesOptions.length === 0}
+                className={`${inputClass} disabled:bg-gray-50 disabled:text-gray-400`}
+              >
+                <option value="">{pumpSeriesOptions.length === 0 ? 'No process variables' : 'None'}</option>
+                {pumpSeriesOptions.map((option) => (
+                  <option key={option.name} value={option.name}>
+                    {pumpOptionLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Waste Pump / Cumulative Waste Volume (mL)
+              </label>
+              <select
+                value={editWastePumpSeries}
+                onChange={(e) => {
+                  setEditWastePumpSeries(e.target.value)
+                  markChanged()
+                }}
+                disabled={pumpSeriesOptions.length === 0}
+                className={`${inputClass} disabled:bg-gray-50 disabled:text-gray-400`}
+              >
+                <option value="">{pumpSeriesOptions.length === 0 ? 'No process variables' : 'None'}</option>
+                {pumpSeriesOptions.map((option) => (
+                  <option key={option.name} value={option.name}>
+                    {pumpOptionLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Variables */}
