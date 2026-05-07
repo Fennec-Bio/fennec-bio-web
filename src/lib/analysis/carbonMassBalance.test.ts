@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { ExperimentInPayload, MediaInPayload, TimeSeriesEntry } from './types'
 import {
+  computeMassBalance,
   computeVolumeOverTime,
   pickBatchCarbonConcentrationGperL,
   pickFeedCarbonConcentrationGperL,
@@ -210,5 +211,70 @@ describe('computeVolumeOverTime', () => {
       values: [0, 10, 10],
     })
     assert.deepEqual(v.valuesML, [0, 10, 40])
+  })
+})
+
+const glucoseBatchMedia = (concentrationPct: number | null): MediaInPayload => media({
+  carbon_sources: concentrationPct == null
+    ? []
+    : [{ name: 'Glucose', concentration: concentrationPct, molecular_weight: 180.16 }],
+})
+
+const glucoseFeedMedia = (concentrationPct: number | null): MediaInPayload => media({
+  carbon_sources: concentrationPct == null
+    ? []
+    : [{ name: 'Glucose', concentration: concentrationPct, molecular_weight: 180.16 }],
+})
+
+describe('computeMassBalance - mass mode happy path', () => {
+  it('integrates feed addition and substrate consumption into a real mass balance', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: 800,
+      feed_pump_series: 'dm_spump2',
+      batch_media: glucoseBatchMedia(2),
+      feed_media: glucoseFeedMedia(50),
+      time_series: [
+        series('process_data', 'dm_spump2', null, [5, 5, 5], [0, 12, 24]),
+        series('process_data', 'Glucose', 'substrate', [20, 8, 2], [0, 12, 24]),
+      ],
+    })
+    const substrate = exp.time_series.find((s) => s.role === 'substrate')!
+    const result = computeMassBalance({ experiment: exp, substrate })
+
+    assert.equal(result.mode, 'mass')
+    assert.equal(result.missing.batchVolume, false)
+    assert.equal(result.missing.batchCarbonConcentration, false)
+    assert.equal(result.missing.feedRateSeries, false)
+    assert.equal(result.missing.feedCarbonConcentration, false)
+
+    assert.equal(result.scalars.initialCarbonG?.toFixed(2), '6.40')
+    assert.equal(result.scalars.fedCarbonFinalG?.toFixed(2), '24.00')
+
+    const consumed = result.massConsumedG.valuesG
+    for (let i = 1; i < consumed.length; i++) {
+      assert.ok(consumed[i] >= consumed[i - 1] - 1e-9,
+        `consumed not monotone at i=${i}: ${consumed[i]} < ${consumed[i - 1]}`)
+    }
+    assert.ok((result.scalars.massConsumedFinalG ?? 0) > 16,
+      'expected > initial 16g consumed (because feed added more glucose that was also consumed)')
+  })
+
+  it('treats missing feed rate as F=0 (batch-only) but still mass mode', () => {
+    const exp = baseExperiment({
+      batch_volume_ml: 1000,
+      feed_pump_series: 'dm_spump2',
+      batch_media: glucoseBatchMedia(2),
+      feed_media: null,
+      time_series: [
+        series('process_data', 'Glucose', 'substrate', [20, 5], [0, 24]),
+      ],
+    })
+    const substrate = exp.time_series.find((s) => s.role === 'substrate')!
+    const result = computeMassBalance({ experiment: exp, substrate })
+
+    assert.equal(result.mode, 'mass')
+    assert.equal(result.missing.feedRateSeries, true)
+    assert.equal(result.scalars.fedCarbonFinalG, 0)
+    assert.equal(result.scalars.massConsumedFinalG?.toFixed(2), '15.00')
   })
 })
