@@ -5,6 +5,11 @@ import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import * as d3 from 'd3'
 import { ExperimentList } from '@/components/Shared/ExperimentList'
+import { DashboardSection } from '@/components/Plate/DashboardTabs'
+import type { PlateExperimentListItem } from '@/hooks/usePlateExperiment'
+import { usePlateExperiment } from '@/hooks/usePlateExperiment'
+import { PlateNotesPanel } from '@/components/Plate/PlateNotesPanel'
+import { Results } from '@/components/dashboard/Results'
 
 interface Experiment {
   id: number
@@ -878,11 +883,74 @@ function Notes({ selectedExperiment }: { selectedExperiment: Experiment | null }
   )
 }
 
+function PlateNotebook({ plateExperimentId }: { plateExperimentId: string | null }) {
+  const { data, loading, error, refetch } = usePlateExperiment(plateExperimentId ?? '')
+
+  if (!plateExperimentId) {
+    return (
+      <div className="w-full min-h-[600px] bg-white rounded-lg shadow p-6 flex items-center justify-center text-gray-500">
+        Select a plate experiment from the list
+      </div>
+    )
+  }
+  if (loading && !data) {
+    return (
+      <div className="w-full min-h-[600px] bg-white rounded-lg shadow p-6 flex items-center justify-center text-gray-500">
+        Loading plate experiment…
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="w-full min-h-[600px] bg-white rounded-lg shadow p-6 flex items-center justify-center text-red-600">
+        {error}
+      </div>
+    )
+  }
+  if (!data) return null
+
+  return (
+    <div className="w-full min-h-[600px] bg-white rounded-lg shadow">
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
+          <div className="text-xs text-gray-500 mt-1">
+            {data.project_name} · {data.date ?? '—'}
+          </div>
+          {data.description && (
+            <div className="mt-2 text-sm text-gray-700">{data.description}</div>
+          )}
+        </div>
+
+        <PlateNotesPanel experiment={data} onSaved={refetch} />
+
+        <Results plateExperimentId={plateExperimentId} />
+      </div>
+    </div>
+  )
+}
+
 function NotebookContent() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [section, setSection] = useState<DashboardSection>('reactor')
+  const [selectedPlateExperimentId, setSelectedPlateExperimentId] = useState<string | null>(null)
+  const [plateExperimentsList, setPlateExperimentsList] = useState<PlateExperimentListItem[]>([])
   const searchParams = useSearchParams()
+
+  // Auto-select first plate experiment when entering plates mode (mirrors dashboard)
+  useEffect(() => {
+    if (section === 'plates' && selectedPlateExperimentId === null && plateExperimentsList.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedPlateExperimentId(plateExperimentsList[0].id)
+    }
+  }, [section, selectedPlateExperimentId, plateExperimentsList])
+
+  const handlePlateSelect = useCallback((id: string) => {
+    setSelectedPlateExperimentId(id)
+    setIsMobileMenuOpen(false)
+  }, [])
 
   // Auto-select experiment from URL query param
   useEffect(() => {
@@ -914,6 +982,11 @@ function NotebookContent() {
               onExperimentSelect={handleSelect}
               onExperimentsChange={handleExperimentsChange}
               isMobileDrawer
+              section={section}
+              onSectionChange={setSection}
+              onPlateExperimentSelect={handlePlateSelect}
+              selectedPlateExperimentId={selectedPlateExperimentId}
+              onPlateExperimentsChange={setPlateExperimentsList}
             />
           </div>
         </div>
@@ -934,12 +1007,20 @@ function NotebookContent() {
             <ExperimentList
               onExperimentSelect={handleSelect}
               onExperimentsChange={handleExperimentsChange}
+              section={section}
+              onSectionChange={setSection}
+              onPlateExperimentSelect={handlePlateSelect}
+              selectedPlateExperimentId={selectedPlateExperimentId}
+              onPlateExperimentsChange={setPlateExperimentsList}
             />
           </div>
 
           {/* Notes panel */}
           <div className="flex-1 min-w-0">
-            <Notes selectedExperiment={selectedExperiment} />
+            {section === 'plates'
+              ? <PlateNotebook plateExperimentId={selectedPlateExperimentId} />
+              : <Notes selectedExperiment={selectedExperiment} />
+            }
           </div>
         </div>
       </div>

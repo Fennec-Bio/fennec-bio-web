@@ -7,6 +7,8 @@ import { useAuth } from '@clerk/nextjs'
 import { useProjectContext } from '@/hooks/useProjectContext'
 import { DashboardTabs, DashboardSection } from '@/components/Plate/DashboardTabs'
 import { usePlateExperiments } from '@/hooks/usePlateExperiment'
+import type { PlateExperimentListItem } from '@/hooks/usePlateExperiment'
+import { PlateFilterBar, type PlateFilters } from '@/components/Plate/PlateFilterBar'
 
 interface Experiment {
   id: number
@@ -49,9 +51,26 @@ interface ExperimentListProps {
   onExperimentSetSelect?: (setId: string) => void
   isMobileDrawer?: boolean
   refreshKey?: number
+  // Controlled mode (all optional, all backwards-compatible)
+  section?: DashboardSection
+  onSectionChange?: (s: DashboardSection) => void
+  onPlateExperimentSelect?: (id: string) => void
+  selectedPlateExperimentId?: string | null
+  onPlateExperimentsChange?: (items: PlateExperimentListItem[]) => void
 }
 
-export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExperimentSetSelect, isMobileDrawer = false, refreshKey }: ExperimentListProps) => {
+export const ExperimentList = ({
+  onExperimentSelect,
+  onExperimentsChange,
+  onExperimentSetSelect,
+  isMobileDrawer = false,
+  refreshKey,
+  section: controlledSection,
+  onSectionChange,
+  onPlateExperimentSelect,
+  selectedPlateExperimentId,
+  onPlateExperimentsChange,
+}: ExperimentListProps) => {
   const { getToken } = useAuth()
   const { activeProject } = useProjectContext()
 
@@ -71,10 +90,34 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
     anomalies: []
   })
 
-  const [section, setSection] = useState<DashboardSection>('reactor')
+  const [internalSection, setInternalSection] = useState<DashboardSection>('reactor')
+  const sectionControlled = controlledSection !== undefined && onSectionChange !== undefined
+  const section: DashboardSection = sectionControlled ? controlledSection! : internalSection
+  const setSection = (s: DashboardSection) => {
+    if (sectionControlled) onSectionChange!(s)
+    else setInternalSection(s)
+  }
   const [viewMode, setViewMode] = useState<'experiments' | 'sets'>('experiments')
+  const [plateFilters, setPlateFilters] = useState<PlateFilters>({})
   const { data: plateData, loading: platesLoading, error: platesError } =
-    usePlateExperiments({ projectId: activeProject?.id ?? null })
+    usePlateExperiments({
+      projectId: activeProject?.id ?? null,
+      filters: {
+        variables: plateFilters.variables,
+        strain: plateFilters.strain,
+        media: plateFilters.media,
+        keyword: plateFilters.keyword,
+      },
+      sort: plateFilters.sortBy
+        ? { by: plateFilters.sortBy, order: plateFilters.sortOrder ?? 'desc' }
+        : undefined,
+    })
+
+  useEffect(() => {
+    if (onPlateExperimentsChange && plateData) {
+      onPlateExperimentsChange(plateData.results)
+    }
+  }, [plateData, onPlateExperimentsChange])
   const [experimentSets, setExperimentSets] = useState<ExperimentSetData[]>([])
   const [expandedSets, setExpandedSets] = useState<Set<string>>(new Set())
   const [setsLoading, setSetsLoading] = useState(false)
@@ -1092,6 +1135,13 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
           </div>
         )}
         </>}
+        {section === 'plates' && (
+          <PlateFilterBar
+            projectId={activeProject?.id ?? null}
+            value={plateFilters}
+            onChange={setPlateFilters}
+          />
+        )}
       </div>
 
       {section === 'plates' ? (
@@ -1110,18 +1160,38 @@ export const ExperimentList = ({ onExperimentSelect, onExperimentsChange, onExpe
             </div>
           ) : (
             <div className="space-y-2">
-              {plateData.results.map((pe) => (
-                <Link
-                  key={pe.id}
-                  href={`/dashboard/plates/${pe.id}`}
-                  className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <h4 className="font-medium">{pe.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {pe.plate_count} plate{pe.plate_count === 1 ? '' : 's'} · {pe.date ?? '—'}
-                  </p>
-                </Link>
-              ))}
+              {plateData.results.map((pe) => {
+                const isSelected = selectedPlateExperimentId === pe.id
+                const baseClass = 'block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
+                const itemClass = `${baseClass}${onPlateExperimentSelect && isSelected ? ' bg-blue-100 border-blue-300' : ''}`
+                if (onPlateExperimentSelect) {
+                  return (
+                    <button
+                      key={pe.id}
+                      type="button"
+                      onClick={() => onPlateExperimentSelect(pe.id)}
+                      className={`${itemClass} text-left w-full`}
+                    >
+                      <h4 className="font-medium">{pe.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {pe.plate_count} plate{pe.plate_count === 1 ? '' : 's'} · {pe.date ?? '—'}
+                      </p>
+                    </button>
+                  )
+                }
+                return (
+                  <Link
+                    key={pe.id}
+                    href={`/dashboard/plates/${pe.id}`}
+                    className={itemClass}
+                  >
+                    <h4 className="font-medium">{pe.title}</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {pe.plate_count} plate{pe.plate_count === 1 ? '' : 's'} · {pe.date ?? '—'}
+                    </p>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
