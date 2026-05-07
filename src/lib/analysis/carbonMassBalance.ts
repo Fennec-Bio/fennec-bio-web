@@ -78,3 +78,30 @@ export function pickFeedCarbonConcentrationGperL(
 ): number | null {
   return pickConcentrationGperL(media, substrateName)
 }
+
+function trapCumulative(
+  timepoints_h: number[],
+  rates: number[],
+): number[] {
+  const out: number[] = new Array(timepoints_h.length).fill(0)
+  for (let i = 1; i < timepoints_h.length; i++) {
+    const dt = timepoints_h[i] - timepoints_h[i - 1]
+    const avg = (rates[i] + rates[i - 1]) / 2
+    out[i] = out[i - 1] + Math.max(0, avg * dt)
+  }
+  return out
+}
+
+export function computeVolumeOverTime(
+  V_batch_ml: number,
+  feed: TimeSeriesEntry | null,
+): VolumeSeries {
+  if (!feed || feed.timepoints_h.length === 0) {
+    return { timepoints_h: [0], valuesML: [V_batch_ml] }
+  }
+  const cum = trapCumulative(feed.timepoints_h, feed.values)
+  return {
+    timepoints_h: feed.timepoints_h,
+    valuesML: cum.map((c) => V_batch_ml + c),
+  }
+}

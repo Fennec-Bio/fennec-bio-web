@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { ExperimentInPayload, MediaInPayload, TimeSeriesEntry } from './types'
 import {
+  computeVolumeOverTime,
   pickBatchCarbonConcentrationGperL,
   pickFeedCarbonConcentrationGperL,
   pickFeedRateSeries,
@@ -147,5 +148,67 @@ describe('pickFeedCarbonConcentrationGperL', () => {
       carbon_sources: [{ name: 'Glucose', concentration: 50, molecular_weight: 180.16 }],
     })
     assert.equal(pickFeedCarbonConcentrationGperL(m, 'Glucose'), 500)
+  })
+})
+
+describe('computeVolumeOverTime', () => {
+  it('returns [V_batch] at t=0 when feed is null', () => {
+    const v = computeVolumeOverTime(800, null)
+    assert.deepEqual(v.timepoints_h, [0])
+    assert.deepEqual(v.valuesML, [800])
+  })
+
+  it('returns [V_batch] at t=0 when feed series is empty', () => {
+    const v = computeVolumeOverTime(800, {
+      category: 'process_data',
+      name: 'dm_spump2',
+      role: null,
+      unit: 'mL/h',
+      timepoints_h: [],
+      values: [],
+    })
+    assert.deepEqual(v.timepoints_h, [0])
+    assert.deepEqual(v.valuesML, [800])
+  })
+
+  it('integrates a constant 5 mL/h feed for 10h to V(10) = 850', () => {
+    const v = computeVolumeOverTime(800, {
+      category: 'process_data',
+      name: 'dm_spump2',
+      role: null,
+      unit: 'mL/h',
+      timepoints_h: [0, 5, 10],
+      values: [5, 5, 5],
+    })
+    assert.deepEqual(v.timepoints_h, [0, 5, 10])
+    assert.equal(v.valuesML[0], 800)
+    assert.equal(v.valuesML[1], 825)
+    assert.equal(v.valuesML[2], 850)
+  })
+
+  it('clamps negative feed values to zero in the cumulative integral', () => {
+    const v = computeVolumeOverTime(800, {
+      category: 'process_data',
+      name: 'dm_spump2',
+      role: null,
+      unit: 'mL/h',
+      timepoints_h: [0, 1, 2],
+      values: [10, -5, 10],
+    })
+    assert.equal(v.valuesML[0], 800)
+    assert.equal(v.valuesML[1], 802.5)
+    assert.equal(v.valuesML[2], 805)
+  })
+
+  it('integrates non-uniform timepoints via trapezoid', () => {
+    const v = computeVolumeOverTime(0, {
+      category: 'process_data',
+      name: 'dm_spump2',
+      role: null,
+      unit: 'mL/h',
+      timepoints_h: [0, 2, 5],
+      values: [0, 10, 10],
+    })
+    assert.deepEqual(v.valuesML, [0, 10, 40])
   })
 })
