@@ -50,6 +50,9 @@ export interface ExperimentInPayload {
   } | null
   batch_media: MediaInPayload | null
   feed_media: MediaInPayload | null
+  batch_volume_ml: number | null
+  feed_pump_series: string
+  waste_pump_series: string
   variables: Array<{ name: string; value: string }>
   outcomes: {
     final_titer: Record<string, number | null>
